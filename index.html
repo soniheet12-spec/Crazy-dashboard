@@ -175,7 +175,7 @@
 <script>
 // ── CONFIG ──────────────────────────────────────────────
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbzyJWMHnorbyJ2svSC315b4TuIznoVDO29bsQxUZ6NSme-bEv0ttG-Af1r-U2uaum6Y/exec';
-const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbxV6U1HKze5PiWgegv5Luor6FOOyZl4FQ4tXV__mXlT9_1vlxonr6HGhM7ApnQhYQQ1/exec';
+const STARTUP_URL  = 'https://docs.google.com/spreadsheets/d/1_1Lqmv8nc__yTaswAjQ0ieGpE2kN9FgKsU-5QJ8MyGU/gviz/tq?tqx=out:csv&sheet=Form+responses+1';
 // ────────────────────────────────────────────────────────
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -221,6 +221,24 @@ function showLoading(msg) {
 }
 
 // Load data from Google Sheets
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+  return lines.slice(1).map(line => {
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { vals.push(cur); cur = ''; }
+      else { cur += line[i]; }
+    }
+    vals.push(cur);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
+    return obj;
+  });
+}
+
 async function loadData() {
   showError(''); showLoading('Fetching live data from Google Sheets...');
   try {
@@ -229,9 +247,9 @@ async function loadData() {
       fetch(STARTUP_URL)
     ]);
     const invData = await invRes.json();
-    const stData  = await stRes.json();
+    const stCsv = await stRes.text();
+
     if (!invData.success) throw new Error('Investor sheet: ' + invData.error);
-    if (!stData.success)  throw new Error('Startup sheet: ' + stData.error);
 
     investors = invData.data.filter(r => r['Full Name']).map(r => ({
       name:         r['Full Name'] || '',
@@ -249,7 +267,8 @@ async function loadData() {
       sendVia:      r['Where should we send you investment opportunities?'] || '',
     }));
 
-    startups = stData.data.filter(r => r['Company Name']).map(r => ({
+    const stRows = parseCSV(stCsv);
+    startups = stRows.filter(r => r['Company Name']).map(r => ({
       company:      r['Company Name'] || '',
       founder:      r["Founder's Name"] || '',
       phone:        r["Founder's Contact No."] || '',
