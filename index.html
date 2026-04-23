@@ -175,7 +175,7 @@
 <script>
 // ── CONFIG ──────────────────────────────────────────────
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbzyJWMHnorbyJ2svSC315b4TuIznoVDO29bsQxUZ6NSme-bEv0ttG-Af1r-U2uaum6Y/exec';
-const STARTUP_URL  = 'https://docs.google.com/spreadsheets/d/1_1Lqmv8nc__yTaswAjQ0ieGpE2kN9FgKsU-5QJ8MyGU/gviz/tq?tqx=out:csv&sheet=Form+responses+1';
+const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzutUeVfQF3y1QzSmdlnejXcI0C6K4_9OgN1Eg03Sl9yojnXJbO4IR7FdpdtQbYPex5/exec';
 // ────────────────────────────────────────────────────────
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -247,9 +247,10 @@ async function loadData() {
       fetch(STARTUP_URL)
     ]);
     const invData = await invRes.json();
-    const stCsv = await stRes.text();
+    const stData  = await stRes.json();
 
     if (!invData.success) throw new Error('Investor sheet: ' + invData.error);
+    if (!stData.success)  throw new Error('Startup sheet: ' + stData.error);
 
     investors = invData.data.filter(r => r['Full Name']).map(r => ({
       name:         r['Full Name'] || '',
@@ -267,8 +268,7 @@ async function loadData() {
       sendVia:      r['Where should we send you investment opportunities?'] || '',
     }));
 
-    const stRows = parseCSV(stCsv);
-    startups = stRows.filter(r => r['Company Name']).map(r => ({
+    startups = stData.data.filter(r => r['Company Name']).map(r => ({
       company:      r['Company Name'] || '',
       founder:      r["Founder's Name"] || '',
       phone:        r["Founder's Contact No."] || '',
