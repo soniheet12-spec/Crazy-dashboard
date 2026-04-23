@@ -242,7 +242,7 @@ function parseCSV(text) {
 async function loadData() {
   showError(''); showLoading('Fetching live data from Google Sheets...');
   try {
-    const proxy = 'https://corsproxy.io/?';
+    const proxy = 'https://api.allorigins.win/raw?url=';
     const [invRes, stRes] = await Promise.all([
       fetch(proxy + encodeURIComponent(INVESTOR_URL)),
       fetch(proxy + encodeURIComponent(STARTUP_URL))
