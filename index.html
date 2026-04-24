@@ -267,18 +267,63 @@ function normalizeRows(rows) {
   });
 }
 
+function normalizeKey(key) {
+  return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getField(row, candidates) {
+  if (Array.isArray(row)) return '';
+  const entries = Object.entries(row || {});
+  const normalizedCandidates = candidates.map(normalizeKey);
+
+  for (const [key, value] of entries) {
+    const normalized = normalizeKey(key);
+    if (normalizedCandidates.includes(normalized)) {
+      return String(value || '').trim();
+    }
+  }
+
+  for (const [key, value] of entries) {
+    const normalized = normalizeKey(key);
+    if (normalizedCandidates.some(candidate => normalized.includes(candidate) || candidate.includes(normalized))) {
+      return String(value || '').trim();
+    }
+  }
+
+  return '';
+}
+
+function firstMeaningfulValue(row, excludedKeys = []) {
+  if (Array.isArray(row)) {
+    return row.map(v => String(v || '').trim()).find(Boolean) || '';
+  }
+
+  const excluded = excludedKeys.map(normalizeKey);
+  for (const [key, value] of Object.entries(row || {})) {
+    const normalized = normalizeKey(key);
+    if (excluded.some(ex => normalized.includes(ex))) continue;
+    const text = String(value || '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 function hasCompanyName(row) {
   if (Array.isArray(row)) {
     return row.some(value => String(value || '').trim());
   }
-  return !!(
-    row['Company Name'] ||
-    row['company'] ||
-    row['companyName'] ||
-    row['Startup Name'] ||
-    row['Startup'] ||
-    row['Name']
-  );
+  return !!getField(row, [
+    'Company Name',
+    'company',
+    'companyName',
+    'Startup Name',
+    'Startup',
+    'Name of Startup',
+    'Venture Name',
+    'Business Name',
+    'Brand Name',
+    'Name'
+  ]) || !!firstMeaningfulValue(row, ['timestamp']);
 }
 
 function mapStartup(row) {
@@ -304,23 +349,23 @@ function mapStartup(row) {
     };
   }
   return {
-    company:      row['Company Name'] || row['company'] || row['companyName'] || row['Startup Name'] || row['Startup'] || row['Name'] || '',
-    founder:      row["Founder's Name"] || row['Founder Name'] || row['Founder'] || '',
-    phone:        row["Founder's Contact No."] || row['Founder Contact No.'] || row['Phone'] || row['Contact Number'] || '',
-    email:        row['email address'] || row['Email Address'] || row['Email'] || '',
-    sector:       row['Sector'] || row['Industry'] || '',
-    location:     row['Location'] || row['City'] || '',
-    website:      row['Website'] || row['Website URL'] || '',
-    valuation:    row['Proposed Valuation'] || row['Valuation'] || '',
-    roundSize:    row['Round Size'] || row['Raise Amount'] || '',
-    fundedBefore: row['Have you received funding earlier? If yes, please provide details'] || row['Funding History'] || '',
-    problem:      row['What problem are you solving?'] || row['Problem'] || row['Problem Statement'] || '',
-    currentRound: row['Current Round'] || row['Funding Round'] || '',
-    arr:          row['ARR(Annual run-rate)'] || row['ARR'] || '',
-    prevRevenue:  row["Previous Month's Revenue"] || row['Previous Revenue'] || '',
-    pitchDeckUrl: row['Attach your Pitch Deck (PDF)'] || row['Pitch Deck'] || row['Pitch Deck URL'] || '',
-    stage:        row['What stage is your company in?'] || row['Stage'] || '',
-    timestamp:    row['Timestamp'] || row['Created At'] || '',
+    company:      getField(row, ['Company Name', 'company', 'companyName', 'Startup Name', 'Startup', 'Name of Startup', 'Venture Name', 'Business Name', 'Brand Name', 'Name']) || firstMeaningfulValue(row, ['timestamp']),
+    founder:      getField(row, ["Founder's Name", 'Founder Name', 'Founder', 'Founders Name', 'Contact Person']),
+    phone:        getField(row, ["Founder's Contact No.", 'Founder Contact No.', 'Phone', 'Contact Number', 'Mobile', 'Whatsapp Number']),
+    email:        getField(row, ['email address', 'Email Address', 'Email', 'Email ID']),
+    sector:       getField(row, ['Sector', 'Industry', 'Category', 'Domain']),
+    location:     getField(row, ['Location', 'City', 'Base Location']),
+    website:      getField(row, ['Website', 'Website URL', 'Company Website']),
+    valuation:    getField(row, ['Proposed Valuation', 'Valuation', 'Current Valuation']),
+    roundSize:    getField(row, ['Round Size', 'Raise Amount', 'Fundraise Amount', 'Amount Raising']),
+    fundedBefore: getField(row, ['Have you received funding earlier? If yes, please provide details', 'Funding History', 'Prior Funding', 'Previous Funding']),
+    problem:      getField(row, ['What problem are you solving?', 'Problem', 'Problem Statement', 'What problem does your startup solve?']),
+    currentRound: getField(row, ['Current Round', 'Funding Round', 'Round']),
+    arr:          getField(row, ['ARR(Annual run-rate)', 'ARR', 'Annual Revenue Run Rate']),
+    prevRevenue:  getField(row, ["Previous Month's Revenue", 'Previous Revenue', 'Monthly Revenue']),
+    pitchDeckUrl: getField(row, ['Attach your Pitch Deck (PDF)', 'Pitch Deck', 'Pitch Deck URL', 'Deck Link']),
+    stage:        getField(row, ['What stage is your company in?', 'Stage', 'Startup Stage']),
+    timestamp:    getField(row, ['Timestamp', 'Created At', 'Submitted At']),
   };
 }
 
