@@ -230,11 +230,7 @@ function buildFreshUrl(url) {
 async function fetchSheetJson(url) {
   const res = await fetch(buildFreshUrl(url), {
     method: 'GET',
-    cache: 'no-store',
-    headers: {
-      'Cache-Control': 'no-cache, no-store, max-age=0',
-      'Pragma': 'no-cache'
-    }
+    cache: 'no-store'
   });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
