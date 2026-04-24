@@ -174,8 +174,8 @@
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────
-const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbzyJWMHnorbyJ2svSC315b4TuIznoVDO29bsQxUZ6NSme-bEv0ttG-Af1r-U2uaum6Y/exec';
-const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbwpyHbvF_R5W0E4Tsgit9paGPOfxParOkVC5kgK16E5E9BvZkTtx7r_NRhLtJokJ6eh/exec';
+const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbyDvK8t4E9_5ZMLv0WfYrmtomcOBFKNxOdBqj5VbzvGxa1AdohX1aWIQDFeMVN32S0s/exec';
+const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 // ────────────────────────────────────────────────────────
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -242,10 +242,9 @@ function parseCSV(text) {
 async function loadData() {
   showError(''); showLoading('Fetching live data from Google Sheets...');
   try {
-    const proxy = 'https://api.allorigins.win/raw?url=';
     const [invRes, stRes] = await Promise.all([
-      fetch(proxy + encodeURIComponent(INVESTOR_URL)),
-      fetch(proxy + encodeURIComponent(STARTUP_URL))
+      fetch(INVESTOR_URL),
+      fetch(STARTUP_URL)
     ]);
     const invData = await invRes.json();
     const stData  = await stRes.json();
