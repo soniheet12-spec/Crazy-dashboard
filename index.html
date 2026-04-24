@@ -6,125 +6,570 @@
 <title>Log7 Capital</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap');
-  :root{--bg:#0A0A0A;--s1:#111111;--s2:#1A1A1A;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#F0EDE8;--muted:#888580;--gold:#C8A96E;--green:#4CAF7D;--amber:#E8A838;--red:#E05555;}
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;min-height:100vh}
-  nav{padding:1.1rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(10,10,10,0.95);backdrop-filter:blur(12px);z-index:100;gap:1rem;flex-wrap:wrap}
-  .logo{font-family:'DM Serif Display',serif;font-size:1.15rem;color:var(--gold)}
-  .nav-tabs{display:flex;gap:4px;flex-wrap:wrap}
-  .nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-  .nav-tab{padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all 0.2s}
-  .nav-tab:hover{color:var(--text);background:var(--s2)}
-  .nav-tab.active{color:var(--gold);background:var(--s2);border:1px solid var(--border2)}
-  .container{max-width:1080px;margin:0 auto;padding:2rem}
-  .page{display:none}.page.active{display:block}
-  .top-bar{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
-  .section-title{font-family:'DM Serif Display',serif;font-size:1.5rem;flex:1}
-  .btn{padding:9px 22px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all 0.2s}
-  .btn-primary{background:var(--gold);color:#0A0A0A}
-  .btn-primary:hover{background:#D4B87A}
-  .btn-primary:disabled{opacity:0.4;cursor:not-allowed}
-  .btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text)}
-  .btn-ghost:hover{background:var(--s2)}
-  .card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1rem}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
-  label{font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:7px}
-  input,select,textarea{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:300;outline:none;transition:border 0.2s;appearance:none}
-  input:focus,select:focus,textarea:focus{border-color:#8B6F3E}
-  textarea{resize:vertical}
-  .field{margin-bottom:1.2rem}
-  .drop-zone{border:1px dashed rgba(255,255,255,0.15);border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--s1)}
-  .drop-zone:hover,.drop-zone.over{border-color:var(--gold);background:rgba(200,169,110,0.04)}
-  .drop-zone p{color:var(--muted);font-size:13px}
-  .file-ok{color:var(--gold);font-size:13px;margin-top:6px}
-  .startup-option{padding:12px 1.25rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
-  .startup-option:hover,.startup-option.selected{background:rgba(200,169,110,0.06)}
-  .startup-option:last-child{border-bottom:none}
-  .co-name{font-size:14px;font-weight:400}
-  .co-meta{font-size:12px;color:var(--muted);margin-top:2px}
-  .match-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:10px}
-  .match-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-  .avatar{width:38px;height:38px;border-radius:50%;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--gold);flex-shrink:0}
-  .score-num{font-family:'DM Serif Display',serif;font-size:28px;line-height:1}
-  .bar-bg{height:3px;background:var(--s2);border-radius:99px;margin:8px 0;overflow:hidden}
-  .bar-fill{height:3px;border-radius:99px}
-  .verdict{font-size:11px;font-weight:500;padding:3px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:0.06em;display:inline-block;margin-top:3px}
-  .v-strong{background:rgba(76,175,125,0.12);color:var(--green)}
-  .v-good{background:rgba(200,169,110,0.12);color:var(--gold)}
-  .v-weak{background:rgba(232,168,56,0.12);color:var(--amber)}
-  .v-poor{background:rgba(224,85,85,0.12);color:var(--red)}
-  .tag{display:inline-block;padding:3px 9px;border-radius:4px;font-size:11px;margin:2px}
-  .tag-g{background:rgba(76,175,125,0.1);color:var(--green);border:1px solid rgba(76,175,125,0.2)}
-  .tag-a{background:rgba(232,168,56,0.1);color:var(--amber);border:1px solid rgba(232,168,56,0.2)}
-  .tags-row{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
-  .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .btn-small{padding:8px 12px;font-size:12px;border-radius:7px}
-  .btn-secondary{background:var(--s2);border:1px solid var(--border2);color:var(--text)}
-  .btn-secondary:hover{background:#202020}
-  .template-card textarea{min-height:110px}
-  .template-help{font-size:11px;color:var(--muted);line-height:1.6;margin-top:8px}
-  .subtle-note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px}
-  .inv-row{display:flex;align-items:flex-start;gap:14px;padding:14px 1.25rem;border-bottom:1px solid var(--border)}
-  .inv-row:last-child{border-bottom:none}
-  .pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;margin:2px}
-  .pill-gold{background:rgba(200,169,110,0.1);color:var(--gold);border:1px solid rgba(200,169,110,0.2)}
-  .pill-gray{background:var(--s2);color:var(--muted);border:1px solid var(--border)}
-  .empty{text-align:center;padding:3rem;color:var(--muted);font-size:14px}
-  .error-box{color:var(--red);font-size:13px;padding:0.75rem 1rem;background:rgba(224,85,85,0.08);border-radius:8px;border:1px solid rgba(224,85,85,0.2);margin-bottom:1rem}
-  .loading-box{text-align:center;padding:2rem;color:var(--muted);font-size:14px}
-  .count-badge{background:var(--s2);border:1px solid var(--border);border-radius:99px;padding:1px 9px;font-size:12px;color:var(--muted);margin-left:8px}
-  .refresh-btn{font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:'DM Sans',sans-serif}
-  .refresh-btn:hover{color:var(--text)}
-  .detail-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
-  .detail-label{color:var(--muted)}
-  .settings-wrap{position:relative}
-  .settings-toggle{font-size:12px;color:var(--text);background:var(--s1);border:1px solid var(--border2);border-radius:999px;padding:8px 14px;cursor:pointer;font-family:'DM Sans',sans-serif}
-  .settings-menu{position:absolute;right:0;top:calc(100% + 10px);width:min(360px,calc(100vw - 32px));background:rgba(17,17,17,0.98);border:1px solid var(--border2);border-radius:14px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,0.35);display:none}
-  .settings-wrap.open .settings-menu{display:block}
-  .settings-section{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
-  .settings-section:last-child{padding-bottom:0;margin-bottom:0;border-bottom:none}
-  .settings-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px}
-  .settings-input{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;width:100%}
-  .theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .theme-chip{border:1px solid var(--border);background:var(--s2);border-radius:10px;padding:10px;cursor:pointer;text-align:left;color:var(--text)}
-  .theme-chip.active{border-color:var(--gold);box-shadow:0 0 0 1px rgba(200,169,110,0.3) inset}
-  .theme-dot{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
-  .settings-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}
-  .key-saved{font-size:11px;color:var(--green)}
-  .insight-card{background:linear-gradient(135deg, rgba(200,169,110,0.1), rgba(255,255,255,0.02));border:1px solid rgba(200,169,110,0.25)}
-  .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-  .insight-list{font-size:12px;color:var(--muted);line-height:1.7}
-  .insight-list b{color:var(--text);font-weight:500}
-  @media(max-width:680px){.insight-grid{grid-template-columns:1fr}}
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;700&display=swap');
+  :root {
+    --bg:#0a0a0a;
+    --s1:#111111;
+    --s2:#191919;
+    --s3:#232323;
+    --border:rgba(255,255,255,0.08);
+    --border2:rgba(255,255,255,0.15);
+    --text:#f0ede8;
+    --muted:#8b8780;
+    --accent:#c8a96e;
+    --accent-soft:rgba(200,169,110,0.14);
+    --green:#54bf84;
+    --amber:#e7b24b;
+    --red:#e36161;
+    --blue:#72b8e6;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(200,169,110,0.08), transparent 30%),
+      radial-gradient(circle at top right, rgba(114,184,230,0.07), transparent 28%),
+      linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18%),
+      var(--bg);
+    color:var(--text);
+    font-family:'DM Sans', sans-serif;
+    min-height:100vh;
+  }
+  nav {
+    position:sticky;
+    top:0;
+    z-index:20;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+    padding:18px 24px;
+    border-bottom:1px solid var(--border);
+    background:rgba(10,10,10,0.92);
+    backdrop-filter:blur(16px);
+  }
+  .logo {
+    font-family:'DM Serif Display', serif;
+    font-size:1.2rem;
+    color:var(--accent);
+    letter-spacing:0.02em;
+  }
+  .nav-tabs, .subtabs, .inline-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-right { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .nav-tab, .subtab, .ghost-btn, .pill-btn, .settings-toggle, .theme-chip, .action-btn, .small-select, .mini-btn {
+    border:none;
+    border-radius:999px;
+    cursor:pointer;
+    font-family:'DM Sans', sans-serif;
+    transition:all 0.2s ease;
+  }
+  .nav-tab, .subtab, .ghost-btn, .pill-btn, .settings-toggle, .mini-btn {
+    padding:8px 14px;
+    font-size:12px;
+    background:transparent;
+    color:var(--muted);
+    border:1px solid var(--border);
+  }
+  .nav-tab:hover, .subtab:hover, .ghost-btn:hover, .pill-btn:hover, .settings-toggle:hover, .mini-btn:hover {
+    color:var(--text);
+    background:var(--s2);
+  }
+  .nav-tab.active, .subtab.active {
+    color:var(--accent);
+    border-color:var(--border2);
+    background:var(--s2);
+  }
+  .container { max-width:1240px; margin:0 auto; padding:24px; }
+  .page { display:none; }
+  .page.active { display:block; }
+  .hero-card {
+    position:relative;
+    overflow:hidden;
+    background:
+      radial-gradient(circle at top right, rgba(114,184,230,0.11), transparent 30%),
+      radial-gradient(circle at bottom left, rgba(200,169,110,0.12), transparent 28%),
+      linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+      var(--s1);
+  }
+  .hero-card::after {
+    content:'';
+    position:absolute;
+    inset:auto -80px -80px auto;
+    width:220px;
+    height:220px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.03);
+    filter:blur(10px);
+    pointer-events:none;
+  }
+  .hero-title {
+    font-family:'DM Serif Display', serif;
+    font-size:2.2rem;
+    line-height:1.05;
+    max-width:10ch;
+  }
+  .hero-copy {
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.8;
+    max-width:62ch;
+    margin-top:10px;
+  }
+  .section-bar {
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:18px;
+  }
+  .section-title {
+    font-family:'DM Serif Display', serif;
+    font-size:1.65rem;
+    flex:1;
+  }
+  .grid-main {
+    display:grid;
+    grid-template-columns:380px minmax(0, 1fr);
+    gap:16px;
+    align-items:start;
+  }
+  .grid-two {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  .card {
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    background-color:var(--s1);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:18px;
+    margin-bottom:16px;
+    overflow:hidden;
+    box-shadow:0 14px 40px rgba(0,0,0,0.16);
+  }
+  .card.flush { padding:0; }
+  .card-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding-bottom:12px;
+    margin-bottom:14px;
+    border-bottom:1px solid var(--border);
+  }
+  .card-title {
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color:var(--muted);
+  }
+  .stat-grid, .mini-grid {
+    display:grid;
+    gap:10px;
+  }
+  .stat-grid { grid-template-columns:repeat(4, 1fr); }
+  .mini-grid { grid-template-columns:repeat(2, 1fr); }
+  .stat, .mini-stat {
+    padding:14px;
+    background:var(--s2);
+    border:1px solid var(--border);
+    border-radius:14px;
+  }
+  .stat-value, .mini-value {
+    font-family:'DM Serif Display', serif;
+    font-size:1.6rem;
+    color:var(--accent);
+  }
+  .stat-label, .mini-label {
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-top:4px;
+  }
+  label {
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    margin-bottom:8px;
+  }
+  input, select, textarea {
+    width:100%;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:var(--s2);
+    color:var(--text);
+    padding:11px 13px;
+    font-size:14px;
+    font-family:'DM Sans', sans-serif;
+    outline:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  textarea { resize:vertical; min-height:110px; }
+  .field { margin-bottom:14px; }
+  .field-row {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  .drop-zone {
+    border:1px dashed rgba(255,255,255,0.18);
+    border-radius:16px;
+    padding:20px;
+    background:var(--s2);
+    cursor:pointer;
+    text-align:center;
+    transition:all 0.2s ease;
+  }
+  .drop-zone:hover, .drop-zone.over { border-color:var(--accent); background:rgba(200,169,110,0.06); }
+  .drop-zone p { color:var(--muted); font-size:13px; }
+  .subtle {
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.6;
+  }
+  .file-ok { color:var(--accent); font-size:12px; margin-top:8px; }
+  .btn-primary, .action-btn.primary {
+    background:var(--accent);
+    color:#101010;
+    border:1px solid transparent;
+  }
+  .btn-primary:hover, .action-btn.primary:hover { filter:brightness(1.06); }
+  .action-btn {
+    padding:9px 12px;
+    border-radius:10px;
+    font-size:12px;
+    background:var(--s2);
+    color:var(--text);
+    border:1px solid var(--border2);
+  }
+  .action-btn.secondary { background:transparent; }
+  .action-btn:disabled { opacity:0.45; cursor:not-allowed; }
+  .badge, .tag, .status-pill {
+    display:inline-block;
+    border-radius:999px;
+    font-size:11px;
+    padding:4px 10px;
+    border:1px solid var(--border);
+  }
+  .badge { color:var(--muted); background:var(--s2); }
+  .tag.good { color:var(--green); border-color:rgba(84,191,132,0.22); background:rgba(84,191,132,0.1); }
+  .tag.warn { color:var(--amber); border-color:rgba(231,178,75,0.22); background:rgba(231,178,75,0.1); }
+  .tag.info { color:var(--blue); border-color:rgba(114,184,230,0.22); background:rgba(114,184,230,0.1); }
+  .status-pill { color:var(--text); background:var(--s2); }
+  .status-pill.hot { color:var(--green); }
+  .status-pill.pass { color:var(--red); }
+  .list-row, .startup-row, .pipeline-row {
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    padding:14px 16px;
+    border-bottom:1px solid var(--border);
+  }
+  .list-row:last-child, .startup-row:last-child, .pipeline-row:last-child { border-bottom:none; }
+  .avatar {
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    background:var(--s2);
+    border:1px solid var(--border2);
+    color:var(--accent);
+    font-weight:700;
+    font-size:12px;
+  }
+  .row-main { flex:1; min-width:0; }
+  .row-title {
+    font-size:14px;
+    font-weight:500;
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .row-meta, .row-copy {
+    color:var(--muted);
+    font-size:12px;
+    margin-top:4px;
+    line-height:1.6;
+  }
+  .startup-option {
+    padding:14px 16px;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+    transition:all 0.18s ease;
+  }
+  .startup-option:hover, .startup-option.selected {
+    background:
+      linear-gradient(90deg, rgba(200,169,110,0.1), transparent 70%),
+      rgba(200,169,110,0.05);
+  }
+  .match-card {
+    background:var(--s1);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:18px;
+    margin-bottom:12px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.14);
+  }
+  .match-head {
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    justify-content:space-between;
+  }
+  .score {
+    text-align:right;
+    min-width:70px;
+  }
+  .score-num {
+    font-family:'DM Serif Display', serif;
+    font-size:2rem;
+    line-height:1;
+  }
+  .score-caption { color:var(--muted); font-size:11px; margin-top:3px; }
+  .bar {
+    height:4px;
+    background:var(--s2);
+    border-radius:999px;
+    overflow:hidden;
+    margin:12px 0 14px;
+  }
+  .bar-fill { height:100%; border-radius:999px; }
+  .detail-list {
+    display:grid;
+    gap:8px;
+  }
+  .detail-row {
+    display:flex;
+    justify-content:space-between;
+    gap:14px;
+    padding:6px 0;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+    font-size:13px;
+  }
+  .detail-row:last-child { border-bottom:none; }
+  .detail-label { color:var(--muted); }
+  .empty {
+    text-align:center;
+    padding:44px 18px;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .error-box, .loading-box {
+    border-radius:14px;
+    padding:12px 14px;
+    margin-bottom:14px;
+    font-size:13px;
+  }
+  .error-box {
+    color:var(--red);
+    background:rgba(227,97,97,0.09);
+    border:1px solid rgba(227,97,97,0.22);
+  }
+  .loading-box {
+    color:var(--muted);
+    background:rgba(255,255,255,0.03);
+    border:1px solid var(--border);
+  }
+  .settings-wrap { position:relative; }
+  .settings-menu {
+    position:absolute;
+    right:0;
+    top:calc(100% + 10px);
+    width:min(360px, calc(100vw - 32px));
+    display:none;
+    padding:16px;
+    border-radius:18px;
+    border:1px solid var(--border2);
+    background:rgba(16,16,16,0.98);
+    box-shadow:0 24px 60px rgba(0,0,0,0.38);
+  }
+  .settings-wrap.open .settings-menu { display:block; }
+  .settings-section { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .settings-section:last-child { margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .settings-label {
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    margin-bottom:8px;
+  }
+  .theme-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+  .theme-chip {
+    padding:10px 12px;
+    background:var(--s2);
+    border:1px solid var(--border);
+    color:var(--text);
+    text-align:left;
+  }
+  .theme-chip.active { border-color:var(--accent); box-shadow:0 0 0 1px rgba(200,169,110,0.24) inset; }
+  .theme-dot {
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    display:inline-block;
+    margin-right:8px;
+    vertical-align:middle;
+  }
+  .insight-card {
+    background:
+      linear-gradient(135deg, rgba(200,169,110,0.11), rgba(114,184,230,0.05)),
+      var(--s1);
+    border-color:rgba(200,169,110,0.22);
+  }
+  .insight-grid, .pipeline-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+  .insight-list {
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.75;
+  }
+  .insight-list b {
+    display:block;
+    color:var(--text);
+    font-weight:500;
+    margin-bottom:6px;
+  }
+  .template-help {
+    font-size:11px;
+    color:var(--muted);
+    line-height:1.6;
+    margin-top:8px;
+  }
+  .timeline-item {
+    padding:12px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .timeline-item:last-child { border-bottom:none; }
+  .timeline-title { font-size:13px; }
+  .timeline-meta { color:var(--muted); font-size:11px; margin-top:4px; }
+  .table {
+    width:100%;
+    border-collapse:collapse;
+  }
+  .table th, .table td {
+    padding:11px 10px;
+    border-bottom:1px solid var(--border);
+    text-align:left;
+    vertical-align:top;
+    font-size:12px;
+  }
+  .table th {
+    color:var(--muted);
+    font-weight:500;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    font-size:11px;
+  }
+  .chip-row, .tag-row, .action-row, .filters-row {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .small-select {
+    padding:8px 12px;
+    background:var(--s2);
+    color:var(--text);
+    border:1px solid var(--border);
+  }
+  .small-input {
+    max-width:160px;
+  }
+  .stack { display:grid; gap:12px; }
+  .hidden { display:none !important; }
+  .print-only { display:none; }
+  .mobile-sticky-actions {
+    display:none;
+    position:sticky;
+    bottom:12px;
+    z-index:12;
+    margin-top:14px;
+    padding:10px;
+    border-radius:18px;
+    background:rgba(17,17,17,0.92);
+    border:1px solid var(--border2);
+    backdrop-filter:blur(12px);
+    box-shadow:0 18px 40px rgba(0,0,0,0.26);
+  }
+  @media (max-width:1024px) {
+    .grid-main, .grid-two, .insight-grid, .pipeline-grid, .stat-grid { grid-template-columns:1fr; }
+    .hero-title { max-width:none; }
+  }
+  @media (max-width:680px) {
+    .container { padding:18px; }
+    nav { padding:16px 18px; }
+    .section-title { font-size:1.35rem; }
+    .field-row { grid-template-columns:1fr; }
+    .hero-title { font-size:1.7rem; }
+    .hero-copy { font-size:13px; }
+    .card { border-radius:16px; padding:16px; }
+    .match-card { padding:16px; }
+    .match-head { flex-direction:column; align-items:stretch; }
+    .score { text-align:left; min-width:0; }
+    .settings-menu { right:-6px; }
+    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; }
+    .inline-actions > *, .action-row > * { width:100%; }
+    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle { min-height:40px; }
+    .mobile-sticky-actions { display:block; }
+  }
+  @media print {
+    nav, .settings-wrap, .section-bar button, .template-card, .drop-zone, #pdf-input, .filters-row, .subtabs, .action-row {
+      display:none !important;
+    }
+    body { background:#fff; color:#111; }
+    .card, .match-card { border-color:#ddd; box-shadow:none; background:#fff; }
+    .print-only { display:block; }
+  }
 </style>
 </head>
 <body>
-
 <nav>
   <div class="logo">Log7 Capital</div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showTab('match',this)">Match</button>
-    <button class="nav-tab" onclick="showTab('investors',this)">Investors</button>
-    <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
+    <button class="nav-tab active" onclick="showTab('match', this)">Match</button>
+    <button class="nav-tab" onclick="showTab('pipeline', this)">Pipeline</button>
+    <button class="nav-tab" onclick="showTab('investors', this)">Investors</button>
+    <button class="nav-tab" onclick="showTab('startups', this)">Startups</button>
+    <button class="nav-tab" onclick="showTab('deck', this)">Deck Insights</button>
   </div>
   <div class="nav-right">
+    <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
+    <button class="pill-btn" onclick="window.print()">Print / PDF</button>
     <div class="settings-wrap" id="settings-wrap">
       <button class="settings-toggle" onclick="toggleSettings()">Settings</button>
-      <div class="settings-menu" id="settings-menu">
+      <div class="settings-menu">
         <div class="settings-section">
           <div class="settings-label">Theme</div>
           <div class="theme-grid">
-            <button class="theme-chip" data-theme="obsidian" onclick="setTheme('obsidian')"><span class="theme-dot" style="background:#C8A96E"></span>Obsidian</button>
-            <button class="theme-chip" data-theme="forest" onclick="setTheme('forest')"><span class="theme-dot" style="background:#77C7A5"></span>Forest</button>
-            <button class="theme-chip" data-theme="ocean" onclick="setTheme('ocean')"><span class="theme-dot" style="background:#6FB7E9"></span>Ocean</button>
+            <button class="theme-chip" data-theme="obsidian" onclick="setTheme('obsidian')"><span class="theme-dot" style="background:#c8a96e"></span>Obsidian</button>
+            <button class="theme-chip" data-theme="forest" onclick="setTheme('forest')"><span class="theme-dot" style="background:#78c5a6"></span>Forest</button>
+            <button class="theme-chip" data-theme="ocean" onclick="setTheme('ocean')"><span class="theme-dot" style="background:#72b8e6"></span>Ocean</button>
+            <button class="theme-chip" data-theme="ember" onclick="setTheme('ember')"><span class="theme-dot" style="background:#f08c5a"></span>Ember</button>
           </div>
         </div>
         <div class="settings-section">
-          <div class="settings-label">API Key</div>
-          <input class="settings-input" type="password" id="api-key" placeholder="Paste your Anthropic API key here (sk-ant-...)" oninput="saveKey()">
-          <div class="settings-note"><span class="key-saved" id="key-status"></span></div>
+          <div class="settings-label">Anthropic API Key</div>
+          <input type="password" id="api-key" placeholder="Paste your Anthropic API key here" oninput="saveKey()">
+          <div class="template-help"><span id="key-status"></span></div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Matching Mode</div>
+          <select id="matching-mode" onchange="savePreferences()">
+            <option value="auto">Auto (use AI when key exists)</option>
+            <option value="ai">AI only</option>
+            <option value="rules">No-API fallback only</option>
+          </select>
+          <div class="template-help">Fallback mode is fully free and uses local rules based on sector, stage, ticket size, deployment status, and thesis overlap.</div>
         </div>
       </div>
     </div>
@@ -132,127 +577,212 @@
 </nav>
 
 <div class="container">
+  <div id="error-box" class="error-box hidden"></div>
+  <div id="loading-box" class="loading-box hidden"></div>
 
-  <!-- ERROR / LOADING -->
-  <div id="error-box" class="error-box" style="display:none"></div>
-  <div id="loading-box" class="loading-box" style="display:none"></div>
-
-  <!-- MATCH PAGE -->
   <div id="page-match" class="page active">
-    <div class="top-bar">
-      <div class="section-title">Match a Startup</div>
-      <button class="refresh-btn" onclick="loadData()">↓ Load from Google Sheets</button>
+    <div class="section-bar">
+      <div class="section-title">Startup Match Studio</div>
+      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
+      <button class="ghost-btn" onclick="resetWorkflow()">Reset Workspace</button>
     </div>
-    <div class="grid2">
-      <!-- Left col -->
+
+    <div class="card hero-card">
+      <div class="grid-two" style="align-items:end;gap:20px">
+        <div>
+          <div class="hero-title">Investor matching, outreach, and pipeline in one place.</div>
+          <div class="hero-copy">Use startup form data, uploaded pitch decks, no-API fallback scoring, and AI-assisted insights to move from intake to investor outreach without leaving the dashboard.</div>
+        </div>
+        <div class="mini-grid">
+          <div class="mini-stat"><div class="mini-value">Deck + Form</div><div class="mini-label">Dual-source analysis</div></div>
+          <div class="mini-stat"><div class="mini-value">CRM Ready</div><div class="mini-label">Status, tags, notes</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-value" id="stat-startups">0</div><div class="stat-label">Startups</div></div>
+      <div class="stat"><div class="stat-value" id="stat-investors">0</div><div class="stat-label">Investors</div></div>
+      <div class="stat"><div class="stat-value" id="stat-matches">0</div><div class="stat-label">Ranked Matches</div></div>
+      <div class="stat"><div class="stat-value" id="stat-pipeline">0</div><div class="stat-label">Pipeline Rows</div></div>
+    </div>
+
+    <div class="grid-main">
       <div>
-        <div class="card" style="padding:0;margin-bottom:1rem">
-          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
-            <label>Select startup</label>
+        <div class="card flush">
+          <div class="card-header" style="padding:16px 16px 0;">
+            <div class="card-title">Select Startup</div>
+            <span class="badge" id="st-count">0</span>
           </div>
-          <div id="startup-list-match"><div class="empty">Click "Load from Google Sheets" first</div></div>
+          <div id="startup-list-match"><div class="empty">Load data from Google Sheets to begin</div></div>
         </div>
 
-        <div id="startup-detail" style="display:none" class="card">
+        <div id="startup-detail" class="card hidden">
+          <div class="card-header">
+            <div class="card-title">Startup Snapshot</div>
+            <button class="mini-btn" onclick="showTab('deck', document.querySelectorAll('.nav-tab')[4])">Open Deck Tab</button>
+          </div>
           <div id="startup-detail-content"></div>
         </div>
 
-        <!-- PDF Upload -->
-        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()"
-          ondragover="event.preventDefault();this.classList.add('over')"
-          ondragleave="this.classList.remove('over')"
-          ondrop="handleDrop(event)">
-          <p>📎 Drag & drop pitch deck PDF, or click to upload</p>
-          <div id="pdf-name" class="file-ok"></div>
-          <div id="drive-link-wrap" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Pitch Deck Input</div>
+          </div>
+          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()"
+            ondragover="event.preventDefault();this.classList.add('over')"
+            ondragleave="this.classList.remove('over')"
+            ondrop="handleDrop(event)">
+            <p>Drag and drop a pitch deck PDF, or click to upload.</p>
+            <div id="pdf-name" class="file-ok"></div>
+            <div id="drive-link-wrap" class="template-help"></div>
+          </div>
+          <input id="pdf-input" type="file" accept=".pdf" class="hidden" onchange="handlePdfSelect(event)">
+          <div class="subtle" style="margin-top:10px">Uploaded deck text improves deck insights, match reasons, readiness scoring, and objection prediction.</div>
         </div>
-        <input id="pdf-input" type="file" accept=".pdf" style="display:none" onchange="handlePdfSelect(event)">
 
-        <button class="btn btn-primary" id="match-btn" onclick="runMatch()" style="width:100%;margin-top:1rem;padding:12px" disabled>
-          Run AI Match
-        </button>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Pre-Match Filters</div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Sector Filter</label>
+              <input id="filter-sector" placeholder="e.g. Fintech" oninput="renderMatches(window.lastPayload || { matches: [] })">
+            </div>
+            <div class="field">
+              <label>Stage Filter</label>
+              <input id="filter-stage" placeholder="e.g. Pre-Seed" oninput="renderMatches(window.lastPayload || { matches: [] })">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Require Deploying</label>
+              <select id="filter-deploying" onchange="renderMatches(window.lastPayload || { matches: [] })">
+                <option value="">Any</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Minimum Match Score</label>
+              <input id="filter-score" type="number" min="0" max="100" value="0" oninput="renderMatches(window.lastPayload || { matches: [] })">
+            </div>
+          </div>
+          <button class="action-btn primary" id="match-btn" onclick="runMatch()" disabled style="width:100%;">Run Match</button>
+          <div class="action-row">
+            <button class="action-btn secondary" onclick="runRuleBasedMatch()">Run No-API Match</button>
+            <button class="action-btn secondary" onclick="clearFilters()">Clear Filters</button>
+          </div>
+        </div>
 
-        <div class="card template-card" style="margin-top:1rem">
-          <label>Email Template</label>
-          <textarea id="email-template" oninput="saveTemplates()">Hi {{investor_name}},
-
-I’m sharing {{startup_company}}, a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
-
-Why this may fit:
-{{match_reasons}}
-
-Round: {{startup_round}}
-Round size: {{startup_round_size}}
-Location: {{startup_location}}
-
-Pitch deck:
-{{pitch_deck_link}}
-
-If this looks interesting, I’d love to connect.
-
-Best,
-Log7 Capital</textarea>
-          <label style="margin-top:1rem">WhatsApp Template</label>
-          <textarea id="whatsapp-template" oninput="saveTemplates()">Hi {{investor_name}}, sharing {{startup_company}} from Log7 Capital.
-
-{{startup_company}} is a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
-Why it may fit: {{match_reasons}}
-Round: {{startup_round}}
-Round size: {{startup_round_size}}
-Pitch deck: {{pitch_deck_link}}
-
-Interested?</textarea>
-          <div class="template-help">Available placeholders: {{investor_name}}, {{startup_company}}, {{startup_founder}}, {{startup_sector}}, {{startup_stage}}, {{startup_round}}, {{startup_round_size}}, {{startup_location}}, {{match_score}}, {{match_verdict}}, {{match_reasons}}, {{match_concerns}}, {{pitch_deck_link}}</div>
-          <div class="subtle-note">Browser buttons can prefill email and WhatsApp text. They cannot attach a local PDF file directly, so the startup’s pitch deck link is inserted automatically.</div>
+        <div class="card template-card">
+          <div class="card-header">
+            <div class="card-title">Outreach Templates</div>
+          </div>
+          <div class="field">
+            <label>Email Subject</label>
+            <input id="email-subject-template" oninput="saveTemplates()" value="Log7 Capital intro: {{startup_company}} ({{startup_sector}})">
+          </div>
+          <div class="field">
+            <label>Email Template</label>
+            <textarea id="email-template" oninput="saveTemplates()"></textarea>
+          </div>
+          <div class="field">
+            <label>WhatsApp Template</label>
+            <textarea id="whatsapp-template" oninput="saveTemplates()"></textarea>
+          </div>
+          <div class="template-help">Placeholders: {{investor_name}}, {{startup_company}}, {{startup_founder}}, {{startup_sector}}, {{startup_stage}}, {{startup_round}}, {{startup_round_size}}, {{startup_location}}, {{match_score}}, {{match_verdict}}, {{match_reasons}}, {{match_concerns}}, {{pitch_deck_link}}, {{warm_intro}}, {{likely_objections}}</div>
+          <div class="subtle" style="margin-top:8px">Browsers cannot attach local PDFs directly into Gmail or WhatsApp drafts, so the deck link is inserted automatically.</div>
         </div>
       </div>
 
-      <!-- Right col - results -->
-      <div id="match-results">
-        <div class="empty" style="padding-top:4rem">
-          <div style="font-size:2rem;opacity:0.15;margin-bottom:1rem">◈</div>
-          Select a startup and run match
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Bulk Actions</div>
+          </div>
+          <div class="inline-actions">
+            <button class="action-btn primary" onclick="bulkEmail(5)">Email Top 5</button>
+            <button class="action-btn secondary" onclick="bulkWhatsapp(3)">WhatsApp Top 3</button>
+            <button class="action-btn secondary" onclick="copyAllIntros()">Copy All Intros</button>
+            <button class="action-btn secondary" onclick="exportPipelineCsv()">Export Pipeline CSV</button>
+          </div>
+        </div>
+
+        <div id="match-results">
+          <div class="empty">
+            Select a startup, upload a pitch deck if available, and run a match.
+          </div>
+        </div>
+
+        <div class="mobile-sticky-actions">
+          <div class="action-row" style="margin-top:0">
+            <button class="action-btn primary" onclick="runMatch()">Run Match</button>
+            <button class="action-btn secondary" onclick="showTab('pipeline', document.querySelectorAll('.nav-tab')[1])">Open Pipeline</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- INVESTORS PAGE -->
-  <div id="page-investors" class="page">
-    <div class="top-bar">
-      <div class="section-title">Investors <span class="count-badge" id="inv-count">0</span></div>
-      <button class="refresh-btn" onclick="loadData()">↻ Refresh from Sheets</button>
+  <div id="page-pipeline" class="page">
+    <div class="section-bar">
+      <div class="section-title">Pipeline CRM</div>
+      <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
+      <button class="ghost-btn" onclick="clearPipeline()">Clear Pipeline</button>
     </div>
-    <div class="card" style="padding:0">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Investor Workflow</div>
+        <span class="badge" id="pipeline-count">0</span>
+      </div>
+      <div id="pipeline-list"><div class="empty">Matches that you save to pipeline will appear here.</div></div>
+    </div>
+  </div>
+
+  <div id="page-investors" class="page">
+    <div class="section-bar">
+      <div class="section-title">Investors</div>
+      <span class="badge" id="inv-count">0</span>
+      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
+    </div>
+    <div class="card flush">
       <div id="investor-list"><div class="empty">Load data from Google Sheets</div></div>
     </div>
   </div>
 
-  <!-- STARTUPS PAGE -->
   <div id="page-startups" class="page">
-    <div class="top-bar">
-      <div class="section-title">Startups <span class="count-badge" id="st-count">0</span></div>
-      <button class="refresh-btn" onclick="loadData()">↻ Refresh from Sheets</button>
+    <div class="section-bar">
+      <div class="section-title">Startups</div>
+      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
     </div>
-    <div class="card" style="padding:0">
+    <div class="card flush">
       <div id="startup-list-tab"><div class="empty">Load data from Google Sheets</div></div>
     </div>
   </div>
 
+  <div id="page-deck" class="page">
+    <div class="section-bar">
+      <div class="section-title">Deck Insights</div>
+      <button class="ghost-btn" onclick="window.print()">Export PDF</button>
+    </div>
+    <div id="deck-tab-content">
+      <div class="empty">Run a match to generate deck insights, readiness score, missing-data alerts, and likely investor objections.</div>
+    </div>
+  </div>
 </div>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbyDvK8t4E9_5ZMLv0WfYrmtomcOBFKNxOdBqj5VbzvGxa1AdohX1aWIQDFeMVN32S0s/exec';
-const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
-// ────────────────────────────────────────────────────────
+const STARTUP_URL = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-let investors = [], startups = [], selectedStartup = null, pdfText = '';
+const DEFAULT_EMAIL_SUBJECT = 'Log7 Capital intro: {{startup_company}} ({{startup_sector}})';
 const DEFAULT_EMAIL_TEMPLATE = `Hi {{investor_name}},
 
-I’m sharing {{startup_company}}, a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
+I am sharing {{startup_company}}, a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
 
 Why this may fit:
 {{match_reasons}}
@@ -261,69 +791,64 @@ Round: {{startup_round}}
 Round size: {{startup_round_size}}
 Location: {{startup_location}}
 
+Likely objections to address:
+{{likely_objections}}
+
 Pitch deck:
 {{pitch_deck_link}}
 
-If this looks interesting, I’d love to connect.
+Warm intro path:
+{{warm_intro}}
+
+If this looks interesting, I would love to connect.
 
 Best,
 Log7 Capital`;
+
 const DEFAULT_WHATSAPP_TEMPLATE = `Hi {{investor_name}}, sharing {{startup_company}} from Log7 Capital.
 
 {{startup_company}} is a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
 Why it may fit: {{match_reasons}}
 Round: {{startup_round}}
 Round size: {{startup_round_size}}
+Likely objections: {{likely_objections}}
 Pitch deck: {{pitch_deck_link}}
+Warm intro: {{warm_intro}}
 
 Interested?`;
+
 const THEMES = {
-  obsidian: { bg:'#0A0A0A', s1:'#111111', s2:'#1A1A1A', border:'rgba(255,255,255,0.08)', border2:'rgba(255,255,255,0.14)', text:'#F0EDE8', muted:'#888580', gold:'#C8A96E', green:'#4CAF7D', amber:'#E8A838', red:'#E05555' },
-  forest: { bg:'#08110F', s1:'#0F1B18', s2:'#152521', border:'rgba(159,214,188,0.12)', border2:'rgba(159,214,188,0.24)', text:'#EDF6F1', muted:'#8CA39A', gold:'#77C7A5', green:'#8BE39E', amber:'#E5C96B', red:'#F06A67' },
-  ocean: { bg:'#08111A', s1:'#0E1A27', s2:'#152536', border:'rgba(124,183,220,0.12)', border2:'rgba(124,183,220,0.26)', text:'#ECF5FF', muted:'#8EA4BC', gold:'#6FB7E9', green:'#74D3AE', amber:'#F1C76B', red:'#F07178' }
+  obsidian: { bg:'#0a0a0a', s1:'#111111', s2:'#191919', s3:'#232323', border:'rgba(255,255,255,0.08)', border2:'rgba(255,255,255,0.15)', text:'#f0ede8', muted:'#8b8780', accent:'#c8a96e', accentSoft:'rgba(200,169,110,0.14)', green:'#54bf84', amber:'#e7b24b', red:'#e36161', blue:'#72b8e6' },
+  forest: { bg:'#08100e', s1:'#0f1916', s2:'#172521', s3:'#20332d', border:'rgba(160,215,188,0.1)', border2:'rgba(160,215,188,0.2)', text:'#eef6f1', muted:'#89a198', accent:'#79c6a7', accentSoft:'rgba(121,198,167,0.16)', green:'#88d89d', amber:'#e3cb6a', red:'#eb7a73', blue:'#6bb4dd' },
+  ocean: { bg:'#07111a', s1:'#0d1825', s2:'#142334', s3:'#1b2d42', border:'rgba(114,184,230,0.11)', border2:'rgba(114,184,230,0.22)', text:'#edf5ff', muted:'#89a1bc', accent:'#72b8e6', accentSoft:'rgba(114,184,230,0.16)', green:'#71d0ad', amber:'#efc66d', red:'#eb7479', blue:'#72b8e6' },
+  ember: { bg:'#130c09', s1:'#1c120e', s2:'#291914', s3:'#362119', border:'rgba(240,140,90,0.1)', border2:'rgba(240,140,90,0.22)', text:'#fff2eb', muted:'#b59b90', accent:'#f08c5a', accentSoft:'rgba(240,140,90,0.14)', green:'#79cc8f', amber:'#f0ba62', red:'#ef7268', blue:'#77aed8' }
 };
 
-// API Key
+const CRM_STATUSES = ['not contacted', 'emailed', 'whatsapped', 'replied', 'meeting booked', 'passed', 'invested'];
+
+let investors = [];
+let startups = [];
+let selectedStartup = null;
+let pdfText = '';
+let uploadedPdfName = '';
+let deckInsightsCache = null;
+let lastMatches = [];
+let lastPayload = null;
+
 window.onload = async () => {
-  const k = localStorage.getItem('l7_key') || '';
-  document.getElementById('api-key').value = k;
+  const key = localStorage.getItem('l7_key') || '';
+  document.getElementById('api-key').value = key;
   loadPreferences();
   loadTemplates();
   await loadData();
-  if (k) document.getElementById('key-status').textContent = '✓ Saved';
+  if (key) setKeyStatus('Saved');
 };
-function saveKey() {
-  const k = document.getElementById('api-key').value;
-  localStorage.setItem('l7_key', k);
-  document.getElementById('key-status').textContent = k ? '✓ Saved' : '';
-}
 
-function loadTemplates() {
-  const emailTemplate = localStorage.getItem('l7_email_template') || DEFAULT_EMAIL_TEMPLATE;
-  const whatsappTemplate = localStorage.getItem('l7_whatsapp_template') || DEFAULT_WHATSAPP_TEMPLATE;
-  document.getElementById('email-template').value = emailTemplate;
-  document.getElementById('whatsapp-template').value = whatsappTemplate;
-}
-
-function saveTemplates() {
-  localStorage.setItem('l7_email_template', document.getElementById('email-template').value);
-  localStorage.setItem('l7_whatsapp_template', document.getElementById('whatsapp-template').value);
-}
-
-function applyTheme(themeName) {
-  const theme = THEMES[themeName] || THEMES.obsidian;
-  const root = document.documentElement;
-  Object.entries(theme).forEach(([key, value]) => root.style.setProperty(`--${key}`, value));
-  document.querySelectorAll('.theme-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.theme === themeName));
-}
-
-function setTheme(themeName) {
-  localStorage.setItem('l7_theme', themeName);
-  applyTheme(themeName);
-}
-
-function loadPreferences() {
-  applyTheme(localStorage.getItem('l7_theme') || 'obsidian');
+function showTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  btn.classList.add('active');
 }
 
 function toggleSettings() {
@@ -335,30 +860,86 @@ document.addEventListener('click', (event) => {
   if (wrap && !wrap.contains(event.target)) wrap.classList.remove('open');
 });
 
-// Tabs
-function showTab(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  btn.classList.add('active');
+function applyTheme(themeName) {
+  const theme = THEMES[themeName] || THEMES.obsidian;
+  const root = document.documentElement;
+  root.style.setProperty('--bg', theme.bg);
+  root.style.setProperty('--s1', theme.s1);
+  root.style.setProperty('--s2', theme.s2);
+  root.style.setProperty('--s3', theme.s3);
+  root.style.setProperty('--border', theme.border);
+  root.style.setProperty('--border2', theme.border2);
+  root.style.setProperty('--text', theme.text);
+  root.style.setProperty('--muted', theme.muted);
+  root.style.setProperty('--accent', theme.accent);
+  root.style.setProperty('--accent-soft', theme.accentSoft);
+  root.style.setProperty('--green', theme.green);
+  root.style.setProperty('--amber', theme.amber);
+  root.style.setProperty('--red', theme.red);
+  root.style.setProperty('--blue', theme.blue);
+  document.querySelectorAll('.theme-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.theme === themeName));
 }
 
-function initials(n) { return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
-function scoreColor(s) { return s >= 75 ? '#4CAF7D' : s >= 50 ? '#E8A838' : '#E05555'; }
-function verdictClass(v) {
-  if (v === 'Strong match') return 'v-strong';
-  if (v === 'Good match') return 'v-good';
-  if (v === 'Weak match') return 'v-weak';
-  return 'v-poor';
+function setTheme(themeName) {
+  localStorage.setItem('l7_theme', themeName);
+  applyTheme(themeName);
 }
 
-function showError(msg) {
+function loadPreferences() {
+  applyTheme(localStorage.getItem('l7_theme') || 'obsidian');
+  document.getElementById('matching-mode').value = localStorage.getItem('l7_matching_mode') || 'auto';
+}
+
+function savePreferences() {
+  localStorage.setItem('l7_matching_mode', document.getElementById('matching-mode').value);
+}
+
+function loadTemplates() {
+  document.getElementById('email-subject-template').value = localStorage.getItem('l7_email_subject_template') || DEFAULT_EMAIL_SUBJECT;
+  document.getElementById('email-template').value = localStorage.getItem('l7_email_template') || DEFAULT_EMAIL_TEMPLATE;
+  document.getElementById('whatsapp-template').value = localStorage.getItem('l7_whatsapp_template') || DEFAULT_WHATSAPP_TEMPLATE;
+}
+
+function saveTemplates() {
+  localStorage.setItem('l7_email_subject_template', document.getElementById('email-subject-template').value);
+  localStorage.setItem('l7_email_template', document.getElementById('email-template').value);
+  localStorage.setItem('l7_whatsapp_template', document.getElementById('whatsapp-template').value);
+}
+
+function saveKey() {
+  const key = document.getElementById('api-key').value;
+  localStorage.setItem('l7_key', key);
+  setKeyStatus(key ? 'Saved' : '');
+}
+
+function setKeyStatus(text) {
+  document.getElementById('key-status').textContent = text ? `API key ${text}` : '';
+}
+
+function initials(name) {
+  return (name || '?').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function scoreColor(score) {
+  return score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+}
+
+function verdictClass(verdict) {
+  if (verdict === 'Strong match') return 'good';
+  if (verdict === 'Good match') return 'info';
+  return 'warn';
+}
+
+function showError(message) {
   const el = document.getElementById('error-box');
-  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+  el.textContent = message;
+  el.classList.toggle('hidden', !message);
 }
-function showLoading(msg) {
+
+function showLoading(message) {
   const el = document.getElementById('loading-box');
-  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+  el.textContent = message;
+  el.classList.toggle('hidden', !message);
 }
 
 function buildFreshUrl(url) {
@@ -368,21 +949,9 @@ function buildFreshUrl(url) {
 }
 
 async function fetchSheetJson(url) {
-  const res = await fetch(buildFreshUrl(url), {
-    method: 'GET',
-    cache: 'no-store'
-  });
+  const res = await fetch(buildFreshUrl(url), { method:'GET', cache:'no-store' });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
-}
-
-function clearStartupSelection() {
-  selectedStartup = null;
-  document.querySelectorAll('.startup-option').forEach(el => el.classList.remove('selected'));
-  document.getElementById('startup-detail').style.display = 'none';
-  document.getElementById('startup-detail-content').innerHTML = '';
-  document.getElementById('drive-link-wrap').innerHTML = '';
-  document.getElementById('match-btn').disabled = true;
 }
 
 function extractRows(payload) {
@@ -396,11 +965,10 @@ function extractRows(payload) {
 function normalizeRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return [];
   if (!Array.isArray(rows[0])) return rows;
-
-  const headerRow = rows[0].map(v => String(v || '').trim());
+  const headers = rows[0].map(v => String(v || '').trim());
   return rows.slice(1).map(row => {
     const obj = {};
-    headerRow.forEach((header, index) => {
+    headers.forEach((header, index) => {
       obj[header] = row[index] == null ? '' : String(row[index]).trim();
     });
     return obj;
@@ -415,66 +983,22 @@ function getField(row, candidates) {
   if (Array.isArray(row)) return '';
   const entries = Object.entries(row || {});
   const normalizedCandidates = candidates.map(normalizeKey);
-
   for (const [key, value] of entries) {
     const normalized = normalizeKey(key);
-    if (normalizedCandidates.includes(normalized)) {
-      return String(value || '').trim();
-    }
+    if (normalizedCandidates.includes(normalized)) return String(value || '').trim();
   }
-
   for (const [key, value] of entries) {
     const normalized = normalizeKey(key);
     if (normalizedCandidates.some(candidate => normalized.includes(candidate) || candidate.includes(normalized))) {
       return String(value || '').trim();
     }
   }
-
   return '';
-}
-
-function firstMeaningfulValue(row, excludedKeys = []) {
-  if (Array.isArray(row)) {
-    return row.map(v => String(v || '').trim()).find(Boolean) || '';
-  }
-
-  const excluded = excludedKeys.map(normalizeKey);
-  for (const [key, value] of Object.entries(row || {})) {
-    const normalized = normalizeKey(key);
-    if (excluded.some(ex => normalized.includes(ex))) continue;
-    const text = String(value || '').trim();
-    if (text) return text;
-  }
-  return '';
-}
-
-function describeRow(row) {
-  if (Array.isArray(row)) {
-    return `Array row with ${row.length} columns. First values: ${row.slice(0, 6).map(v => String(v || '').trim()).join(' | ')}`;
-  }
-  if (row && typeof row === 'object') {
-    const keys = Object.keys(row);
-    return `Object row keys: ${keys.slice(0, 12).join(' | ')}`;
-  }
-  return `Unexpected row type: ${typeof row}`;
 }
 
 function hasCompanyName(row) {
-  if (Array.isArray(row)) {
-    return row.some(value => String(value || '').trim());
-  }
-  return !!getField(row, [
-    'Company Name',
-    'company',
-    'companyName',
-    'Startup Name',
-    'Startup',
-    'Name of Startup',
-    'Venture Name',
-    'Business Name',
-    'Brand Name',
-    'Name'
-  ]) || !!firstMeaningfulValue(row, ['timestamp']);
+  if (Array.isArray(row)) return row.some(value => String(value || '').trim());
+  return !!getField(row, ['Company Name', 'company', 'companyName', 'Startup Name', 'Startup', 'Business Name', 'Brand Name', 'Name']);
 }
 
 function mapStartup(row) {
@@ -496,52 +1020,52 @@ function mapStartup(row) {
       prevRevenue: String(row[13] || '').trim(),
       pitchDeckUrl: String(row[14] || '').trim(),
       stage: String(row[15] || '').trim(),
-      timestamp: String(row[16] || '').trim(),
+      timestamp: String(row[16] || '').trim()
     };
   }
   return {
-    company:      getField(row, ['Company Name', 'company', 'companyName', 'Startup Name', 'Startup', 'Name of Startup', 'Venture Name', 'Business Name', 'Brand Name', 'Name']) || firstMeaningfulValue(row, ['timestamp']),
-    founder:      getField(row, ["Founder's Name", 'Founder Name', 'Founder', 'Founders Name', 'Contact Person']),
-    phone:        getField(row, ["Founder's Contact No.", 'Founder Contact No.', 'Phone', 'Contact Number', 'Mobile', 'Whatsapp Number']),
-    email:        getField(row, ['email address', 'Email Address', 'Email', 'Email ID']),
-    sector:       getField(row, ['Sector', 'Industry', 'Category', 'Domain']),
-    location:     getField(row, ['Location', 'City', 'Base Location']),
-    website:      getField(row, ['Website', 'Website URL', 'Company Website']),
-    valuation:    getField(row, ['Proposed Valuation', 'Valuation', 'Current Valuation']),
-    roundSize:    getField(row, ['Round Size', 'Raise Amount', 'Fundraise Amount', 'Amount Raising']),
-    fundedBefore: getField(row, ['Have you received funding earlier? If yes, please provide details', 'Funding History', 'Prior Funding', 'Previous Funding']),
-    problem:      getField(row, ['What problem are you solving?', 'Problem', 'Problem Statement', 'What problem does your startup solve?']),
+    company: getField(row, ['Company Name', 'company', 'companyName', 'Startup Name', 'Startup', 'Business Name', 'Brand Name', 'Name']),
+    founder: getField(row, ["Founder's Name", 'Founder Name', 'Founder', 'Contact Person']),
+    phone: getField(row, ["Founder's Contact No.", 'Founder Contact No.', 'Phone', 'Contact Number', 'Mobile', 'Whatsapp Number']),
+    email: getField(row, ['email address', 'Email Address', 'Email', 'Email ID']),
+    sector: getField(row, ['Sector', 'Industry', 'Category', 'Domain']),
+    location: getField(row, ['Location', 'City', 'Base Location']),
+    website: getField(row, ['Website', 'Website URL', 'Company Website']),
+    valuation: getField(row, ['Proposed Valuation', 'Valuation']),
+    roundSize: getField(row, ['Round Size', 'Raise Amount', 'Fundraise Amount']),
+    fundedBefore: getField(row, ['Have you received funding earlier? If yes, please provide details', 'Funding History', 'Previous Funding']),
+    problem: getField(row, ['What problem are you solving?', 'Problem', 'Problem Statement']),
     currentRound: getField(row, ['Current Round', 'Funding Round', 'Round']),
-    arr:          getField(row, ['ARR(Annual run-rate)', 'ARR', 'Annual Revenue Run Rate']),
-    prevRevenue:  getField(row, ["Previous Month's Revenue", 'Previous Revenue', 'Monthly Revenue']),
+    arr: getField(row, ['ARR(Annual run-rate)', 'ARR', 'Annual Revenue Run Rate']),
+    prevRevenue: getField(row, ["Previous Month's Revenue", 'Previous Revenue', 'Monthly Revenue']),
     pitchDeckUrl: getField(row, ['Attach your Pitch Deck (PDF)', 'Pitch Deck', 'Pitch Deck URL', 'Deck Link']),
-    stage:        getField(row, ['What stage is your company in?', 'Stage', 'Startup Stage']),
-    timestamp:    getField(row, ['Timestamp', 'Created At', 'Submitted At']),
+    stage: getField(row, ['What stage is your company in?', 'Stage', 'Startup Stage']),
+    timestamp: getField(row, ['Timestamp', 'Created At', 'Submitted At'])
   };
 }
 
-// Load data from Google Sheets
-function parseCSV(text) {
-  const lines = text.split('\n').filter(l => l.trim());
-  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  return lines.slice(1).map(line => {
-    const vals = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '"') { inQ = !inQ; }
-      else if (line[i] === ',' && !inQ) { vals.push(cur); cur = ''; }
-      else { cur += line[i]; }
-    }
-    vals.push(cur);
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
-    return obj;
-  });
+function mapInvestor(row) {
+  return {
+    name: row['Full Name'] || '',
+    phone: row['WhatsApp Number'] || '',
+    email: row['Email Address'] || '',
+    type: row['Investor Type'] || '',
+    ticketSize: row['Typical Ticket Size'] || '',
+    sectors: row['Sector Preferences'] || '',
+    stage: row['Investment Stage Preference'] || '',
+    startupStage: row['Startup Stage Preference'] || '',
+    sweetSpot: row["What's your sweet spot in terms of investment?"] || '',
+    thesis: row['Thesis Notes'] || '',
+    hardNos: row["Hard No's"] || '',
+    deploying: row['Currently Deploying'] || '',
+    sendVia: row['Where should we send you investment opportunities?'] || ''
+  };
 }
 
 async function loadData() {
   const previouslySelectedCompany = selectedStartup?.company || '';
-  showError(''); showLoading('Fetching live data from Google Sheets...');
+  showError('');
+  showLoading('Fetching live data from Google Sheets...');
   let investorError = '';
   let startupError = '';
 
@@ -551,161 +1075,740 @@ async function loadData() {
   ]);
 
   if (invResult.status === 'fulfilled') {
-    const invData = invResult.value;
-    if (invData.success === false) {
-      investorError = invData.error || 'Investor sheet returned success=false';
-      investors = [];
-    } else {
-      const investorRows = extractRows(invData);
-      investors = investorRows.filter(r => r['Full Name']).map(r => ({
-        name:         r['Full Name'] || '',
-        phone:        r['WhatsApp Number'] || '',
-        email:        r['Email Address'] || '',
-        type:         r['Investor Type'] || '',
-        ticketSize:   r['Typical Ticket Size'] || '',
-        sectors:      r['Sector Preferences'] || '',
-        stage:        r['Investment Stage Preference'] || '',
-        startupStage: r['Startup Stage Preference'] || '',
-        sweetSpot:    r["What's your sweet spot in terms of investment?"] || '',
-        thesis:       r['Thesis Notes'] || '',
-        hardNos:      r["Hard No's"] || '',
-        deploying:    r['Currently Deploying'] || '',
-        sendVia:      r['Where should we send you investment opportunities?'] || '',
-      }));
-    }
+    const rows = extractRows(invResult.value);
+    investors = rows.filter(r => r['Full Name']).map(mapInvestor);
   } else {
     investorError = invResult.reason?.message || 'Investor sheet request failed';
     investors = [];
   }
 
   if (stResult.status === 'fulfilled') {
-    const stData = stResult.value;
-    if (stData.success === false) {
-      startupError = stData.error || 'Startup sheet returned success=false';
-      startups = [];
-    } else {
-      const startupRows = extractRows(stData);
-      startups = startupRows.filter(hasCompanyName).map(mapStartup);
-      if (!startups.length && startupRows.length) {
-        startupError = `Startup sheet returned rows, but none matched the expected company columns. ${describeRow(startupRows[0])}`;
-      }
-    }
+    const rows = extractRows(stResult.value);
+    startups = rows.filter(hasCompanyName).map(mapStartup);
+    if (!startups.length && rows.length) startupError = 'Startup sheet returned rows, but no startup names were detected.';
   } else {
     startupError = stResult.reason?.message || 'Startup sheet request failed';
     startups = [];
   }
 
   document.getElementById('inv-count').textContent = investors.length;
-  document.getElementById('st-count').textContent  = startups.length;
-  renderInvestors(); renderStartups(); renderStartupMatchList();
+  document.getElementById('st-count').textContent = startups.length;
+  document.getElementById('stat-investors').textContent = investors.length;
+  document.getElementById('stat-startups').textContent = startups.length;
+  renderInvestors();
+  renderStartups();
+  renderStartupMatchList();
   clearStartupSelection();
   if (previouslySelectedCompany) {
-    const selectedIndex = startups.findIndex(s => s.company === previouslySelectedCompany);
-    if (selectedIndex >= 0) selectStartup(selectedIndex);
+    const index = startups.findIndex(startup => startup.company === previouslySelectedCompany);
+    if (index >= 0) selectStartup(index);
   }
-
+  renderPipeline();
+  updateStats();
   showLoading('');
   if (investorError || startupError) {
-    const messages = [];
-    if (investorError) messages.push(`Investor feed: ${investorError}`);
-    if (startupError) messages.push(`Startup feed: ${startupError}`);
-    showError(messages.join(' | '));
+    showError([investorError ? `Investor feed: ${investorError}` : '', startupError ? `Startup feed: ${startupError}` : ''].filter(Boolean).join(' | '));
   }
 }
 
-// Render investor list
 function renderInvestors() {
   const el = document.getElementById('investor-list');
-  if (!investors.length) { el.innerHTML = '<div class="empty">No investors loaded</div>'; return; }
+  if (!investors.length) {
+    el.innerHTML = '<div class="empty">No investors loaded</div>';
+    return;
+  }
   el.innerHTML = investors.map(inv => `
-    <div class="inv-row">
+    <div class="list-row">
       <div class="avatar">${initials(inv.name)}</div>
-      <div style="flex:1">
-        <div style="font-size:14px">${inv.name}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">${inv.type} · ${inv.ticketSize} · ${inv.phone}</div>
-        <div style="margin-top:6px">
-          ${(inv.sectors||'').split(',').filter(Boolean).map(s=>`<span class="pill pill-gold">${s.trim()}</span>`).join('')}
-          ${(inv.stage||'').split(',').filter(Boolean).map(s=>`<span class="pill pill-gray">${s.trim()}</span>`).join('')}
+      <div class="row-main">
+        <div class="row-title">${inv.name} <span class="badge">${inv.type || 'Investor'}</span></div>
+        <div class="row-meta">${inv.ticketSize || 'No ticket size'} | ${inv.phone || 'No WhatsApp'} | ${inv.email || 'No email'}</div>
+        <div class="tag-row">
+          ${(inv.sectors || '').split(',').filter(Boolean).map(tag => `<span class="tag info">${tag.trim()}</span>`).join('')}
+          ${(inv.stage || '').split(',').filter(Boolean).map(tag => `<span class="tag warn">${tag.trim()}</span>`).join('')}
+          <span class="status-pill ${String(inv.deploying).toLowerCase() === 'true' ? 'hot' : ''}">${String(inv.deploying).toLowerCase() === 'true' ? 'Deploying' : 'Not deploying'}</span>
         </div>
-        ${inv.thesis ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6">${inv.thesis}</div>` : ''}
+        ${inv.thesis ? `<div class="row-copy">${inv.thesis}</div>` : ''}
       </div>
-      <span class="pill ${inv.deploying === 'TRUE' || inv.deploying === 'true' ? 'pill-gold' : 'pill-gray'}">${inv.deploying === 'TRUE' || inv.deploying === 'true' ? 'Deploying' : 'Not deploying'}</span>
     </div>
   `).join('');
 }
 
-// Render startup list (tab)
 function renderStartups() {
   const el = document.getElementById('startup-list-tab');
-  if (!startups.length) { el.innerHTML = '<div class="empty">No startups loaded</div>'; return; }
-  el.innerHTML = startups.map(s => `
-    <div class="inv-row">
-      <div class="avatar" style="color:var(--muted)">${initials(s.company)}</div>
-      <div style="flex:1">
-        <div style="font-size:14px">${s.company}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">${s.founder} · ${s.sector} · ${s.location}</div>
-        <div style="margin-top:6px">
-          <span class="pill pill-gold">${s.stage}</span>
-          ${s.roundSize ? `<span class="pill pill-gray">${s.roundSize}</span>` : ''}
-          ${s.arr ? `<span class="pill pill-gray">ARR: ${s.arr}</span>` : ''}
+  if (!startups.length) {
+    el.innerHTML = '<div class="empty">No startups loaded</div>';
+    return;
+  }
+  el.innerHTML = startups.map(startup => `
+    <div class="startup-row">
+      <div class="avatar">${initials(startup.company)}</div>
+      <div class="row-main">
+        <div class="row-title">${startup.company} <span class="badge">${startup.stage || 'Stage n/a'}</span></div>
+        <div class="row-meta">${startup.founder || 'Founder n/a'} | ${startup.sector || 'Sector n/a'} | ${startup.location || 'Location n/a'}</div>
+        <div class="tag-row">
+          ${startup.roundSize ? `<span class="tag info">${startup.roundSize}</span>` : ''}
+          ${startup.arr ? `<span class="tag good">ARR ${startup.arr}</span>` : ''}
+          ${startup.pitchDeckUrl ? `<a class="tag info" href="${startup.pitchDeckUrl}" target="_blank">View Deck</a>` : ''}
         </div>
-        ${s.problem ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6">${s.problem}</div>` : ''}
+        ${startup.problem ? `<div class="row-copy">${startup.problem}</div>` : ''}
       </div>
-      ${s.pitchDeckUrl ? `<a href="${s.pitchDeckUrl}" target="_blank" style="color:var(--gold);font-size:12px;text-decoration:none;flex-shrink:0">View deck →</a>` : ''}
     </div>
   `).join('');
 }
 
-// Render startup selector on match page
 function renderStartupMatchList() {
   const el = document.getElementById('startup-list-match');
-  if (!startups.length) { el.innerHTML = '<div class="empty">No startups loaded</div>'; return; }
-  el.innerHTML = startups.map((s,i) => `
-    <div class="startup-option" onclick="selectStartup(${i})">
-      <div class="co-name">${s.company}</div>
-      <div class="co-meta">${s.founder} · ${s.sector} · ${s.stage}</div>
+  if (!startups.length) {
+    el.innerHTML = '<div class="empty">No startups loaded</div>';
+    return;
+  }
+  el.innerHTML = startups.map((startup, index) => `
+    <div class="startup-option" onclick="selectStartup(${index})">
+      <div class="row-title">${startup.company}</div>
+      <div class="row-meta">${startup.founder || 'Founder n/a'} | ${startup.sector || 'Sector n/a'} | ${startup.stage || 'Stage n/a'}</div>
     </div>
   `).join('');
 }
 
-function selectStartup(i) {
-  selectedStartup = startups[i];
-  document.querySelectorAll('.startup-option').forEach((el,j) => el.classList.toggle('selected', j===i));
-  
-  // Show detail card
-  const detail = document.getElementById('startup-detail');
-  const content = document.getElementById('startup-detail-content');
-  detail.style.display = 'block';
-  
-  const rows = [
+function clearStartupSelection() {
+  selectedStartup = null;
+  deckInsightsCache = null;
+  document.querySelectorAll('.startup-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('startup-detail').classList.add('hidden');
+  document.getElementById('startup-detail-content').innerHTML = '';
+  document.getElementById('drive-link-wrap').innerHTML = '';
+  document.getElementById('match-btn').disabled = true;
+  document.getElementById('deck-tab-content').innerHTML = '<div class="empty">Run a match to generate deck insights, readiness score, missing-data alerts, and likely investor objections.</div>';
+}
+
+function selectStartup(index) {
+  selectedStartup = startups[index];
+  pdfText = '';
+  uploadedPdfName = '';
+  deckInsightsCache = null;
+  document.getElementById('pdf-name').textContent = '';
+  document.querySelectorAll('.startup-option').forEach((el, i) => el.classList.toggle('selected', i === index));
+
+  const readiness = computeFounderReadiness(selectedStartup, null);
+  const missing = getMissingDataAlerts(selectedStartup);
+  const detailRows = [
     ['Sector', selectedStartup.sector],
     ['Stage', selectedStartup.stage],
-    ['Round', selectedStartup.currentRound],
+    ['Current Round', selectedStartup.currentRound],
     ['Round Size', selectedStartup.roundSize],
     ['Valuation', selectedStartup.valuation],
     ['ARR', selectedStartup.arr],
-    ['Prev Revenue', selectedStartup.prevRevenue],
-    ['Funded Before', selectedStartup.fundedBefore],
-  ].filter(([,v])=>v);
+    ['Previous Revenue', selectedStartup.prevRevenue],
+    ['Website', selectedStartup.website]
+  ].filter(([, value]) => value);
 
-  content.innerHTML = `
-    <div style="font-size:15px;margin-bottom:4px">${selectedStartup.company}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${selectedStartup.founder} · ${selectedStartup.location}</div>
-    ${rows.map(([k,v])=>`<div class="detail-row"><span class="detail-label">${k}</span><span>${v}</span></div>`).join('')}
-    ${selectedStartup.problem ? `<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">${selectedStartup.problem}</div>` : ''}
+  document.getElementById('startup-detail').classList.remove('hidden');
+  document.getElementById('startup-detail-content').innerHTML = `
+    <div style="font-size:18px;margin-bottom:4px">${selectedStartup.company}</div>
+    <div class="row-meta" style="margin-bottom:14px">${selectedStartup.founder || 'Founder n/a'} | ${selectedStartup.location || 'Location n/a'} | ${selectedStartup.email || 'Email n/a'}</div>
+    <div class="mini-grid" style="margin-bottom:14px">
+      <div class="mini-stat"><div class="mini-value">${readiness.score}</div><div class="mini-label">Readiness Score</div></div>
+      <div class="mini-stat"><div class="mini-value">${missing.length}</div><div class="mini-label">Missing Data Flags</div></div>
+    </div>
+    <div class="detail-list">
+      ${detailRows.map(([label, value]) => `<div class="detail-row"><span class="detail-label">${label}</span><span>${value}</span></div>`).join('')}
+    </div>
+    ${selectedStartup.problem ? `<div class="row-copy" style="margin-top:12px">${selectedStartup.problem}</div>` : ''}
+    ${missing.length ? `<div class="tag-row" style="margin-top:12px">${missing.map(item => `<span class="tag warn">${item}</span>`).join('')}</div>` : ''}
   `;
 
-  // Show drive link if available
   const driveWrap = document.getElementById('drive-link-wrap');
-  driveWrap.innerHTML = selectedStartup.pitchDeckUrl
-    ? `Or open their submitted deck: <a href="${selectedStartup.pitchDeckUrl}" target="_blank" style="color:var(--gold)">Open in Drive</a>`
-    : '';
-
+  driveWrap.innerHTML = selectedStartup.pitchDeckUrl ? `Submitted deck link: <a href="${selectedStartup.pitchDeckUrl}" target="_blank" style="color:var(--accent)">Open in Drive</a>` : 'No deck link from the form yet.';
   document.getElementById('match-btn').disabled = false;
 }
 
+function handleDrop(event) {
+  event.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const file = event.dataTransfer.files[0];
+  if (file?.type === 'application/pdf') processPdf(file);
+}
+
+function handlePdfSelect(event) {
+  const file = event.target.files[0];
+  if (file) processPdf(file);
+}
+
+async function processPdf(file) {
+  document.getElementById('pdf-name').textContent = 'Reading PDF...';
+  try {
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 10); pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    pdfText = text.slice(0, 7000);
+    uploadedPdfName = file.name;
+    document.getElementById('pdf-name').textContent = `${file.name} ready`;
+  } catch (error) {
+    document.getElementById('pdf-name').textContent = 'Could not read PDF';
+  }
+}
+
+function getSelectedMatchingMode() {
+  return document.getElementById('matching-mode').value || 'auto';
+}
+
+function shouldUseAi() {
+  const mode = getSelectedMatchingMode();
+  const hasKey = !!localStorage.getItem('l7_key');
+  if (mode === 'rules') return false;
+  if (mode === 'ai') return true;
+  return hasKey;
+}
+
+async function runMatch() {
+  if (!selectedStartup) return showError('Select a startup first');
+  if (!investors.length) return showError('Load investor data first');
+  showError('');
+  document.getElementById('match-btn').disabled = true;
+  document.getElementById('match-btn').textContent = 'Matching...';
+  document.getElementById('match-results').innerHTML = '<div class="loading-box">Generating fit analysis, deck insights, and investor ranking...</div>';
+
+  try {
+    let payload;
+    if (shouldUseAi()) {
+      const apiKey = localStorage.getItem('l7_key');
+      if (!apiKey) throw new Error('AI mode is selected but no Anthropic API key is saved.');
+      payload = await runAiMatch(apiKey);
+    } else {
+      payload = buildRuleBasedPayload();
+    }
+    lastPayload = payload;
+    lastMatches = payload.matches || [];
+    deckInsightsCache = payload.deck_insights || null;
+    renderMatches(payload);
+    renderDeckTab(payload);
+  } catch (error) {
+    showError('Matching failed: ' + error.message);
+    document.getElementById('match-results').innerHTML = '';
+  }
+
+  document.getElementById('match-btn').disabled = false;
+  document.getElementById('match-btn').textContent = 'Run Match';
+}
+
+function runRuleBasedMatch() {
+  if (!selectedStartup) return showError('Select a startup first');
+  if (!investors.length) return showError('Load investor data first');
+  const payload = buildRuleBasedPayload();
+  lastPayload = payload;
+  lastMatches = payload.matches || [];
+  deckInsightsCache = payload.deck_insights || null;
+  renderMatches(payload);
+  renderDeckTab(payload);
+}
+
+async function runAiMatch(apiKey) {
+  const startupInfo = buildStartupInfo();
+  const investorList = investors.map(inv => `- ${inv.name} | ${inv.type} | Ticket: ${inv.ticketSize} | Sectors: ${inv.sectors} | Stage: ${inv.stage} | Startup Stage: ${inv.startupStage} | Thesis: ${inv.thesis} | Hard Nos: ${inv.hardNos} | Deploying: ${inv.deploying}`).join('\n');
+  const sourceContext = pdfText
+    ? 'Use the uploaded pitch deck text as a primary source for business model, traction, go-to-market, moat, risks, and fundraising readiness. Use the form data to confirm factual fields and fill gaps.'
+    : 'No uploaded PDF text is available, so use the startup form fields and deck link only.';
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:2600,
+      messages:[{
+        role:'user',
+        content:`You are an expert operator for Log7 Capital, an invite-only investor network in India.
+
+Startup:
+${startupInfo}
+
+Investors:
+${investorList}
+
+Instructions:
+- ${sourceContext}
+- Extract deck insights, founder readiness, missing-data issues, and likely investor objections.
+- Then score every investor 0-100 for fit.
+- Consider sector fit, stage fit, ticket size, thesis fit, deployment status, and obvious hard no signals.
+
+Respond ONLY with valid JSON, no markdown:
+{
+  "deck_insights": {
+    "summary":"...",
+    "strengths":["..."],
+    "risks":["..."],
+    "signals":["..."],
+    "market":"...",
+    "traction":"...",
+    "business_model":"..."
+  },
+  "founder_readiness": {
+    "score": 78,
+    "verdict":"Ready",
+    "reasons":["..."]
+  },
+  "missing_data":["..."],
+  "matches":[
+    {
+      "name":"...",
+      "score":85,
+      "verdict":"Strong match",
+      "reasons":["..."],
+      "concerns":["..."],
+      "objections":["..."]
+    }
+  ]
+}
+
+Rules:
+- Keep summary concise.
+- Score all investors.
+- Sort matches descending.
+- Verdict must be Strong match, Good match, Weak match, or Poor match.`
+      }]
+    })
+  });
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  const text = data.content.map(item => item.text || '').join('');
+  return normalizeMatchPayload(JSON.parse(text.replace(/```json|```/g, '').trim()));
+}
+
+function buildStartupInfo() {
+  return `Company: ${selectedStartup.company}
+Founder: ${selectedStartup.founder}
+Sector: ${selectedStartup.sector}
+Location: ${selectedStartup.location}
+Stage: ${selectedStartup.stage}
+Current Round: ${selectedStartup.currentRound}
+Round Size: ${selectedStartup.roundSize}
+Valuation: ${selectedStartup.valuation}
+ARR: ${selectedStartup.arr}
+Previous Month Revenue: ${selectedStartup.prevRevenue}
+Funded Before: ${selectedStartup.fundedBefore}
+Website: ${selectedStartup.website}
+Problem: ${selectedStartup.problem}
+Deck Link: ${selectedStartup.pitchDeckUrl || 'Not available'}
+Uploaded Deck Text:
+${pdfText || 'No uploaded deck text available.'}`.trim();
+}
+
+function normalizeMatchPayload(raw) {
+  if (Array.isArray(raw)) return { deck_insights:null, founder_readiness:computeFounderReadiness(selectedStartup, null), missing_data:getMissingDataAlerts(selectedStartup), matches:raw };
+  return {
+    deck_insights: raw.deck_insights || raw.deckInsights || null,
+    founder_readiness: raw.founder_readiness || raw.founderReadiness || computeFounderReadiness(selectedStartup, raw.deck_insights || null),
+    missing_data: raw.missing_data || raw.missingData || getMissingDataAlerts(selectedStartup),
+    matches: Array.isArray(raw.matches) ? raw.matches : []
+  };
+}
+
+function buildRuleBasedPayload() {
+  const deckInsights = deriveDeckInsightsFromLocalData();
+  const founderReadiness = computeFounderReadiness(selectedStartup, deckInsights);
+  const missingData = getMissingDataAlerts(selectedStartup);
+  const matches = investors.map(investor => {
+    const reasons = [];
+    const concerns = [];
+    const objections = [];
+    let score = 28;
+
+    const startupSector = String(selectedStartup.sector || '').toLowerCase();
+    const startupStage = String(selectedStartup.stage || selectedStartup.currentRound || '').toLowerCase();
+    const investorSector = String(investor.sectors || '').toLowerCase();
+    const investorStage = String(investor.stage || investor.startupStage || '').toLowerCase();
+    const investorThesis = String(investor.thesis || '').toLowerCase();
+    const problem = String(selectedStartup.problem || '').toLowerCase();
+    const deckContext = String(pdfText || '').toLowerCase();
+
+    if (startupSector && investorSector.includes(startupSector)) {
+      score += 24;
+      reasons.push(`Sector fit with ${selectedStartup.sector}`);
+    } else {
+      concerns.push('Sector preference not clearly aligned');
+      objections.push('May not be a core sector priority');
+    }
+
+    if (startupStage && investorStage.includes(startupStage)) {
+      score += 18;
+      reasons.push(`Stage preference aligns with ${selectedStartup.stage || selectedStartup.currentRound}`);
+    } else {
+      concerns.push('Stage fit is uncertain');
+      objections.push('Could feel early or late for this investor');
+    }
+
+    if (String(investor.deploying).toLowerCase() === 'true') {
+      score += 10;
+      reasons.push('Investor is currently deploying');
+    } else {
+      concerns.push('Investor may not be actively deploying');
+    }
+
+    const keywordHits = countKeywordHits(`${startupSector} ${problem} ${deckContext}`, `${investorSector} ${investorThesis}`);
+    if (keywordHits > 0) {
+      score += Math.min(18, keywordHits * 4);
+      reasons.push('Thesis keywords overlap with startup positioning');
+    } else {
+      concerns.push('Little thesis overlap detected');
+    }
+
+    if (selectedStartup.arr) {
+      score += 8;
+      reasons.push('Reported revenue or traction available');
+    } else {
+      objections.push('Limited traction visibility');
+    }
+
+    if (selectedStartup.pitchDeckUrl || pdfText) {
+      score += 6;
+      reasons.push('Deck material available for diligence');
+    } else {
+      objections.push('No deck uploaded for deeper review');
+    }
+
+    if (String(investor.hardNos || '').toLowerCase().includes(startupSector)) {
+      score -= 20;
+      concerns.push('Potential conflict with investor hard nos');
+      objections.push('Sector may trigger a hard no');
+    }
+
+    score = Math.max(8, Math.min(95, Math.round(score)));
+    const verdict = score >= 75 ? 'Strong match' : score >= 58 ? 'Good match' : score >= 40 ? 'Weak match' : 'Poor match';
+
+    return {
+      name: investor.name,
+      score,
+      verdict,
+      reasons: uniqueList(reasons),
+      concerns: uniqueList(concerns),
+      objections: uniqueList(objections)
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  return normalizeMatchPayload({
+    deck_insights: deckInsights,
+    founder_readiness: founderReadiness,
+    missing_data: missingData,
+    matches
+  });
+}
+
+function countKeywordHits(textA, textB) {
+  const words = uniqueList((textA + ' ' + textB).split(/[^a-z0-9]+/).filter(word => word.length > 4));
+  return words.filter(word => textA.includes(word) && textB.includes(word)).length;
+}
+
+function uniqueList(items) {
+  return [...new Set((items || []).filter(Boolean))];
+}
+
+function deriveDeckInsightsFromLocalData() {
+  const summaryParts = [];
+  if (selectedStartup.sector) summaryParts.push(`${selectedStartup.company} operates in ${selectedStartup.sector}`);
+  if (selectedStartup.stage) summaryParts.push(`currently at ${selectedStartup.stage} stage`);
+  if (selectedStartup.currentRound || selectedStartup.roundSize) summaryParts.push(`raising ${selectedStartup.roundSize || 'an active round'} in ${selectedStartup.currentRound || 'the current round'}`);
+  const summary = summaryParts.length ? summaryParts.join(', ') + '.' : 'Startup profile insights generated from local startup data.';
+
+  const strengths = uniqueList([
+    selectedStartup.arr ? `Reported ARR: ${selectedStartup.arr}` : '',
+    selectedStartup.prevRevenue ? `Previous month revenue shared: ${selectedStartup.prevRevenue}` : '',
+    selectedStartup.website ? 'Website available for diligence' : '',
+    pdfText ? 'Uploaded pitch deck text available' : '',
+    selectedStartup.pitchDeckUrl ? 'Founder submitted deck link' : ''
+  ]);
+
+  const risks = uniqueList([
+    !selectedStartup.arr ? 'No ARR disclosed' : '',
+    !selectedStartup.prevRevenue ? 'No recent revenue number disclosed' : '',
+    !selectedStartup.website ? 'No website shared' : '',
+    !pdfText ? 'No uploaded deck text for richer analysis' : '',
+    !selectedStartup.problem ? 'Problem statement is thin or missing' : ''
+  ]);
+
+  const signals = uniqueList([
+    selectedStartup.sector || '',
+    selectedStartup.stage || '',
+    selectedStartup.currentRound || '',
+    pdfText ? 'Deck uploaded' : 'Deck not uploaded'
+  ]);
+
+  return {
+    summary,
+    strengths,
+    risks,
+    signals,
+    market: selectedStartup.sector || 'Market not clearly specified',
+    traction: selectedStartup.arr || selectedStartup.prevRevenue || 'Traction not clearly specified',
+    business_model: extractBusinessModelHint()
+  };
+}
+
+function extractBusinessModelHint() {
+  const text = `${selectedStartup.problem || ''} ${pdfText || ''}`.toLowerCase();
+  if (text.includes('saas') || text.includes('subscription')) return 'Likely recurring revenue or SaaS model';
+  if (text.includes('marketplace')) return 'Marketplace or platform-led model';
+  if (text.includes('lending') || text.includes('credit')) return 'Financial product or lending-driven model';
+  if (text.includes('fintech')) return 'Fintech-driven business model';
+  return 'Business model inferred from startup profile is still limited';
+}
+
+function computeFounderReadiness(startup, deckInsights) {
+  let score = 35;
+  const reasons = [];
+  if (startup.problem) { score += 10; reasons.push('Problem statement present'); }
+  if (startup.sector) { score += 8; reasons.push('Sector clearly defined'); }
+  if (startup.stage) { score += 8; reasons.push('Stage specified'); }
+  if (startup.roundSize) { score += 8; reasons.push('Round size included'); }
+  if (startup.arr || startup.prevRevenue) { score += 12; reasons.push('Revenue or traction shared'); }
+  if (startup.website) { score += 5; reasons.push('Website available'); }
+  if (startup.pitchDeckUrl || pdfText) { score += 10; reasons.push('Deck materials available'); }
+  if (deckInsights?.strengths?.length) { score += 4; reasons.push('Deck insights extracted'); }
+  score = Math.min(95, score);
+  const verdict = score >= 78 ? 'Ready' : score >= 60 ? 'Promising' : score >= 45 ? 'Needs polish' : 'Needs work';
+  return { score, verdict, reasons };
+}
+
+function getMissingDataAlerts(startup) {
+  return uniqueList([
+    !startup.website ? 'Website missing' : '',
+    !startup.arr ? 'ARR missing' : '',
+    !startup.prevRevenue ? 'Monthly revenue missing' : '',
+    !startup.roundSize ? 'Round size missing' : '',
+    !startup.currentRound ? 'Current round missing' : '',
+    !startup.pitchDeckUrl && !pdfText ? 'Pitch deck missing' : '',
+    !startup.email ? 'Founder email missing' : '',
+    !startup.problem ? 'Problem statement missing' : ''
+  ]);
+}
+
+function renderMatches(payload) {
+  const normalized = normalizeMatchPayload(payload);
+  const filteredMatches = applyMatchFilters(normalized.matches);
+  lastPayload = normalized;
+  lastMatches = filteredMatches;
+  deckInsightsCache = normalized.deck_insights;
+  renderDeckTab(normalized);
+  updateStats();
+
+  const el = document.getElementById('match-results');
+  if (!filteredMatches.length) {
+    el.innerHTML = renderInsightsSummary(normalized) + '<div class="card"><div class="empty">No investors match the active filters. Relax the filters or rerun the match.</div></div>';
+    return;
+  }
+
+  el.innerHTML = renderInsightsSummary(normalized) + filteredMatches.map(match => renderMatchCard(match)).join('');
+}
+
+function renderInsightsSummary(payload) {
+  return `
+    <div class="card insight-card">
+      <div class="card-header">
+        <div class="card-title">Deck And Founder Insights</div>
+        <span class="badge">${payload.matches.length} total matches</span>
+      </div>
+      <div style="font-size:14px;line-height:1.7">${payload.deck_insights?.summary || 'Insights are based on startup form data and any uploaded deck.'}</div>
+      <div class="insight-grid" style="margin-top:14px">
+        <div class="insight-list">
+          <b>Strengths</b>
+          ${(payload.deck_insights?.strengths || ['No strengths captured yet']).map(item => `<div>- ${item}</div>`).join('')}
+        </div>
+        <div class="insight-list">
+          <b>Risks</b>
+          ${(payload.deck_insights?.risks || ['No risks captured yet']).map(item => `<div>- ${item}</div>`).join('')}
+        </div>
+      </div>
+      <div class="mini-grid" style="margin-top:14px">
+        <div class="mini-stat"><div class="mini-value">${payload.founder_readiness?.score || 0}</div><div class="mini-label">Founder Readiness</div></div>
+        <div class="mini-stat"><div class="mini-value">${(payload.missing_data || []).length}</div><div class="mini-label">Missing Data Alerts</div></div>
+      </div>
+      <div class="tag-row">
+        ${(payload.deck_insights?.signals || []).map(signal => `<span class="tag info">${signal}</span>`).join('')}
+        ${(payload.missing_data || []).map(item => `<span class="tag warn">${item}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderMatchCard(match) {
+  const investor = findInvestorByName(match.name);
+  const crm = getInvestorCRM(match.name);
+  const objections = uniqueList(match.objections || predictObjections(match));
+  const noteSummary = crm.notes ? `<div class="row-copy" style="margin-top:8px">${crm.notes}</div>` : '';
+  return `
+    <div class="match-card">
+      <div class="match-head">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div class="avatar">${initials(match.name)}</div>
+          <div>
+            <div class="row-title">${match.name} <span class="tag ${verdictClass(match.verdict)}">${match.verdict}</span></div>
+            <div class="row-meta">${investor?.type || 'Investor'} | ${investor?.ticketSize || 'Ticket n/a'} | ${investor?.email || 'No email'}</div>
+            <div class="tag-row">
+              <span class="status-pill ${crm.status === 'invested' || crm.status === 'meeting booked' ? 'hot' : crm.status === 'passed' ? 'pass' : ''}">${crm.status}</span>
+              ${crm.followUp ? `<span class="tag info">Follow up ${crm.followUp}</span>` : ''}
+              ${crm.warmIntro ? `<span class="tag good">Warm intro mapped</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="score">
+          <div class="score-num" style="color:${scoreColor(match.score)}">${match.score}</div>
+          <div class="score-caption">/100</div>
+        </div>
+      </div>
+      <div class="bar"><div class="bar-fill" style="width:${match.score}%;background:${scoreColor(match.score)}"></div></div>
+      <div class="pipeline-grid">
+        <div>
+          <div class="card-title" style="margin-bottom:8px">Why matched</div>
+          <div class="tag-row">${(match.reasons || []).map(reason => `<span class="tag good">${reason}</span>`).join('') || '<span class="tag warn">No reasons captured</span>'}</div>
+          <div class="card-title" style="margin:14px 0 8px">Why not matched</div>
+          <div class="tag-row">${(match.concerns || []).map(concern => `<span class="tag warn">${concern}</span>`).join('') || '<span class="tag info">No major concerns</span>'}</div>
+          <div class="card-title" style="margin:14px 0 8px">Likely objections</div>
+          <div class="tag-row">${objections.map(objection => `<span class="tag warn">${objection}</span>`).join('') || '<span class="tag info">No objections predicted</span>'}</div>
+        </div>
+        <div>
+          <div class="field">
+            <label>CRM Status</label>
+            <select onchange="updateInvestorCRM('${escapeQuotes(match.name)}', 'status', this.value)">
+              ${CRM_STATUSES.map(status => `<option value="${status}" ${crm.status === status ? 'selected' : ''}>${status}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Warm Intro Mapping</label>
+            <input value="${escapeHtml(crm.warmIntro || '')}" placeholder="e.g. Introduced by Aman via portfolio founder" oninput="updateInvestorCRM('${escapeQuotes(match.name)}', 'warmIntro', this.value)">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Follow-Up Date</label>
+              <input type="date" value="${crm.followUp || ''}" onchange="updateInvestorCRM('${escapeQuotes(match.name)}', 'followUp', this.value)">
+            </div>
+            <div class="field">
+              <label>Internal Tags</label>
+              <input value="${escapeHtml((crm.tags || []).join(', '))}" placeholder="fintech, warm, fast mover" oninput="updateInvestorTags('${escapeQuotes(match.name)}', this.value)">
+            </div>
+          </div>
+          <div class="field">
+            <label>Internal Notes</label>
+            <textarea style="min-height:86px" oninput="updateInvestorCRM('${escapeQuotes(match.name)}', 'notes', this.value)">${escapeHtml(crm.notes || '')}</textarea>
+          </div>
+        </div>
+      </div>
+      ${noteSummary}
+      <div class="action-row">
+        <button class="action-btn primary" onclick="emailInvestor('${escapeQuotes(match.name)}')" ${investor?.email ? '' : 'disabled'}>Email Investor</button>
+        <button class="action-btn secondary" onclick="whatsappInvestor('${escapeQuotes(match.name)}')" ${investor?.phone ? '' : 'disabled'}>WhatsApp Investor</button>
+        <button class="action-btn secondary" onclick="saveMatchToPipeline('${escapeQuotes(match.name)}')">Save to Pipeline</button>
+        <button class="action-btn secondary" onclick="copySingleIntro('${escapeQuotes(match.name)}')">Copy Intro</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDeckTab(payload) {
+  const normalized = normalizeMatchPayload(payload);
+  const deck = normalized.deck_insights || deriveDeckInsightsFromLocalData();
+  const readiness = normalized.founder_readiness || computeFounderReadiness(selectedStartup, deck);
+  const missing = normalized.missing_data || getMissingDataAlerts(selectedStartup);
+  const topMatches = normalized.matches.slice(0, 5);
+
+  document.getElementById('deck-tab-content').innerHTML = `
+    <div class="grid-two">
+      <div>
+        <div class="card insight-card">
+          <div class="card-header"><div class="card-title">Deck Summary</div></div>
+          <div style="font-size:14px;line-height:1.8">${deck.summary || 'No deck summary yet.'}</div>
+          <div class="tag-row">
+            ${(deck.signals || []).map(signal => `<span class="tag info">${signal}</span>`).join('')}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Readiness Score</div></div>
+          <div class="mini-grid">
+            <div class="mini-stat"><div class="mini-value">${readiness.score}</div><div class="mini-label">Score</div></div>
+            <div class="mini-stat"><div class="mini-value">${readiness.verdict}</div><div class="mini-label">Verdict</div></div>
+          </div>
+          <div class="template-help" style="margin-top:12px">${(readiness.reasons || []).join(' | ')}</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Deck Breakdown</div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span class="detail-label">Market</span><span>${deck.market || 'Not captured'}</span></div>
+            <div class="detail-row"><span class="detail-label">Traction</span><span>${deck.traction || 'Not captured'}</span></div>
+            <div class="detail-row"><span class="detail-label">Business Model</span><span>${deck.business_model || 'Not captured'}</span></div>
+            <div class="detail-row"><span class="detail-label">Uploaded PDF</span><span>${uploadedPdfName || 'No uploaded PDF'}</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Missing Data Alerts</div></div>
+          <div class="tag-row">${missing.map(item => `<span class="tag warn">${item}</span>`).join('') || '<span class="tag info">No missing data flags</span>'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-two">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Strengths</div></div>
+        <div class="insight-list">${(deck.strengths || ['No strengths captured']).map(item => `<div>- ${item}</div>`).join('')}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Risks</div></div>
+        <div class="insight-list">${(deck.risks || ['No risks captured']).map(item => `<div>- ${item}</div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Top Investor Objections</div></div>
+      <div class="tag-row">${uniqueList(topMatches.flatMap(match => match.objections || predictObjections(match))).map(item => `<span class="tag warn">${item}</span>`).join('') || '<span class="tag info">No objections predicted yet</span>'}</div>
+    </div>
+  `;
+}
+
+function applyMatchFilters(matches) {
+  const sectorFilter = String(document.getElementById('filter-sector').value || '').toLowerCase().trim();
+  const stageFilter = String(document.getElementById('filter-stage').value || '').toLowerCase().trim();
+  const deployingFilter = document.getElementById('filter-deploying').value;
+  const minScore = Number(document.getElementById('filter-score').value || 0);
+
+  return (matches || []).filter(match => {
+    const investor = findInvestorByName(match.name);
+    const investorSectors = String(investor?.sectors || '').toLowerCase();
+    const investorStages = String(investor?.stage || investor?.startupStage || '').toLowerCase();
+    const deploying = String(investor?.deploying || '').toLowerCase() === 'true';
+    if (sectorFilter && !investorSectors.includes(sectorFilter)) return false;
+    if (stageFilter && !investorStages.includes(stageFilter)) return false;
+    if (deployingFilter === 'yes' && !deploying) return false;
+    if (deployingFilter === 'no' && deploying) return false;
+    if (Number(match.score || 0) < minScore) return false;
+    return true;
+  });
+}
+
+function clearFilters() {
+  document.getElementById('filter-sector').value = '';
+  document.getElementById('filter-stage').value = '';
+  document.getElementById('filter-deploying').value = '';
+  document.getElementById('filter-score').value = '0';
+  renderMatches(lastPayload || { matches:[] });
+}
+
+function normalizeWhatsappNumber(number) {
+  let digits = String(number || '').replace(/[^\d]/g, '');
+  if (digits.length === 10) digits = `91${digits}`;
+  return digits;
+}
+
 function findInvestorByName(name) {
-  return investors.find(inv => inv.name === name) || investors.find(inv => (inv.name || '').toLowerCase() === (name || '').toLowerCase()) || null;
+  return investors.find(inv => inv.name === name) || investors.find(inv => (inv.name || '').toLowerCase() === String(name || '').toLowerCase()) || null;
 }
 
 function getDeckLink() {
@@ -713,7 +1816,29 @@ function getDeckLink() {
   return 'Pitch deck link not available';
 }
 
+function getInvestorCRM(name) {
+  const key = crmKey(name);
+  const saved = JSON.parse(localStorage.getItem(key) || 'null');
+  return saved || { status:'not contacted', notes:'', tags:[], warmIntro:'', followUp:'' };
+}
+
+function crmKey(name) {
+  return `l7_crm_${selectedStartup?.company || 'global'}_${name}`;
+}
+
+function updateInvestorCRM(name, field, value) {
+  const record = getInvestorCRM(name);
+  record[field] = value;
+  localStorage.setItem(crmKey(name), JSON.stringify(record));
+  renderPipeline();
+}
+
+function updateInvestorTags(name, value) {
+  updateInvestorCRM(name, 'tags', value.split(',').map(item => item.trim()).filter(Boolean));
+}
+
 function buildMessageContext(match, investor) {
+  const crm = getInvestorCRM(match.name);
   return {
     investor_name: investor?.name || match.name || 'Investor',
     startup_company: selectedStartup?.company || '',
@@ -726,225 +1851,276 @@ function buildMessageContext(match, investor) {
     match_score: String(match.score ?? ''),
     match_verdict: match.verdict || '',
     match_reasons: (match.reasons || []).join(', ') || 'Strong investor-startup fit',
-    match_concerns: (match.concerns || []).join(', ') || 'None highlighted',
-    pitch_deck_link: getDeckLink()
+    match_concerns: (match.concerns || []).join(', ') || 'No major concerns flagged',
+    pitch_deck_link: getDeckLink(),
+    warm_intro: crm.warmIntro || 'No warm intro mapped yet',
+    likely_objections: uniqueList(match.objections || predictObjections(match)).join(', ') || 'No major objections predicted'
   };
 }
 
 function fillTemplate(template, context) {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => context[key] || '');
+  return String(template || '').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => context[key] || '');
 }
 
-function buildEmailSubject() {
-  const company = selectedStartup?.company || 'startup';
-  const sector = selectedStartup?.sector || 'company';
-  return `Log7 Capital intro: ${company} (${sector})`;
+function buildEmailSubject(match, investor) {
+  return fillTemplate(document.getElementById('email-subject-template').value, buildMessageContext(match, investor));
 }
 
-function emailInvestor(matchName) {
+function emailInvestor(name) {
   if (!selectedStartup) return showError('Select a startup first');
-  const investor = findInvestorByName(matchName);
-  if (!investor?.email) return showError(`No email found for ${matchName}`);
-  const match = window.lastMatches?.find(m => m.name === matchName) || { name: matchName, reasons: [], concerns: [] };
+  const investor = findInvestorByName(name);
+  if (!investor?.email) return showError(`No email found for ${name}`);
+  const match = lastMatches.find(item => item.name === name) || { name, reasons:[], concerns:[] };
   const body = fillTemplate(document.getElementById('email-template').value, buildMessageContext(match, investor));
-  window.location.href = `mailto:${encodeURIComponent(investor.email)}?subject=${encodeURIComponent(buildEmailSubject())}&body=${encodeURIComponent(body)}`;
+  const subject = buildEmailSubject(match, investor);
+  logOutreach('email', name, body);
+  updateInvestorCRM(name, 'status', 'emailed');
+  window.location.href = `mailto:${encodeURIComponent(investor.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function normalizeWhatsappNumber(number) {
-  return String(number || '').replace(/[^\d]/g, '');
-}
-
-function whatsappInvestor(matchName) {
+function whatsappInvestor(name) {
   if (!selectedStartup) return showError('Select a startup first');
-  const investor = findInvestorByName(matchName);
-  if (!investor?.phone) return showError(`No WhatsApp number found for ${matchName}`);
+  const investor = findInvestorByName(name);
+  if (!investor?.phone) return showError(`No WhatsApp number found for ${name}`);
   const phone = normalizeWhatsappNumber(investor.phone);
-  if (!phone) return showError(`Invalid WhatsApp number for ${matchName}`);
-  const match = window.lastMatches?.find(m => m.name === matchName) || { name: matchName, reasons: [], concerns: [] };
+  if (!phone) return showError(`Invalid WhatsApp number for ${name}`);
+  const match = lastMatches.find(item => item.name === name) || { name, reasons:[], concerns:[] };
   const text = fillTemplate(document.getElementById('whatsapp-template').value, buildMessageContext(match, investor));
+  logOutreach('whatsapp', name, text);
+  updateInvestorCRM(name, 'status', 'whatsapped');
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
-function extractMatchPayload(raw) {
-  if (Array.isArray(raw)) return { deckInsights: null, matches: raw };
-  if (raw && Array.isArray(raw.matches)) {
-    return {
-      deckInsights: raw.deck_insights || raw.deckInsights || null,
-      matches: raw.matches
-    };
-  }
-  return { deckInsights: null, matches: [] };
+function copySingleIntro(name) {
+  const investor = findInvestorByName(name);
+  const match = lastMatches.find(item => item.name === name) || { name, reasons:[], concerns:[] };
+  const subject = buildEmailSubject(match, investor);
+  const body = fillTemplate(document.getElementById('email-template').value, buildMessageContext(match, investor));
+  navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
 }
 
-function renderDeckInsights(deckInsights) {
-  if (!deckInsights) return '';
-  const summary = deckInsights.summary || 'Deck insights extracted from the uploaded pitch deck and startup profile.';
-  const strengths = (deckInsights.strengths || []).map(item => `<div>• ${item}</div>`).join('') || '<div>• No strengths captured</div>';
-  const risks = (deckInsights.risks || []).map(item => `<div>• ${item}</div>`).join('') || '<div>• No risks captured</div>';
-  const signals = (deckInsights.signals || []).map(item => `<span class="tag tag-g">${item}</span>`).join('');
-  return `
-    <div class="card insight-card">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">Pitch Deck Insights</div>
-      <div style="font-size:14px;line-height:1.7">${summary}</div>
-      <div class="insight-grid">
-        <div class="insight-list"><b>Strengths</b>${strengths}</div>
-        <div class="insight-list"><b>Risks</b>${risks}</div>
-      </div>
-      ${signals ? `<div class="tags-row" style="margin-top:14px">${signals}</div>` : ''}
-    </div>
-  `;
+function bulkEmail(count) {
+  const top = lastMatches.slice(0, count).filter(match => findInvestorByName(match.name)?.email);
+  if (!top.length) return showError('No email-ready matches found.');
+  const combined = top.map(match => {
+    const investor = findInvestorByName(match.name);
+    const subject = buildEmailSubject(match, investor);
+    const body = fillTemplate(document.getElementById('email-template').value, buildMessageContext(match, investor));
+    logOutreach('email-draft', match.name, body);
+    return `${investor.email}\nSubject: ${subject}\n${body}`;
+  }).join('\n\n-----------------\n\n');
+  navigator.clipboard.writeText(combined);
+  showError('Top email drafts copied to clipboard.');
 }
 
-// PDF handling
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.remove('over');
-  const file = e.dataTransfer.files[0];
-  if (file?.type === 'application/pdf') processPdf(file);
-}
-function handlePdfSelect(e) {
-  const file = e.target.files[0];
-  if (file) processPdf(file);
-}
-async function processPdf(file) {
-  document.getElementById('pdf-name').textContent = '⏳ Reading PDF...';
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let text = '';
-    for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      text += content.items.map(item => item.str).join(' ') + '\n';
-    }
-    pdfText = text.slice(0, 4000);
-    document.getElementById('pdf-name').textContent = `✓ ${file.name} — ready`;
-  } catch(e) {
-    document.getElementById('pdf-name').textContent = '⚠ Could not read PDF';
-  }
+function bulkWhatsapp(count) {
+  const top = lastMatches.slice(0, count).filter(match => findInvestorByName(match.name)?.phone);
+  if (!top.length) return showError('No WhatsApp-ready matches found.');
+  const combined = top.map(match => {
+    const investor = findInvestorByName(match.name);
+    const text = fillTemplate(document.getElementById('whatsapp-template').value, buildMessageContext(match, investor));
+    logOutreach('whatsapp-draft', match.name, text);
+    return `${investor.name} (${investor.phone})\n${text}`;
+  }).join('\n\n-----------------\n\n');
+  navigator.clipboard.writeText(combined);
+  showError('Top WhatsApp drafts copied to clipboard.');
 }
 
-// AI Matching
-async function runMatch() {
-  const apiKey = localStorage.getItem('l7_key');
-  if (!apiKey) return showError('Please enter your Anthropic API key at the top');
-  if (!selectedStartup) return showError('Select a startup first');
-  if (!investors.length) return showError('Load investor data first');
+function copyAllIntros() {
+  if (!lastMatches.length) return showError('Run a match first.');
+  const text = lastMatches.map(match => {
+    const investor = findInvestorByName(match.name);
+    const subject = buildEmailSubject(match, investor);
+    const body = fillTemplate(document.getElementById('email-template').value, buildMessageContext(match, investor));
+    return `${match.name}\nSubject: ${subject}\n${body}`;
+  }).join('\n\n====================\n\n');
+  navigator.clipboard.writeText(text);
+  showError('All intros copied to clipboard.');
+}
 
-  showError('');
-  document.getElementById('match-btn').disabled = true;
-  document.getElementById('match-btn').textContent = 'Matching...';
-  document.getElementById('match-results').innerHTML = '<div class="loading-box">AI is analysing the startup and scoring all investors...</div>';
+function outreachHistoryKey() {
+  return `l7_outreach_history_${selectedStartup?.company || 'global'}`;
+}
 
-  const startupInfo = `
-Company: ${selectedStartup.company}
-Founder: ${selectedStartup.founder}
-Sector: ${selectedStartup.sector}
-Location: ${selectedStartup.location}
-Stage: ${selectedStartup.stage}
-Current Round: ${selectedStartup.currentRound}
-Round Size: ${selectedStartup.roundSize}
-Valuation: ${selectedStartup.valuation}
-ARR: ${selectedStartup.arr}
-Previous Month Revenue: ${selectedStartup.prevRevenue}
-Funded Before: ${selectedStartup.fundedBefore}
-Problem: ${selectedStartup.problem}
-${pdfText ? '\nPitch Deck Content:\n' + pdfText : ''}
-  `.trim();
+function logOutreach(channel, investorName, content) {
+  const history = JSON.parse(localStorage.getItem(outreachHistoryKey()) || '[]');
+  history.unshift({
+    ts: new Date().toISOString(),
+    investorName,
+    channel,
+    content
+  });
+  localStorage.setItem(outreachHistoryKey(), JSON.stringify(history.slice(0, 150)));
+  renderPipeline();
+}
 
-  const sourceContext = pdfText
-    ? 'Use the pitch deck content as a primary source of truth for business model, traction, positioning, and risks. Use the form fields to fill factual gaps and confirm round details.'
-    : 'No uploaded PDF deck text is available, so rely on the startup form fields and any deck link context only.';
-
-  const investorList = investors.map(inv =>
-    `- ${inv.name} | ${inv.type} | Ticket: ${inv.ticketSize} | Sectors: ${inv.sectors} | Stage: ${inv.stage} | Startup Stage: ${inv.startupStage} | Thesis: ${inv.thesis} | Hard Nos: ${inv.hardNos} | Deploying: ${inv.deploying}`
-  ).join('\n');
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: `You are an expert investor matchmaker for Log7 Capital, an invite-only investor network in India.
-
-Startup:
-${startupInfo}
-
-Investors:
-${investorList}
-
-Instructions:
-- ${sourceContext}
-- First extract the most relevant insights from the startup and pitch deck.
-- Then score each investor 0-100 for fit with this startup.
-- Consider: sector fit, stage fit, ticket size, thesis, hard nos, whether deploying.
-
-Respond ONLY with valid JSON object, no markdown, no backticks:
-{"deck_insights":{"summary":"...","strengths":["..."],"risks":["..."],"signals":["..."]},"matches":[{"name":"...","score":85,"verdict":"Strong match","reasons":["r1","r2"],"concerns":["c1"]}]}
-
-Rules:
-- Keep deck_insights.summary to 2-3 sentences.
-- strengths, risks, and signals should each be concise.
-- Verdict must be one of: Strong match, Good match, Weak match, Poor match.
-- Sort matches by score descending.
-- Include ALL investors in matches.`
-        }]
-      })
+function saveMatchToPipeline(name) {
+  const match = (lastPayload?.matches || []).find(item => item.name === name);
+  if (!match) return;
+  const pipeline = getPipeline();
+  const existing = pipeline.find(item => item.startup === selectedStartup.company && item.investor === name);
+  if (!existing) {
+    pipeline.unshift({
+      startup: selectedStartup.company,
+      investor: name,
+      score: match.score,
+      verdict: match.verdict,
+      reasons: match.reasons || [],
+      concerns: match.concerns || [],
+      savedAt: new Date().toISOString()
     });
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    const text = data.content.map(i => i.text || '').join('');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-    renderMatches(parsed);
-  } catch(e) {
-    showError('Matching failed: ' + e.message);
-    document.getElementById('match-results').innerHTML = '';
+    localStorage.setItem('l7_pipeline', JSON.stringify(pipeline.slice(0, 500)));
   }
-
-  document.getElementById('match-btn').disabled = false;
-  document.getElementById('match-btn').textContent = 'Run AI Match';
+  renderPipeline();
+  updateStats();
 }
 
-function renderMatches(payload) {
-  const { deckInsights, matches } = extractMatchPayload(payload);
-  window.lastMatches = matches;
-  const el = document.getElementById('match-results');
-  el.innerHTML = renderDeckInsights(deckInsights) +
-    `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:1rem">${matches.length} investors ranked</div>` +
-    matches.map(m => `
-    <div class="match-card">
-      <div class="match-header">
-        <div class="avatar">${initials(m.name)}</div>
-        <div style="flex:1">
-          <div style="font-size:15px">${m.name}</div>
-          <span class="verdict ${verdictClass(m.verdict)}">${m.verdict}</span>
+function getPipeline() {
+  return JSON.parse(localStorage.getItem('l7_pipeline') || '[]');
+}
+
+function renderPipeline() {
+  const el = document.getElementById('pipeline-list');
+  const history = JSON.parse(localStorage.getItem(outreachHistoryKey()) || '[]');
+  const pipeline = getPipeline().filter(item => !selectedStartup || item.startup === selectedStartup.company || true);
+  document.getElementById('pipeline-count').textContent = pipeline.length;
+  document.getElementById('stat-pipeline').textContent = pipeline.length;
+  if (!pipeline.length) {
+    el.innerHTML = '<div class="empty">Matches that you save to pipeline will appear here.</div>';
+    return;
+  }
+  el.innerHTML = pipeline.map(item => {
+    const crm = getInvestorCRM(item.investor);
+    const recentHistory = history.filter(row => row.investorName === item.investor).slice(0, 2);
+    return `
+      <div class="pipeline-row">
+        <div class="avatar">${initials(item.investor)}</div>
+        <div class="row-main">
+          <div class="row-title">${item.investor} <span class="tag ${verdictClass(item.verdict)}">${item.verdict}</span> <span class="badge">${item.startup}</span></div>
+          <div class="row-meta">Score ${item.score} | Status ${crm.status} | Saved ${formatDate(item.savedAt)}</div>
+          <div class="tag-row">
+            ${(crm.tags || []).map(tag => `<span class="tag info">${tag}</span>`).join('')}
+            ${crm.followUp ? `<span class="tag warn">Follow up ${crm.followUp}</span>` : ''}
+            ${crm.warmIntro ? `<span class="tag good">Warm intro ready</span>` : ''}
+          </div>
+          ${crm.notes ? `<div class="row-copy">${crm.notes}</div>` : ''}
+          <div class="stack" style="margin-top:10px">
+            ${recentHistory.map(entry => `
+              <div class="timeline-item">
+                <div class="timeline-title">${entry.channel} draft sent</div>
+                <div class="timeline-meta">${formatDate(entry.ts)}</div>
+              </div>
+            `).join('')}
+          </div>
         </div>
-        <div style="text-align:right">
-          <div class="score-num" style="color:${scoreColor(m.score)}">${m.score}</div>
-          <div style="font-size:11px;color:var(--muted)">/100</div>
-        </div>
       </div>
-      <div class="bar-bg"><div class="bar-fill" style="width:${m.score}%;background:${scoreColor(m.score)}"></div></div>
-      <div class="tags-row">
-        ${(m.reasons||[]).map(r=>`<span class="tag tag-g">${r}</span>`).join('')}
-        ${(m.concerns||[]).map(c=>`<span class="tag tag-a">${c}</span>`).join('')}
-      </div>
-      <div class="actions-row">
-        <button class="btn btn-small btn-primary" data-name="${encodeURIComponent(m.name)}" onclick="emailInvestor(decodeURIComponent(this.dataset.name))" ${findInvestorByName(m.name)?.email ? '' : 'disabled'}>Email Investor</button>
-        <button class="btn btn-small btn-secondary" data-name="${encodeURIComponent(m.name)}" onclick="whatsappInvestor(decodeURIComponent(this.dataset.name))" ${findInvestorByName(m.name)?.phone ? '' : 'disabled'}>WhatsApp Investor</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+}
+
+function predictObjections(match) {
+  const objections = [];
+  if (!selectedStartup?.arr) objections.push('Traction metrics may feel thin');
+  if (!selectedStartup?.website) objections.push('Lack of website can slow first-pass diligence');
+  if (!pdfText && !selectedStartup?.pitchDeckUrl) objections.push('No deck material attached');
+  if ((match.concerns || []).some(item => item.toLowerCase().includes('stage'))) objections.push('Stage fit may need closer discussion');
+  if ((match.concerns || []).some(item => item.toLowerCase().includes('sector'))) objections.push('Sector thesis may not be direct');
+  return uniqueList(objections);
+}
+
+function updateStats() {
+  document.getElementById('stat-matches').textContent = lastMatches.length;
+}
+
+function exportRowsAsCsv(filename, rows) {
+  if (!rows.length) return showError('Nothing to export.');
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.join(',')].concat(rows.map(row => headers.map(header => csvEscape(row[header])).join(','))).join('\n');
+  downloadFile(filename, csv, 'text/csv;charset=utf-8;');
+}
+
+function csvEscape(value) {
+  const text = String(value == null ? '' : value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type:mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportMatchesCsv() {
+  exportRowsAsCsv('log7-matches.csv', lastMatches.map(match => ({
+    startup:selectedStartup?.company || '',
+    investor:match.name,
+    score:match.score,
+    verdict:match.verdict,
+    reasons:(match.reasons || []).join(' | '),
+    concerns:(match.concerns || []).join(' | '),
+    objections:uniqueList(match.objections || predictObjections(match)).join(' | ')
+  })));
+}
+
+function exportPipelineCsv() {
+  const rows = getPipeline().map(item => {
+    const crm = getInvestorCRM(item.investor);
+    return {
+      startup:item.startup,
+      investor:item.investor,
+      score:item.score,
+      verdict:item.verdict,
+      status:crm.status,
+      follow_up:crm.followUp,
+      warm_intro:crm.warmIntro,
+      tags:(crm.tags || []).join(' | '),
+      notes:crm.notes
+    };
+  });
+  exportRowsAsCsv('log7-pipeline.csv', rows);
+}
+
+function clearPipeline() {
+  localStorage.removeItem('l7_pipeline');
+  renderPipeline();
+}
+
+function resetWorkflow() {
+  lastMatches = [];
+  lastPayload = null;
+  deckInsightsCache = null;
+  pdfText = '';
+  uploadedPdfName = '';
+  document.getElementById('pdf-name').textContent = '';
+  document.getElementById('match-results').innerHTML = '<div class="empty">Workspace reset. Select a startup and run a new match.</div>';
+  document.getElementById('deck-tab-content').innerHTML = '<div class="empty">Run a match to generate deck insights, readiness score, missing-data alerts, and likely investor objections.</div>';
+  updateStats();
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString();
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeQuotes(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 </script>
 </body>
