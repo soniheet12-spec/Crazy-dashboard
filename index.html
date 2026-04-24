@@ -445,6 +445,56 @@
     line-height:1.6;
     margin-top:8px;
   }
+  .lux-strip {
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(200,169,110,0.6), rgba(114,184,230,0.45), transparent);
+    margin:14px 0 0;
+  }
+  .memo-block {
+    padding:14px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .memo-block:last-child { border-bottom:none; }
+  .memo-title {
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color:var(--muted);
+    margin-bottom:8px;
+  }
+  .checklist {
+    display:grid;
+    gap:10px;
+  }
+  .check-item {
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    padding:12px;
+    border-radius:14px;
+    background:var(--s2);
+    border:1px solid var(--border);
+  }
+  .check-item input[type="checkbox"] {
+    width:18px;
+    height:18px;
+    margin-top:2px;
+    accent-color:var(--accent);
+  }
+  .module-banner {
+    padding:16px 18px;
+    border-radius:18px;
+    border:1px solid var(--border2);
+    background:
+      linear-gradient(135deg, rgba(200,169,110,0.1), rgba(114,184,230,0.05)),
+      var(--s1);
+    margin-bottom:16px;
+  }
+  .module-banner strong {
+    display:block;
+    font-size:1rem;
+    margin-bottom:6px;
+  }
   .timeline-item {
     padding:12px 0;
     border-bottom:1px solid var(--border);
@@ -536,11 +586,16 @@
 <nav>
   <div class="logo">Log7 Capital</div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showTab('match', this)">Match</button>
+    <button class="nav-tab active" onclick="showTab('home', this)">Home</button>
+    <button class="nav-tab" onclick="showTab('match', this)">Match</button>
     <button class="nav-tab" onclick="showTab('pipeline', this)">Pipeline</button>
     <button class="nav-tab" onclick="showTab('investors', this)">Investors</button>
     <button class="nav-tab" onclick="showTab('startups', this)">Startups</button>
     <button class="nav-tab" onclick="showTab('deck', this)">Deck Insights</button>
+    <button class="nav-tab" onclick="showTab('watchlists', this)">Watchlists</button>
+    <button class="nav-tab" onclick="showTab('memo', this)">IC Memo</button>
+    <button class="nav-tab" onclick="showTab('diligence', this)">Diligence</button>
+    <button class="nav-tab" onclick="showTab('docs', this)">Docs</button>
   </div>
   <div class="nav-right">
     <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
@@ -580,7 +635,89 @@
   <div id="error-box" class="error-box hidden"></div>
   <div id="loading-box" class="loading-box hidden"></div>
 
-  <div id="page-match" class="page active">
+  <div id="page-home" class="page active">
+    <div class="section-bar">
+      <div class="section-title">Deal Command Center</div>
+      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
+      <button class="ghost-btn" onclick="showTab('match', document.querySelectorAll('.nav-tab')[1])">Open Match Studio</button>
+    </div>
+
+    <div class="grid-two">
+      <div class="card hero-card">
+        <div class="card-header">
+          <div class="card-title">Today</div>
+          <span class="badge" id="home-date"></span>
+        </div>
+        <div class="hero-title" style="max-width:14ch">Institutional deal flow, not just startup matching.</div>
+        <div class="hero-copy">This home screen is now designed as a deal desk. It surfaces follow-ups, hot deals, diligence readiness, recent outreach, and module coverage so the product feels closer to a serious investment workflow system.</div>
+        <div class="mini-grid" style="margin-top:18px">
+          <div class="mini-stat"><div class="mini-value" id="home-followups">0</div><div class="mini-label">Due Follow-Ups</div></div>
+          <div class="mini-stat"><div class="mini-value" id="home-hot-deals">0</div><div class="mini-label">Hot Deals</div></div>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Action Center</div>
+          </div>
+          <div class="action-row" style="margin-top:0">
+            <button class="action-btn primary" onclick="showTab('match', document.querySelectorAll('.nav-tab')[1])">Run New Match</button>
+            <button class="action-btn secondary" onclick="showTab('docs', document.querySelectorAll('.nav-tab')[6])">Open Document Vault</button>
+            <button class="action-btn secondary" onclick="showTab('pipeline', document.querySelectorAll('.nav-tab')[2])">Review Pipeline</button>
+            <button class="action-btn secondary" onclick="showTab('deck', document.querySelectorAll('.nav-tab')[5])">View Deck Intelligence</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Professional Modules</div>
+          </div>
+          <div class="tag-row">
+            <span class="tag good">Watchlists</span>
+            <span class="tag good">IC Memo</span>
+            <span class="tag good">Diligence</span>
+            <span class="tag good">Audit Trail</span>
+            <span class="tag info">Research Layer</span>
+            <span class="tag info">Valuation Intelligence</span>
+            <span class="tag info">Relationship Graph</span>
+            <span class="tag warn">Backend Auth Needed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-two">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Priority Queue</div>
+        </div>
+        <div id="home-priority-list"><div class="empty">Pipeline activity will appear here once you save matches and set follow-up dates.</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Institutional Readiness Map</div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Prototype</th>
+              <th>Production Gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Deal Desk Home</td><td>Ready</td><td>Needs live team data</td></tr>
+            <tr><td>Document Vault</td><td>Ready</td><td>Needs secure cloud storage</td></tr>
+            <tr><td>Watchlists / CRM</td><td>Ready</td><td>Needs multi-user sync</td></tr>
+            <tr><td>IC / Diligence</td><td>Scaffolded</td><td>Needs backend workflows</td></tr>
+            <tr><td>Audit / Permissions</td><td>Scaffolded</td><td>Needs auth and role system</td></tr>
+            <tr><td>Relationship Intelligence</td><td>Scaffolded</td><td>Needs graph data model</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-match" class="page">
     <div class="section-bar">
       <div class="section-title">Startup Match Studio</div>
       <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
@@ -620,7 +757,7 @@
         <div id="startup-detail" class="card hidden">
           <div class="card-header">
             <div class="card-title">Startup Snapshot</div>
-            <button class="mini-btn" onclick="showTab('deck', document.querySelectorAll('.nav-tab')[4])">Open Deck Tab</button>
+            <button class="mini-btn" onclick="showTab('deck', document.querySelectorAll('.nav-tab')[5])">Open Deck Tab</button>
           </div>
           <div id="startup-detail-content"></div>
         </div>
@@ -719,7 +856,7 @@
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
-            <button class="action-btn secondary" onclick="showTab('pipeline', document.querySelectorAll('.nav-tab')[1])">Open Pipeline</button>
+            <button class="action-btn secondary" onclick="showTab('pipeline', document.querySelectorAll('.nav-tab')[2])">Open Pipeline</button>
           </div>
         </div>
       </div>
@@ -769,6 +906,141 @@
     </div>
     <div id="deck-tab-content">
       <div class="empty">Run a match to generate deck insights, readiness score, missing-data alerts, and likely investor objections.</div>
+    </div>
+  </div>
+
+  <div id="page-watchlists" class="page">
+    <div class="section-bar">
+      <div class="section-title">Watchlists</div>
+      <button class="ghost-btn" onclick="saveCurrentToWatchlist()">Save Current Startup</button>
+    </div>
+    <div class="module-banner">
+      <strong>Firm-level watchlists and internal grouping.</strong>
+      Save startups into reusable buckets like `IC Candidates`, `High Conviction`, `Needs More Diligence`, or `Outbound Now`.
+    </div>
+    <div class="grid-two">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Create / Edit Watchlist</div>
+        </div>
+        <div class="field">
+          <label>Watchlist Name</label>
+          <input id="watchlist-name" placeholder="e.g. IC Candidates">
+        </div>
+        <div class="field">
+          <label>Watchlist Notes</label>
+          <textarea id="watchlist-notes" placeholder="What qualifies a startup for this watchlist?"></textarea>
+        </div>
+        <button class="action-btn primary" onclick="createWatchlist()">Save Watchlist</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Saved Watchlists</div>
+        </div>
+        <div id="watchlists-list"><div class="empty">No watchlists created yet.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-memo" class="page">
+    <div class="section-bar">
+      <div class="section-title">Investment Committee Memo</div>
+      <button class="ghost-btn" onclick="generateICMemo()">Generate Memo</button>
+      <button class="ghost-btn" onclick="copyICMemo()">Copy Memo</button>
+    </div>
+    <div class="module-banner">
+      <strong>Institutional memo output for internal review.</strong>
+      Generates a decision-ready memo using startup profile, deck intelligence, top investor-fit themes, and current diligence signals.
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">IC Memo Draft</div>
+      </div>
+      <div id="memo-content"><div class="empty">Select a startup and generate the memo.</div></div>
+    </div>
+  </div>
+
+  <div id="page-diligence" class="page">
+    <div class="section-bar">
+      <div class="section-title">Diligence Workspace</div>
+      <button class="ghost-btn" onclick="refreshDiligence()">Refresh Checklist</button>
+    </div>
+    <div class="module-banner">
+      <strong>Structured diligence sections for bank-grade workflow.</strong>
+      Track legal, finance, product, market, team, and customer validation work as a structured checklist instead of free-form notes only.
+    </div>
+    <div class="grid-two">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Checklist</div>
+        </div>
+        <div id="diligence-checklist"><div class="empty">Select a startup to begin diligence tracking.</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Diligence Summary</div>
+        </div>
+        <div id="diligence-summary"><div class="empty">Checklist completion and diligence notes will appear here.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-docs" class="page">
+    <div class="section-bar">
+      <div class="section-title">Document Vault</div>
+      <button class="ghost-btn" onclick="refreshDocsUI()">Refresh Vault</button>
+    </div>
+    <div class="grid-two">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Upload Documents</div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Entity Type</label>
+              <select id="docs-entity-type" onchange="refreshDocsSelectors()">
+                <option value="startup">Startup</option>
+                <option value="investor">Investor</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Entity Name</label>
+              <select id="docs-entity-name"></select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <select id="docs-category">
+              <option value="Pitch Deck">Pitch Deck</option>
+              <option value="Financial Model">Financial Model</option>
+              <option value="Legal">Legal</option>
+              <option value="Research">Research</option>
+              <option value="Meeting Notes">Meeting Notes</option>
+              <option value="Outreach">Outreach</option>
+              <option value="Misc">Misc</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Document Notes</label>
+            <textarea id="docs-notes" placeholder="What is this document for?"></textarea>
+          </div>
+          <div class="drop-zone" onclick="document.getElementById('docs-file-input').click()">
+            <p>Upload a document for the selected investor or startup.</p>
+            <div id="docs-upload-status" class="file-ok"></div>
+          </div>
+          <input id="docs-file-input" type="file" class="hidden" onchange="handleDocUpload(event)">
+          <div class="template-help">Documents are stored locally in your browser for this prototype. A production version would move this to secure cloud storage with permissions and audit logging.</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Stored Documents</div>
+          </div>
+          <div id="docs-list"><div class="empty">No documents stored yet.</div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -834,13 +1106,29 @@ let uploadedPdfName = '';
 let deckInsightsCache = null;
 let lastMatches = [];
 let lastPayload = null;
+let docsDbPromise = null;
+const DILIGENCE_TEMPLATE = [
+  { id:'legal_entity', label:'Legal entity and incorporation docs reviewed' },
+  { id:'financials', label:'Revenue, runway, and financial model checked' },
+  { id:'cap_table', label:'Cap table and ownership structure reviewed' },
+  { id:'product_demo', label:'Product demo or walkthrough completed' },
+  { id:'market_map', label:'Market landscape and competitor mapping completed' },
+  { id:'customer_refs', label:'Customer or reference calls completed' },
+  { id:'team_checks', label:'Founder and team background checks reviewed' },
+  { id:'regulatory', label:'Regulatory or compliance risks assessed' }
+];
 
 window.onload = async () => {
   const key = localStorage.getItem('l7_key') || '';
   document.getElementById('api-key').value = key;
   loadPreferences();
   loadTemplates();
+  await initDocsDb();
   await loadData();
+  refreshDocsSelectors();
+  refreshHome();
+  renderWatchlists();
+  refreshDiligence();
   if (key) setKeyStatus('Saved');
 };
 
@@ -894,6 +1182,61 @@ function savePreferences() {
   localStorage.setItem('l7_matching_mode', document.getElementById('matching-mode').value);
 }
 
+function getWatchlists() {
+  return JSON.parse(localStorage.getItem('l7_watchlists') || '[]');
+}
+
+function saveWatchlists(watchlists) {
+  localStorage.setItem('l7_watchlists', JSON.stringify(watchlists));
+}
+
+function diligenceKey() {
+  return `l7_diligence_${selectedStartup?.company || 'global'}`;
+}
+
+function getDiligenceState() {
+  return JSON.parse(localStorage.getItem(diligenceKey()) || '{}');
+}
+
+function saveDiligenceState(state) {
+  localStorage.setItem(diligenceKey(), JSON.stringify(state));
+}
+
+function refreshHome() {
+  document.getElementById('home-date').textContent = new Date().toLocaleDateString();
+  const pipeline = getPipeline();
+  const due = pipeline.filter(item => {
+    const crm = getInvestorCRM(item.investor);
+    return crm.followUp && crm.followUp <= new Date().toISOString().slice(0, 10);
+  });
+  const hot = pipeline.filter(item => ['meeting booked', 'invested', 'replied'].includes(getInvestorCRM(item.investor).status));
+  document.getElementById('home-followups').textContent = due.length;
+  document.getElementById('home-hot-deals').textContent = hot.length;
+
+  const priorityList = document.getElementById('home-priority-list');
+  const priorityRows = pipeline.slice(0, 6);
+  if (!priorityRows.length) {
+    priorityList.innerHTML = '<div class="empty">Pipeline activity will appear here once you save matches and set follow-up dates.</div>';
+    return;
+  }
+  priorityList.innerHTML = priorityRows.map(item => {
+    const crm = getInvestorCRM(item.investor);
+    return `
+      <div class="pipeline-row">
+        <div class="avatar">${initials(item.investor)}</div>
+        <div class="row-main">
+          <div class="row-title">${item.investor} <span class="badge">${item.startup}</span></div>
+          <div class="row-meta">Status: ${crm.status} | Score: ${item.score} | Follow up: ${crm.followUp || 'Not set'}</div>
+          <div class="tag-row">
+            ${crm.warmIntro ? `<span class="tag good">Warm intro mapped</span>` : ''}
+            ${(crm.tags || []).slice(0, 3).map(tag => `<span class="tag info">${tag}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function loadTemplates() {
   document.getElementById('email-subject-template').value = localStorage.getItem('l7_email_subject_template') || DEFAULT_EMAIL_SUBJECT;
   document.getElementById('email-template').value = localStorage.getItem('l7_email_template') || DEFAULT_EMAIL_TEMPLATE;
@@ -910,6 +1253,54 @@ function saveKey() {
   const key = document.getElementById('api-key').value;
   localStorage.setItem('l7_key', key);
   setKeyStatus(key ? 'Saved' : '');
+}
+
+function initDocsDb() {
+  if (docsDbPromise) return docsDbPromise;
+  docsDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open('Log7DocumentVault', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('documents')) {
+        const store = db.createObjectStore('documents', { keyPath:'id', autoIncrement:true });
+        store.createIndex('entityType', 'entityType', { unique:false });
+        store.createIndex('entityName', 'entityName', { unique:false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return docsDbPromise;
+}
+
+async function saveDocumentRecord(record) {
+  const db = await initDocsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', 'readwrite');
+    tx.objectStore('documents').add(record);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getAllDocuments() {
+  const db = await initDocsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', 'readonly');
+    const request = tx.objectStore('documents').getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteDocumentRecord(id) {
+  const db = await initDocsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', 'readwrite');
+    tx.objectStore('documents').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
 function setKeyStatus(text) {
@@ -1099,16 +1490,239 @@ async function loadData() {
   renderStartups();
   renderStartupMatchList();
   clearStartupSelection();
+  refreshDocsSelectors();
   if (previouslySelectedCompany) {
     const index = startups.findIndex(startup => startup.company === previouslySelectedCompany);
     if (index >= 0) selectStartup(index);
   }
   renderPipeline();
+  refreshHome();
+  renderWatchlists();
   updateStats();
   showLoading('');
   if (investorError || startupError) {
     showError([investorError ? `Investor feed: ${investorError}` : '', startupError ? `Startup feed: ${startupError}` : ''].filter(Boolean).join(' | '));
   }
+}
+
+function renderWatchlists() {
+  const container = document.getElementById('watchlists-list');
+  if (!container) return;
+  const watchlists = getWatchlists();
+  if (!watchlists.length) {
+    container.innerHTML = '<div class="empty">No watchlists created yet.</div>';
+    return;
+  }
+  container.innerHTML = watchlists.map(list => `
+    <div class="pipeline-row">
+      <div class="avatar">${initials(list.name)}</div>
+      <div class="row-main">
+        <div class="row-title">${list.name} <span class="badge">${(list.items || []).length} startups</span></div>
+        <div class="row-copy">${list.notes || 'No notes'}</div>
+        <div class="tag-row">${(list.items || []).slice(0, 4).map(item => `<span class="tag info">${item}</span>`).join('')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function createWatchlist() {
+  const name = document.getElementById('watchlist-name').value.trim();
+  const notes = document.getElementById('watchlist-notes').value.trim();
+  if (!name) return showError('Enter a watchlist name.');
+  const watchlists = getWatchlists();
+  const existing = watchlists.find(item => item.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    existing.notes = notes;
+  } else {
+    watchlists.unshift({ name, notes, items:[] });
+  }
+  saveWatchlists(watchlists);
+  document.getElementById('watchlist-name').value = '';
+  document.getElementById('watchlist-notes').value = '';
+  renderWatchlists();
+}
+
+function saveCurrentToWatchlist() {
+  if (!selectedStartup) return showError('Select a startup first.');
+  const watchlists = getWatchlists();
+  if (!watchlists.length) return showError('Create a watchlist first.');
+  watchlists[0].items = uniqueList([selectedStartup.company, ...(watchlists[0].items || [])]);
+  saveWatchlists(watchlists);
+  renderWatchlists();
+}
+
+function refreshDocsSelectors() {
+  const typeEl = document.getElementById('docs-entity-type');
+  const nameEl = document.getElementById('docs-entity-name');
+  if (!typeEl || !nameEl) return;
+  const type = typeEl.value;
+  const items = type === 'startup' ? startups.map(item => item.company) : investors.map(item => item.name);
+  nameEl.innerHTML = items.map(name => `<option value="${escapeHtml(name)}">${name}</option>`).join('');
+  refreshDocsUI();
+}
+
+function generateICMemo() {
+  if (!selectedStartup) {
+    document.getElementById('memo-content').innerHTML = '<div class="empty">Select a startup first.</div>';
+    return;
+  }
+  const payload = lastPayload || buildRuleBasedPayload();
+  const topMatches = (payload.matches || []).slice(0, 5);
+  const readiness = payload.founder_readiness || computeFounderReadiness(selectedStartup, payload.deck_insights);
+  const missing = payload.missing_data || getMissingDataAlerts(selectedStartup);
+  const objections = uniqueList(topMatches.flatMap(match => match.objections || predictObjections(match)));
+  const memoHtml = `
+    <div class="memo-block">
+      <div class="memo-title">Company</div>
+      <div>${selectedStartup.company} | ${selectedStartup.sector || 'Sector n/a'} | ${selectedStartup.stage || 'Stage n/a'} | ${selectedStartup.location || 'Location n/a'}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Investment Thesis</div>
+      <div>${payload.deck_insights?.summary || selectedStartup.problem || 'No thesis summary generated yet.'}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Readiness And Signals</div>
+      <div>Readiness score: ${readiness.score} (${readiness.verdict})</div>
+      <div class="tag-row">${(payload.deck_insights?.signals || []).map(item => `<span class="tag info">${item}</span>`).join('')}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Top Match Themes</div>
+      <div>${topMatches.map(match => `<div><strong>${match.name}</strong>: ${(match.reasons || []).join(', ')}</div>`).join('') || 'No match themes available.'}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Key Risks</div>
+      <div>${(payload.deck_insights?.risks || []).map(item => `<div>- ${item}</div>`).join('') || '<div>- No risks captured</div>'}</div>
+      <div style="margin-top:8px">${objections.map(item => `<div>- ${item}</div>`).join('') || ''}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Missing Data / Diligence Gaps</div>
+      <div>${missing.map(item => `<div>- ${item}</div>`).join('') || '<div>- No major missing-data issues</div>'}</div>
+    </div>
+    <div class="memo-block">
+      <div class="memo-title">Recommendation</div>
+      <div>${readiness.score >= 75 ? 'Advance to partner / IC review with focused diligence on flagged risks.' : readiness.score >= 60 ? 'Continue diligence and clarify traction, market proof, and objections before IC.' : 'Do not advance yet; improve data quality and deck evidence first.'}</div>
+    </div>
+  `;
+  document.getElementById('memo-content').innerHTML = memoHtml;
+}
+
+function copyICMemo() {
+  const content = document.getElementById('memo-content');
+  if (!content || !selectedStartup) return showError('Generate an IC memo first.');
+  navigator.clipboard.writeText(content.innerText);
+}
+
+function refreshDiligence() {
+  const container = document.getElementById('diligence-checklist');
+  const summary = document.getElementById('diligence-summary');
+  if (!selectedStartup) {
+    container.innerHTML = '<div class="empty">Select a startup to begin diligence tracking.</div>';
+    summary.innerHTML = '<div class="empty">Checklist completion and diligence notes will appear here.</div>';
+    return;
+  }
+  const state = getDiligenceState();
+  container.innerHTML = `
+    <div class="checklist">
+      ${DILIGENCE_TEMPLATE.map(item => `
+        <label class="check-item">
+          <input type="checkbox" ${state[item.id] ? 'checked' : ''} onchange="toggleDiligenceItem('${item.id}', this.checked)">
+          <div>
+            <div style="font-size:13px">${item.label}</div>
+          </div>
+        </label>
+      `).join('')}
+    </div>
+  `;
+  const completed = DILIGENCE_TEMPLATE.filter(item => state[item.id]).length;
+  summary.innerHTML = `
+    <div class="mini-grid">
+      <div class="mini-stat"><div class="mini-value">${completed}/${DILIGENCE_TEMPLATE.length}</div><div class="mini-label">Checklist Complete</div></div>
+      <div class="mini-stat"><div class="mini-value">${Math.round((completed / DILIGENCE_TEMPLATE.length) * 100)}%</div><div class="mini-label">Completion</div></div>
+    </div>
+    <div class="lux-strip"></div>
+    <div class="template-help" style="margin-top:14px">Use this as the institution-facing diligence tracker. In production, each item should support owners, evidence files, timestamps, and approval status.</div>
+  `;
+}
+
+function toggleDiligenceItem(id, checked) {
+  const state = getDiligenceState();
+  state[id] = checked;
+  saveDiligenceState(state);
+  refreshDiligence();
+}
+
+async function refreshDocsUI() {
+  const typeEl = document.getElementById('docs-entity-type');
+  const nameEl = document.getElementById('docs-entity-name');
+  const listEl = document.getElementById('docs-list');
+  if (!typeEl || !nameEl || !listEl) return;
+  const entityType = typeEl.value;
+  const entityName = nameEl.value;
+  const docs = (await getAllDocuments()).filter(doc => doc.entityType === entityType && doc.entityName === entityName).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!docs.length) {
+    listEl.innerHTML = '<div class="empty">No documents stored for this entity yet.</div>';
+    return;
+  }
+  listEl.innerHTML = docs.map(doc => `
+    <div class="pipeline-row">
+      <div class="avatar">${doc.category.slice(0,2).toUpperCase()}</div>
+      <div class="row-main">
+        <div class="row-title">${doc.fileName} <span class="badge">${doc.category}</span></div>
+        <div class="row-meta">${doc.entityType}: ${doc.entityName} | ${formatDate(doc.createdAt)} | ${(doc.sizeKb || 0)} KB</div>
+        ${doc.notes ? `<div class="row-copy">${doc.notes}</div>` : ''}
+        <div class="action-row">
+          <button class="action-btn primary" onclick="downloadStoredDoc(${doc.id})">Download</button>
+          <button class="action-btn secondary" onclick="deleteStoredDoc(${doc.id})">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function handleDocUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const entityType = document.getElementById('docs-entity-type').value;
+  const entityName = document.getElementById('docs-entity-name').value;
+  const category = document.getElementById('docs-category').value;
+  const notes = document.getElementById('docs-notes').value;
+  document.getElementById('docs-upload-status').textContent = 'Saving document...';
+  const reader = new FileReader();
+  reader.onload = async () => {
+    await saveDocumentRecord({
+      entityType,
+      entityName,
+      category,
+      notes,
+      fileName:file.name,
+      mimeType:file.type || 'application/octet-stream',
+      sizeKb:Math.round(file.size / 1024),
+      dataUrl:reader.result,
+      createdAt:new Date().toISOString()
+    });
+    document.getElementById('docs-upload-status').textContent = `${file.name} stored`;
+    document.getElementById('docs-notes').value = '';
+    document.getElementById('docs-file-input').value = '';
+    refreshDocsUI();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function downloadStoredDoc(id) {
+  const docs = await getAllDocuments();
+  const doc = docs.find(item => item.id === id);
+  if (!doc) return;
+  const link = document.createElement('a');
+  link.href = doc.dataUrl;
+  link.download = doc.fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function deleteStoredDoc(id) {
+  await deleteDocumentRecord(id);
+  refreshDocsUI();
 }
 
 function renderInvestors() {
@@ -1221,6 +1835,8 @@ function selectStartup(index) {
   const driveWrap = document.getElementById('drive-link-wrap');
   driveWrap.innerHTML = selectedStartup.pitchDeckUrl ? `Submitted deck link: <a href="${selectedStartup.pitchDeckUrl}" target="_blank" style="color:var(--accent)">Open in Drive</a>` : 'No deck link from the form yet.';
   document.getElementById('match-btn').disabled = false;
+  refreshDiligence();
+  generateICMemo();
 }
 
 function handleDrop(event) {
@@ -1831,6 +2447,7 @@ function updateInvestorCRM(name, field, value) {
   record[field] = value;
   localStorage.setItem(crmKey(name), JSON.stringify(record));
   renderPipeline();
+  refreshHome();
 }
 
 function updateInvestorTags(name, value) {
@@ -1972,6 +2589,7 @@ function saveMatchToPipeline(name) {
     localStorage.setItem('l7_pipeline', JSON.stringify(pipeline.slice(0, 500)));
   }
   renderPipeline();
+  refreshHome();
   updateStats();
 }
 
@@ -2089,6 +2707,7 @@ function exportPipelineCsv() {
 function clearPipeline() {
   localStorage.removeItem('l7_pipeline');
   renderPipeline();
+  refreshHome();
 }
 
 function resetWorkflow() {
