@@ -183,9 +183,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 let investors = [], startups = [], selectedStartup = null, pdfText = '';
 
 // API Key
-window.onload = () => {
+window.onload = async () => {
   const k = localStorage.getItem('l7_key') || '';
   document.getElementById('api-key').value = k;
+  await loadData();
   if (k) document.getElementById('key-status').textContent = '✓ Saved';
 };
 function saveKey() {
@@ -220,6 +221,34 @@ function showLoading(msg) {
   el.textContent = msg; el.style.display = msg ? 'block' : 'none';
 }
 
+function buildFreshUrl(url) {
+  const u = new URL(url);
+  u.searchParams.set('_ts', Date.now().toString());
+  return u.toString();
+}
+
+async function fetchSheetJson(url) {
+  const res = await fetch(buildFreshUrl(url), {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      'Pragma': 'no-cache'
+    }
+  });
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return res.json();
+}
+
+function clearStartupSelection() {
+  selectedStartup = null;
+  document.querySelectorAll('.startup-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('startup-detail').style.display = 'none';
+  document.getElementById('startup-detail-content').innerHTML = '';
+  document.getElementById('drive-link-wrap').innerHTML = '';
+  document.getElementById('match-btn').disabled = true;
+}
+
 // Load data from Google Sheets
 function parseCSV(text) {
   const lines = text.split('\n').filter(l => l.trim());
@@ -240,14 +269,13 @@ function parseCSV(text) {
 }
 
 async function loadData() {
+  const previouslySelectedCompany = selectedStartup?.company || '';
   showError(''); showLoading('Fetching live data from Google Sheets...');
   try {
-    const [invRes, stRes] = await Promise.all([
-      fetch(INVESTOR_URL),
-      fetch(STARTUP_URL)
+    const [invData, stData] = await Promise.all([
+      fetchSheetJson(INVESTOR_URL),
+      fetchSheetJson(STARTUP_URL)
     ]);
-    const invData = await invRes.json();
-    const stData  = await stRes.json();
 
     if (!invData.success) throw new Error('Investor sheet: ' + invData.error);
     if (!stData.success)  throw new Error('Startup sheet: ' + stData.error);
@@ -291,6 +319,11 @@ async function loadData() {
     document.getElementById('inv-count').textContent = investors.length;
     document.getElementById('st-count').textContent  = startups.length;
     renderInvestors(); renderStartups(); renderStartupMatchList();
+    clearStartupSelection();
+    if (previouslySelectedCompany) {
+      const selectedIndex = startups.findIndex(s => s.company === previouslySelectedCompany);
+      if (selectedIndex >= 0) selectStartup(selectedIndex);
+    }
     showLoading('');
   } catch(e) {
     showLoading('');
