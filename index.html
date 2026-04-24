@@ -246,14 +246,31 @@ function clearStartupSelection() {
 }
 
 function extractRows(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.data)) return payload.data;
-  if (payload && Array.isArray(payload.rows)) return payload.rows;
-  if (payload && Array.isArray(payload.values)) return payload.values;
+  if (Array.isArray(payload)) return normalizeRows(payload);
+  if (payload && Array.isArray(payload.data)) return normalizeRows(payload.data);
+  if (payload && Array.isArray(payload.rows)) return normalizeRows(payload.rows);
+  if (payload && Array.isArray(payload.values)) return normalizeRows(payload.values);
   return [];
 }
 
+function normalizeRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) return [];
+  if (!Array.isArray(rows[0])) return rows;
+
+  const headerRow = rows[0].map(v => String(v || '').trim());
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headerRow.forEach((header, index) => {
+      obj[header] = row[index] == null ? '' : String(row[index]).trim();
+    });
+    return obj;
+  });
+}
+
 function hasCompanyName(row) {
+  if (Array.isArray(row)) {
+    return row.some(value => String(value || '').trim());
+  }
   return !!(
     row['Company Name'] ||
     row['company'] ||
@@ -265,6 +282,27 @@ function hasCompanyName(row) {
 }
 
 function mapStartup(row) {
+  if (Array.isArray(row)) {
+    return {
+      company: String(row[0] || '').trim(),
+      founder: String(row[1] || '').trim(),
+      phone: String(row[2] || '').trim(),
+      email: String(row[3] || '').trim(),
+      sector: String(row[4] || '').trim(),
+      location: String(row[5] || '').trim(),
+      website: String(row[6] || '').trim(),
+      valuation: String(row[7] || '').trim(),
+      roundSize: String(row[8] || '').trim(),
+      fundedBefore: String(row[9] || '').trim(),
+      problem: String(row[10] || '').trim(),
+      currentRound: String(row[11] || '').trim(),
+      arr: String(row[12] || '').trim(),
+      prevRevenue: String(row[13] || '').trim(),
+      pitchDeckUrl: String(row[14] || '').trim(),
+      stage: String(row[15] || '').trim(),
+      timestamp: String(row[16] || '').trim(),
+    };
+  }
   return {
     company:      row['Company Name'] || row['company'] || row['companyName'] || row['Startup Name'] || row['Startup'] || row['Name'] || '',
     founder:      row["Founder's Name"] || row['Founder Name'] || row['Founder'] || '',
