@@ -308,6 +308,17 @@ function firstMeaningfulValue(row, excludedKeys = []) {
   return '';
 }
 
+function describeRow(row) {
+  if (Array.isArray(row)) {
+    return `Array row with ${row.length} columns. First values: ${row.slice(0, 6).map(v => String(v || '').trim()).join(' | ')}`;
+  }
+  if (row && typeof row === 'object') {
+    const keys = Object.keys(row);
+    return `Object row keys: ${keys.slice(0, 12).join(' | ')}`;
+  }
+  return `Unexpected row type: ${typeof row}`;
+}
+
 function hasCompanyName(row) {
   if (Array.isArray(row)) {
     return row.some(value => String(value || '').trim());
@@ -436,7 +447,7 @@ async function loadData() {
       const startupRows = extractRows(stData);
       startups = startupRows.filter(hasCompanyName).map(mapStartup);
       if (!startups.length && startupRows.length) {
-        startupError = 'Startup sheet returned rows, but none matched the expected company columns';
+        startupError = `Startup sheet returned rows, but none matched the expected company columns. ${describeRow(startupRows[0])}`;
       }
     }
   } else {
