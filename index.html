@@ -10,9 +10,10 @@
   :root{--bg:#0A0A0A;--s1:#111111;--s2:#1A1A1A;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#F0EDE8;--muted:#888580;--gold:#C8A96E;--green:#4CAF7D;--amber:#E8A838;--red:#E05555;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;min-height:100vh}
-  nav{padding:1.1rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(10,10,10,0.95);backdrop-filter:blur(12px);z-index:100}
+  nav{padding:1.1rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(10,10,10,0.95);backdrop-filter:blur(12px);z-index:100;gap:1rem;flex-wrap:wrap}
   .logo{font-family:'DM Serif Display',serif;font-size:1.15rem;color:var(--gold)}
-  .nav-tabs{display:flex;gap:4px}
+  .nav-tabs{display:flex;gap:4px;flex-wrap:wrap}
+  .nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
   .nav-tab{padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all 0.2s}
   .nav-tab:hover{color:var(--text);background:var(--s2)}
   .nav-tab.active{color:var(--gold);background:var(--s2);border:1px solid var(--border2)}
@@ -58,6 +59,13 @@
   .tag-g{background:rgba(76,175,125,0.1);color:var(--green);border:1px solid rgba(76,175,125,0.2)}
   .tag-a{background:rgba(232,168,56,0.1);color:var(--amber);border:1px solid rgba(232,168,56,0.2)}
   .tags-row{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+  .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .btn-small{padding:8px 12px;font-size:12px;border-radius:7px}
+  .btn-secondary{background:var(--s2);border:1px solid var(--border2);color:var(--text)}
+  .btn-secondary:hover{background:#202020}
+  .template-card textarea{min-height:110px}
+  .template-help{font-size:11px;color:var(--muted);line-height:1.6;margin-top:8px}
+  .subtle-note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px}
   .inv-row{display:flex;align-items:flex-start;gap:14px;padding:14px 1.25rem;border-bottom:1px solid var(--border)}
   .inv-row:last-child{border-bottom:none}
   .pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;margin:2px}
@@ -71,11 +79,25 @@
   .refresh-btn:hover{color:var(--text)}
   .detail-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
   .detail-label{color:var(--muted)}
-  .config-bar{background:var(--s1);border:1px solid rgba(200,169,110,0.2);border-radius:8px;padding:12px 16px;margin-bottom:1.5rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .config-bar input{background:transparent;border:none;padding:0;font-size:13px;flex:1;min-width:200px}
-  .config-bar input:focus{border:none}
-  .config-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);white-space:nowrap}
+  .settings-wrap{position:relative}
+  .settings-toggle{font-size:12px;color:var(--text);background:var(--s1);border:1px solid var(--border2);border-radius:999px;padding:8px 14px;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .settings-menu{position:absolute;right:0;top:calc(100% + 10px);width:min(360px,calc(100vw - 32px));background:rgba(17,17,17,0.98);border:1px solid var(--border2);border-radius:14px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,0.35);display:none}
+  .settings-wrap.open .settings-menu{display:block}
+  .settings-section{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+  .settings-section:last-child{padding-bottom:0;margin-bottom:0;border-bottom:none}
+  .settings-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px}
+  .settings-input{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;width:100%}
+  .theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .theme-chip{border:1px solid var(--border);background:var(--s2);border-radius:10px;padding:10px;cursor:pointer;text-align:left;color:var(--text)}
+  .theme-chip.active{border-color:var(--gold);box-shadow:0 0 0 1px rgba(200,169,110,0.3) inset}
+  .theme-dot{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .settings-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}
   .key-saved{font-size:11px;color:var(--green)}
+  .insight-card{background:linear-gradient(135deg, rgba(200,169,110,0.1), rgba(255,255,255,0.02));border:1px solid rgba(200,169,110,0.25)}
+  .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .insight-list{font-size:12px;color:var(--muted);line-height:1.7}
+  .insight-list b{color:var(--text);font-weight:500}
+  @media(max-width:680px){.insight-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -87,16 +109,29 @@
     <button class="nav-tab" onclick="showTab('investors',this)">Investors</button>
     <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
   </div>
+  <div class="nav-right">
+    <div class="settings-wrap" id="settings-wrap">
+      <button class="settings-toggle" onclick="toggleSettings()">Settings</button>
+      <div class="settings-menu" id="settings-menu">
+        <div class="settings-section">
+          <div class="settings-label">Theme</div>
+          <div class="theme-grid">
+            <button class="theme-chip" data-theme="obsidian" onclick="setTheme('obsidian')"><span class="theme-dot" style="background:#C8A96E"></span>Obsidian</button>
+            <button class="theme-chip" data-theme="forest" onclick="setTheme('forest')"><span class="theme-dot" style="background:#77C7A5"></span>Forest</button>
+            <button class="theme-chip" data-theme="ocean" onclick="setTheme('ocean')"><span class="theme-dot" style="background:#6FB7E9"></span>Ocean</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">API Key</div>
+          <input class="settings-input" type="password" id="api-key" placeholder="Paste your Anthropic API key here (sk-ant-...)" oninput="saveKey()">
+          <div class="settings-note"><span class="key-saved" id="key-status"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </nav>
 
 <div class="container">
-
-  <!-- API Key Config -->
-  <div class="config-bar">
-    <span class="config-label">API Key</span>
-    <input type="password" id="api-key" placeholder="Paste your Anthropic API key here (sk-ant-...)" oninput="saveKey()">
-    <span class="key-saved" id="key-status"></span>
-  </div>
 
   <!-- ERROR / LOADING -->
   <div id="error-box" class="error-box" style="display:none"></div>
@@ -136,6 +171,40 @@
         <button class="btn btn-primary" id="match-btn" onclick="runMatch()" style="width:100%;margin-top:1rem;padding:12px" disabled>
           Run AI Match
         </button>
+
+        <div class="card template-card" style="margin-top:1rem">
+          <label>Email Template</label>
+          <textarea id="email-template" oninput="saveTemplates()">Hi {{investor_name}},
+
+I’m sharing {{startup_company}}, a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
+
+Why this may fit:
+{{match_reasons}}
+
+Round: {{startup_round}}
+Round size: {{startup_round_size}}
+Location: {{startup_location}}
+
+Pitch deck:
+{{pitch_deck_link}}
+
+If this looks interesting, I’d love to connect.
+
+Best,
+Log7 Capital</textarea>
+          <label style="margin-top:1rem">WhatsApp Template</label>
+          <textarea id="whatsapp-template" oninput="saveTemplates()">Hi {{investor_name}}, sharing {{startup_company}} from Log7 Capital.
+
+{{startup_company}} is a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
+Why it may fit: {{match_reasons}}
+Round: {{startup_round}}
+Round size: {{startup_round_size}}
+Pitch deck: {{pitch_deck_link}}
+
+Interested?</textarea>
+          <div class="template-help">Available placeholders: {{investor_name}}, {{startup_company}}, {{startup_founder}}, {{startup_sector}}, {{startup_stage}}, {{startup_round}}, {{startup_round_size}}, {{startup_location}}, {{match_score}}, {{match_verdict}}, {{match_reasons}}, {{match_concerns}}, {{pitch_deck_link}}</div>
+          <div class="subtle-note">Browser buttons can prefill email and WhatsApp text. They cannot attach a local PDF file directly, so the startup’s pitch deck link is inserted automatically.</div>
+        </div>
       </div>
 
       <!-- Right col - results -->
@@ -181,11 +250,45 @@ const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDF
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 let investors = [], startups = [], selectedStartup = null, pdfText = '';
+const DEFAULT_EMAIL_TEMPLATE = `Hi {{investor_name}},
+
+I’m sharing {{startup_company}}, a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
+
+Why this may fit:
+{{match_reasons}}
+
+Round: {{startup_round}}
+Round size: {{startup_round_size}}
+Location: {{startup_location}}
+
+Pitch deck:
+{{pitch_deck_link}}
+
+If this looks interesting, I’d love to connect.
+
+Best,
+Log7 Capital`;
+const DEFAULT_WHATSAPP_TEMPLATE = `Hi {{investor_name}}, sharing {{startup_company}} from Log7 Capital.
+
+{{startup_company}} is a {{startup_stage}} startup in {{startup_sector}} founded by {{startup_founder}}.
+Why it may fit: {{match_reasons}}
+Round: {{startup_round}}
+Round size: {{startup_round_size}}
+Pitch deck: {{pitch_deck_link}}
+
+Interested?`;
+const THEMES = {
+  obsidian: { bg:'#0A0A0A', s1:'#111111', s2:'#1A1A1A', border:'rgba(255,255,255,0.08)', border2:'rgba(255,255,255,0.14)', text:'#F0EDE8', muted:'#888580', gold:'#C8A96E', green:'#4CAF7D', amber:'#E8A838', red:'#E05555' },
+  forest: { bg:'#08110F', s1:'#0F1B18', s2:'#152521', border:'rgba(159,214,188,0.12)', border2:'rgba(159,214,188,0.24)', text:'#EDF6F1', muted:'#8CA39A', gold:'#77C7A5', green:'#8BE39E', amber:'#E5C96B', red:'#F06A67' },
+  ocean: { bg:'#08111A', s1:'#0E1A27', s2:'#152536', border:'rgba(124,183,220,0.12)', border2:'rgba(124,183,220,0.26)', text:'#ECF5FF', muted:'#8EA4BC', gold:'#6FB7E9', green:'#74D3AE', amber:'#F1C76B', red:'#F07178' }
+};
 
 // API Key
 window.onload = async () => {
   const k = localStorage.getItem('l7_key') || '';
   document.getElementById('api-key').value = k;
+  loadPreferences();
+  loadTemplates();
   await loadData();
   if (k) document.getElementById('key-status').textContent = '✓ Saved';
 };
@@ -194,6 +297,43 @@ function saveKey() {
   localStorage.setItem('l7_key', k);
   document.getElementById('key-status').textContent = k ? '✓ Saved' : '';
 }
+
+function loadTemplates() {
+  const emailTemplate = localStorage.getItem('l7_email_template') || DEFAULT_EMAIL_TEMPLATE;
+  const whatsappTemplate = localStorage.getItem('l7_whatsapp_template') || DEFAULT_WHATSAPP_TEMPLATE;
+  document.getElementById('email-template').value = emailTemplate;
+  document.getElementById('whatsapp-template').value = whatsappTemplate;
+}
+
+function saveTemplates() {
+  localStorage.setItem('l7_email_template', document.getElementById('email-template').value);
+  localStorage.setItem('l7_whatsapp_template', document.getElementById('whatsapp-template').value);
+}
+
+function applyTheme(themeName) {
+  const theme = THEMES[themeName] || THEMES.obsidian;
+  const root = document.documentElement;
+  Object.entries(theme).forEach(([key, value]) => root.style.setProperty(`--${key}`, value));
+  document.querySelectorAll('.theme-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.theme === themeName));
+}
+
+function setTheme(themeName) {
+  localStorage.setItem('l7_theme', themeName);
+  applyTheme(themeName);
+}
+
+function loadPreferences() {
+  applyTheme(localStorage.getItem('l7_theme') || 'obsidian');
+}
+
+function toggleSettings() {
+  document.getElementById('settings-wrap').classList.toggle('open');
+}
+
+document.addEventListener('click', (event) => {
+  const wrap = document.getElementById('settings-wrap');
+  if (wrap && !wrap.contains(event.target)) wrap.classList.remove('open');
+});
 
 // Tabs
 function showTab(name, btn) {
@@ -564,6 +704,97 @@ function selectStartup(i) {
   document.getElementById('match-btn').disabled = false;
 }
 
+function findInvestorByName(name) {
+  return investors.find(inv => inv.name === name) || investors.find(inv => (inv.name || '').toLowerCase() === (name || '').toLowerCase()) || null;
+}
+
+function getDeckLink() {
+  if (selectedStartup?.pitchDeckUrl) return selectedStartup.pitchDeckUrl;
+  return 'Pitch deck link not available';
+}
+
+function buildMessageContext(match, investor) {
+  return {
+    investor_name: investor?.name || match.name || 'Investor',
+    startup_company: selectedStartup?.company || '',
+    startup_founder: selectedStartup?.founder || '',
+    startup_sector: selectedStartup?.sector || '',
+    startup_stage: selectedStartup?.stage || '',
+    startup_round: selectedStartup?.currentRound || '',
+    startup_round_size: selectedStartup?.roundSize || '',
+    startup_location: selectedStartup?.location || '',
+    match_score: String(match.score ?? ''),
+    match_verdict: match.verdict || '',
+    match_reasons: (match.reasons || []).join(', ') || 'Strong investor-startup fit',
+    match_concerns: (match.concerns || []).join(', ') || 'None highlighted',
+    pitch_deck_link: getDeckLink()
+  };
+}
+
+function fillTemplate(template, context) {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => context[key] || '');
+}
+
+function buildEmailSubject() {
+  const company = selectedStartup?.company || 'startup';
+  const sector = selectedStartup?.sector || 'company';
+  return `Log7 Capital intro: ${company} (${sector})`;
+}
+
+function emailInvestor(matchName) {
+  if (!selectedStartup) return showError('Select a startup first');
+  const investor = findInvestorByName(matchName);
+  if (!investor?.email) return showError(`No email found for ${matchName}`);
+  const match = window.lastMatches?.find(m => m.name === matchName) || { name: matchName, reasons: [], concerns: [] };
+  const body = fillTemplate(document.getElementById('email-template').value, buildMessageContext(match, investor));
+  window.location.href = `mailto:${encodeURIComponent(investor.email)}?subject=${encodeURIComponent(buildEmailSubject())}&body=${encodeURIComponent(body)}`;
+}
+
+function normalizeWhatsappNumber(number) {
+  return String(number || '').replace(/[^\d]/g, '');
+}
+
+function whatsappInvestor(matchName) {
+  if (!selectedStartup) return showError('Select a startup first');
+  const investor = findInvestorByName(matchName);
+  if (!investor?.phone) return showError(`No WhatsApp number found for ${matchName}`);
+  const phone = normalizeWhatsappNumber(investor.phone);
+  if (!phone) return showError(`Invalid WhatsApp number for ${matchName}`);
+  const match = window.lastMatches?.find(m => m.name === matchName) || { name: matchName, reasons: [], concerns: [] };
+  const text = fillTemplate(document.getElementById('whatsapp-template').value, buildMessageContext(match, investor));
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function extractMatchPayload(raw) {
+  if (Array.isArray(raw)) return { deckInsights: null, matches: raw };
+  if (raw && Array.isArray(raw.matches)) {
+    return {
+      deckInsights: raw.deck_insights || raw.deckInsights || null,
+      matches: raw.matches
+    };
+  }
+  return { deckInsights: null, matches: [] };
+}
+
+function renderDeckInsights(deckInsights) {
+  if (!deckInsights) return '';
+  const summary = deckInsights.summary || 'Deck insights extracted from the uploaded pitch deck and startup profile.';
+  const strengths = (deckInsights.strengths || []).map(item => `<div>• ${item}</div>`).join('') || '<div>• No strengths captured</div>';
+  const risks = (deckInsights.risks || []).map(item => `<div>• ${item}</div>`).join('') || '<div>• No risks captured</div>';
+  const signals = (deckInsights.signals || []).map(item => `<span class="tag tag-g">${item}</span>`).join('');
+  return `
+    <div class="card insight-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">Pitch Deck Insights</div>
+      <div style="font-size:14px;line-height:1.7">${summary}</div>
+      <div class="insight-grid">
+        <div class="insight-list"><b>Strengths</b>${strengths}</div>
+        <div class="insight-list"><b>Risks</b>${risks}</div>
+      </div>
+      ${signals ? `<div class="tags-row" style="margin-top:14px">${signals}</div>` : ''}
+    </div>
+  `;
+}
+
 // PDF handling
 function handleDrop(e) {
   e.preventDefault();
@@ -621,6 +852,10 @@ Problem: ${selectedStartup.problem}
 ${pdfText ? '\nPitch Deck Content:\n' + pdfText : ''}
   `.trim();
 
+  const sourceContext = pdfText
+    ? 'Use the pitch deck content as a primary source of truth for business model, traction, positioning, and risks. Use the form fields to fill factual gaps and confirm round details.'
+    : 'No uploaded PDF deck text is available, so rely on the startup form fields and any deck link context only.';
+
   const investorList = investors.map(inv =>
     `- ${inv.name} | ${inv.type} | Ticket: ${inv.ticketSize} | Sectors: ${inv.sectors} | Stage: ${inv.stage} | Startup Stage: ${inv.startupStage} | Thesis: ${inv.thesis} | Hard Nos: ${inv.hardNos} | Deploying: ${inv.deploying}`
   ).join('\n');
@@ -647,12 +882,21 @@ ${startupInfo}
 Investors:
 ${investorList}
 
-Score each investor 0-100 for fit with this startup. Consider: sector fit, stage fit, ticket size, thesis, hard nos, whether deploying.
+Instructions:
+- ${sourceContext}
+- First extract the most relevant insights from the startup and pitch deck.
+- Then score each investor 0-100 for fit with this startup.
+- Consider: sector fit, stage fit, ticket size, thesis, hard nos, whether deploying.
 
-Respond ONLY with valid JSON array, no markdown, no backticks:
-[{"name":"...","score":85,"verdict":"Strong match","reasons":["r1","r2"],"concerns":["c1"]}]
+Respond ONLY with valid JSON object, no markdown, no backticks:
+{"deck_insights":{"summary":"...","strengths":["..."],"risks":["..."],"signals":["..."]},"matches":[{"name":"...","score":85,"verdict":"Strong match","reasons":["r1","r2"],"concerns":["c1"]}]}
 
-Verdict must be one of: Strong match, Good match, Weak match, Poor match. Sort by score descending. Include ALL investors.`
+Rules:
+- Keep deck_insights.summary to 2-3 sentences.
+- strengths, risks, and signals should each be concise.
+- Verdict must be one of: Strong match, Good match, Weak match, Poor match.
+- Sort matches by score descending.
+- Include ALL investors in matches.`
         }]
       })
     });
@@ -660,8 +904,8 @@ Verdict must be one of: Strong match, Good match, Weak match, Poor match. Sort b
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
     const text = data.content.map(i => i.text || '').join('');
-    const matches = JSON.parse(text.replace(/```json|```/g, '').trim());
-    renderMatches(matches);
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    renderMatches(parsed);
   } catch(e) {
     showError('Matching failed: ' + e.message);
     document.getElementById('match-results').innerHTML = '';
@@ -671,9 +915,12 @@ Verdict must be one of: Strong match, Good match, Weak match, Poor match. Sort b
   document.getElementById('match-btn').textContent = 'Run AI Match';
 }
 
-function renderMatches(matches) {
+function renderMatches(payload) {
+  const { deckInsights, matches } = extractMatchPayload(payload);
+  window.lastMatches = matches;
   const el = document.getElementById('match-results');
-  el.innerHTML = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:1rem">${matches.length} investors ranked</div>` +
+  el.innerHTML = renderDeckInsights(deckInsights) +
+    `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:1rem">${matches.length} investors ranked</div>` +
     matches.map(m => `
     <div class="match-card">
       <div class="match-header">
@@ -691,6 +938,10 @@ function renderMatches(matches) {
       <div class="tags-row">
         ${(m.reasons||[]).map(r=>`<span class="tag tag-g">${r}</span>`).join('')}
         ${(m.concerns||[]).map(c=>`<span class="tag tag-a">${c}</span>`).join('')}
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-small btn-primary" data-name="${encodeURIComponent(m.name)}" onclick="emailInvestor(decodeURIComponent(this.dataset.name))" ${findInvestorByName(m.name)?.email ? '' : 'disabled'}>Email Investor</button>
+        <button class="btn btn-small btn-secondary" data-name="${encodeURIComponent(m.name)}" onclick="whatsappInvestor(decodeURIComponent(this.dataset.name))" ${findInvestorByName(m.name)?.phone ? '' : 'disabled'}>WhatsApp Investor</button>
       </div>
     </div>
   `).join('');
