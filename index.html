@@ -249,6 +249,47 @@ function clearStartupSelection() {
   document.getElementById('match-btn').disabled = true;
 }
 
+function extractRows(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.data)) return payload.data;
+  if (payload && Array.isArray(payload.rows)) return payload.rows;
+  if (payload && Array.isArray(payload.values)) return payload.values;
+  return [];
+}
+
+function hasCompanyName(row) {
+  return !!(
+    row['Company Name'] ||
+    row['company'] ||
+    row['companyName'] ||
+    row['Startup Name'] ||
+    row['Startup'] ||
+    row['Name']
+  );
+}
+
+function mapStartup(row) {
+  return {
+    company:      row['Company Name'] || row['company'] || row['companyName'] || row['Startup Name'] || row['Startup'] || row['Name'] || '',
+    founder:      row["Founder's Name"] || row['Founder Name'] || row['Founder'] || '',
+    phone:        row["Founder's Contact No."] || row['Founder Contact No.'] || row['Phone'] || row['Contact Number'] || '',
+    email:        row['email address'] || row['Email Address'] || row['Email'] || '',
+    sector:       row['Sector'] || row['Industry'] || '',
+    location:     row['Location'] || row['City'] || '',
+    website:      row['Website'] || row['Website URL'] || '',
+    valuation:    row['Proposed Valuation'] || row['Valuation'] || '',
+    roundSize:    row['Round Size'] || row['Raise Amount'] || '',
+    fundedBefore: row['Have you received funding earlier? If yes, please provide details'] || row['Funding History'] || '',
+    problem:      row['What problem are you solving?'] || row['Problem'] || row['Problem Statement'] || '',
+    currentRound: row['Current Round'] || row['Funding Round'] || '',
+    arr:          row['ARR(Annual run-rate)'] || row['ARR'] || '',
+    prevRevenue:  row["Previous Month's Revenue"] || row['Previous Revenue'] || '',
+    pitchDeckUrl: row['Attach your Pitch Deck (PDF)'] || row['Pitch Deck'] || row['Pitch Deck URL'] || '',
+    stage:        row['What stage is your company in?'] || row['Stage'] || '',
+    timestamp:    row['Timestamp'] || row['Created At'] || '',
+  };
+}
+
 // Load data from Google Sheets
 function parseCSV(text) {
   const lines = text.split('\n').filter(l => l.trim());
@@ -271,63 +312,74 @@ function parseCSV(text) {
 async function loadData() {
   const previouslySelectedCompany = selectedStartup?.company || '';
   showError(''); showLoading('Fetching live data from Google Sheets...');
-  try {
-    const [invData, stData] = await Promise.all([
-      fetchSheetJson(INVESTOR_URL),
-      fetchSheetJson(STARTUP_URL)
-    ]);
+  let investorError = '';
+  let startupError = '';
 
-    if (!invData.success) throw new Error('Investor sheet: ' + invData.error);
-    if (!stData.success)  throw new Error('Startup sheet: ' + stData.error);
+  const [invResult, stResult] = await Promise.allSettled([
+    fetchSheetJson(INVESTOR_URL),
+    fetchSheetJson(STARTUP_URL)
+  ]);
 
-    investors = invData.data.filter(r => r['Full Name']).map(r => ({
-      name:         r['Full Name'] || '',
-      phone:        r['WhatsApp Number'] || '',
-      email:        r['Email Address'] || '',
-      type:         r['Investor Type'] || '',
-      ticketSize:   r['Typical Ticket Size'] || '',
-      sectors:      r['Sector Preferences'] || '',
-      stage:        r['Investment Stage Preference'] || '',
-      startupStage: r['Startup Stage Preference'] || '',
-      sweetSpot:    r["What's your sweet spot in terms of investment?"] || '',
-      thesis:       r['Thesis Notes'] || '',
-      hardNos:      r["Hard No's"] || '',
-      deploying:    r['Currently Deploying'] || '',
-      sendVia:      r['Where should we send you investment opportunities?'] || '',
-    }));
-
-    startups = stData.data.filter(r => r['Company Name']).map(r => ({
-      company:      r['Company Name'] || '',
-      founder:      r["Founder's Name"] || '',
-      phone:        r["Founder's Contact No."] || '',
-      email:        r['email address'] || '',
-      sector:       r['Sector'] || '',
-      location:     r['Location'] || '',
-      website:      r['Website'] || '',
-      valuation:    r['Proposed Valuation'] || '',
-      roundSize:    r['Round Size'] || '',
-      fundedBefore: r['Have you received funding earlier? If yes, please provide details'] || '',
-      problem:      r['What problem are you solving?'] || '',
-      currentRound: r['Current Round'] || '',
-      arr:          r['ARR(Annual run-rate)'] || '',
-      prevRevenue:  r["Previous Month's Revenue"] || '',
-      pitchDeckUrl: r['Attach your Pitch Deck (PDF)'] || '',
-      stage:        r['What stage is your company in?'] || '',
-      timestamp:    r['Timestamp'] || '',
-    }));
-
-    document.getElementById('inv-count').textContent = investors.length;
-    document.getElementById('st-count').textContent  = startups.length;
-    renderInvestors(); renderStartups(); renderStartupMatchList();
-    clearStartupSelection();
-    if (previouslySelectedCompany) {
-      const selectedIndex = startups.findIndex(s => s.company === previouslySelectedCompany);
-      if (selectedIndex >= 0) selectStartup(selectedIndex);
+  if (invResult.status === 'fulfilled') {
+    const invData = invResult.value;
+    if (invData.success === false) {
+      investorError = invData.error || 'Investor sheet returned success=false';
+      investors = [];
+    } else {
+      const investorRows = extractRows(invData);
+      investors = investorRows.filter(r => r['Full Name']).map(r => ({
+        name:         r['Full Name'] || '',
+        phone:        r['WhatsApp Number'] || '',
+        email:        r['Email Address'] || '',
+        type:         r['Investor Type'] || '',
+        ticketSize:   r['Typical Ticket Size'] || '',
+        sectors:      r['Sector Preferences'] || '',
+        stage:        r['Investment Stage Preference'] || '',
+        startupStage: r['Startup Stage Preference'] || '',
+        sweetSpot:    r["What's your sweet spot in terms of investment?"] || '',
+        thesis:       r['Thesis Notes'] || '',
+        hardNos:      r["Hard No's"] || '',
+        deploying:    r['Currently Deploying'] || '',
+        sendVia:      r['Where should we send you investment opportunities?'] || '',
+      }));
     }
-    showLoading('');
-  } catch(e) {
-    showLoading('');
-    showError('Failed to load: ' + e.message);
+  } else {
+    investorError = invResult.reason?.message || 'Investor sheet request failed';
+    investors = [];
+  }
+
+  if (stResult.status === 'fulfilled') {
+    const stData = stResult.value;
+    if (stData.success === false) {
+      startupError = stData.error || 'Startup sheet returned success=false';
+      startups = [];
+    } else {
+      const startupRows = extractRows(stData);
+      startups = startupRows.filter(hasCompanyName).map(mapStartup);
+      if (!startups.length && startupRows.length) {
+        startupError = 'Startup sheet returned rows, but none matched the expected company columns';
+      }
+    }
+  } else {
+    startupError = stResult.reason?.message || 'Startup sheet request failed';
+    startups = [];
+  }
+
+  document.getElementById('inv-count').textContent = investors.length;
+  document.getElementById('st-count').textContent  = startups.length;
+  renderInvestors(); renderStartups(); renderStartupMatchList();
+  clearStartupSelection();
+  if (previouslySelectedCompany) {
+    const selectedIndex = startups.findIndex(s => s.company === previouslySelectedCompany);
+    if (selectedIndex >= 0) selectStartup(selectedIndex);
+  }
+
+  showLoading('');
+  if (investorError || startupError) {
+    const messages = [];
+    if (investorError) messages.push(`Investor feed: ${investorError}`);
+    if (startupError) messages.push(`Startup feed: ${startupError}`);
+    showError(messages.join(' | '));
   }
 }
 
