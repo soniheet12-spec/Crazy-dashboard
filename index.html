@@ -34,24 +34,25 @@
   }
   nav {
     position:sticky; top:0; z-index:20;
-    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
-    padding:18px 24px;
+    display:flex; gap:4px; align-items:center; flex-wrap:wrap;
+    padding:7px 16px;
     border-bottom:1px solid var(--border);
-    background:rgba(8,12,18,0.94);
-    backdrop-filter:blur(16px);
+    background:rgba(8,12,18,0.97);
+    backdrop-filter:blur(20px);
+    min-height:44px;
   }
-  .logo { font-family:'Poppins', sans-serif; font-size:1rem; font-weight:700; color:var(--text); letter-spacing:0.06em; text-transform:uppercase; }
-  .nav-tabs, .subtabs, .inline-actions { display:flex; gap:8px; flex-wrap:wrap; }
-  .nav-right { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .logo { font-family:'Poppins', sans-serif; font-size:.8rem; font-weight:700; color:var(--text); letter-spacing:.08em; text-transform:uppercase; margin-right:6px; white-space:nowrap; }
+  .nav-tabs, .subtabs, .inline-actions { display:flex; gap:2px; flex-wrap:wrap; }
+  .nav-right { margin-left:auto; display:flex; gap:4px; align-items:center; }
   .nav-tab, .subtab, .ghost-btn, .pill-btn, .settings-toggle, .theme-chip, .action-btn, .small-select, .mini-btn {
-    border:none; border-radius:6px; cursor:pointer; font-family:'Poppins', sans-serif; transition:all 0.18s ease;
+    border:none; border-radius:5px; cursor:pointer; font-family:'Poppins', sans-serif; transition:all .15s ease;
   }
   .nav-tab, .subtab, .ghost-btn, .pill-btn, .settings-toggle, .mini-btn {
-    padding:7px 14px; font-size:11.5px; font-weight:500; background:transparent; color:var(--muted); border:1px solid var(--border); letter-spacing:0.02em;
+    padding:4px 9px; font-size:10.5px; font-weight:500; background:transparent; color:var(--muted); border:1px solid transparent; letter-spacing:.01em;
   }
-  .nav-tab:hover, .subtab:hover, .ghost-btn:hover, .pill-btn:hover, .settings-toggle:hover, .mini-btn:hover { color:var(--text); background:var(--s2); border-color:var(--border2); }
+  .nav-tab:hover, .subtab:hover, .ghost-btn:hover, .pill-btn:hover, .settings-toggle:hover, .mini-btn:hover { color:var(--text); background:var(--s2); border-color:var(--border); }
   .nav-tab.active, .subtab.active { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
-  .container { max-width:1280px; margin:0 auto; padding:24px; }
+  .container { max-width:1380px; margin:0 auto; padding:20px 24px; }
   .page { display:none; }
   .page.active { display:block; }
 
@@ -429,55 +430,85 @@ body.theme-pearl .notif-banner.urgent { background:rgba(185,28,28,0.06); border-
 
   <!-- ═══ HOME ═══ -->
   <div id="page-home" class="page active">
-    <div class="section-bar">
-      <div class="section-title">Deal Command Center</div>
-      <button class="ghost-btn" onclick="loadData()">&#8635; Refresh</button>
-      <button class="ghost-btn" onclick="fetchNewsMonitor()">&#128240; Fetch News</button>
-      <button class="ghost-btn" onclick="showTab('match',document.querySelectorAll('.nav-tab')[1])">New Match</button>
+    <div id="home-notifications" style="margin-bottom:8px"></div>
+
+    <!-- KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px">
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-stat-startups">0</div>
+        <div class="stat-label">Startups</div>
+      </div>
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-stat-investors">0</div>
+        <div class="stat-label">Investors</div>
+      </div>
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-stat-pipeline">0</div>
+        <div class="stat-label">Pipeline</div>
+      </div>
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-stat-contacted">0</div>
+        <div class="stat-label">Contacted</div>
+      </div>
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-followups" style="color:var(--amber)">0</div>
+        <div class="stat-label">Follow-ups Due</div>
+      </div>
+      <div class="stat" style="padding:12px 14px">
+        <div class="stat-value" id="home-hot-deals" style="color:var(--green)">0</div>
+        <div class="stat-label">Hot Deals</div>
+      </div>
     </div>
-    <div id="home-notifications"></div>
-    <div id="home-news-feed" style="margin-bottom:14px"></div>
-    <div class="grid-two" style="margin-bottom:16px">
-      <div class="card hero-card">
-        <div class="card-header">
-          <div class="card-title">Today</div>
-          <span class="badge" id="home-date"></span>
+
+    <!-- Main content: pipeline board preview + right column -->
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start">
+      <!-- Left: pipeline snapshot + news -->
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <div class="card-title">Pipeline Snapshot</div>
+            <div style="display:flex;gap:6px">
+              <button class="mini-btn" onclick="loadData()">&#8635; Refresh</button>
+              <button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Full Board &#8599;</button>
+            </div>
+          </div>
+          <div id="home-pipeline-snapshot"><div class="empty" style="padding:18px">Save matches to pipeline to see snapshot.</div></div>
         </div>
-        <div class="hero-title" style="max-width:14ch">Institutional deal flow.</div>
-        <div class="hero-copy">AI-powered matching, Kanban pipeline, IC voting, deal analytics, diligence tracking, and full audit trail — in one place.</div>
-        <div class="mini-grid" style="margin-top:18px">
-          <div class="mini-stat"><div class="mini-value" id="home-followups">0</div><div class="mini-label">Follow-ups Due</div></div>
-          <div class="mini-stat"><div class="mini-value" id="home-hot-deals">0</div><div class="mini-label">Hot Deals</div></div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Sector News Signals</div>
+            <button class="mini-btn" onclick="fetchNewsMonitor()">&#128240; Fetch</button>
+          </div>
+          <div id="home-news-feed"><div class="empty" style="padding:16px">Click Fetch to load AI-generated sector signals.</div></div>
         </div>
       </div>
-      <div class="stack">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Quick Actions</div></div>
-          <div class="action-row" style="margin-top:0">
-            <button class="action-btn primary" onclick="showTab('match',document.querySelectorAll('.nav-tab')[1])">Run New Match</button>
-            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Review Pipeline</button>
-            <button class="action-btn secondary" onclick="showTab('analytics',document.querySelectorAll('.nav-tab')[3])">View Analytics</button>
-            <button class="action-btn secondary" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[9])">Open Diligence</button>
+
+      <!-- Right: actions + overdue + activity -->
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
+          <div style="display:grid;gap:6px">
+            <button class="action-btn primary" style="width:100%;justify-content:center" onclick="showTab('match',document.querySelectorAll('.nav-tab')[1])">&#9889; New Match</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">&#128203; Pipeline Board</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('analytics',document.querySelectorAll('.nav-tab')[3])">&#128202; Analytics</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[9])">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('comps',document.querySelectorAll('.nav-tab')[4])">&#128200; Market Comps</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('lpreport',document.querySelectorAll('.nav-tab')[12])">&#128196; LP Report</button>
           </div>
         </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header"><div class="card-title">Overdue Follow-ups</div></div>
+          <div id="home-overdue-list"><div class="empty" style="padding:14px;font-size:12px">No overdue follow-ups.</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Recent Activity</div></div>
+          <div id="home-recent-activity"><div class="empty" style="padding:14px;font-size:12px">Activity will appear as you use the platform.</div></div>
+        </div>
       </div>
     </div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat"><div class="stat-value" id="home-stat-startups">0</div><div class="stat-label">Startups</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-investors">0</div><div class="stat-label">Investors</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-pipeline">0</div><div class="stat-label">Pipeline Deals</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-contacted">0</div><div class="stat-label">Contacted</div></div>
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Priority Queue</div></div>
-        <div id="home-priority-list"><div class="empty">Save matches to pipeline to see priorities here.</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Recent Activity</div></div>
-        <div id="home-recent-activity"><div class="empty">Activity will appear as you use the platform.</div></div>
-      </div>
-    </div>
+    <!-- hidden element kept for JS compat -->
+    <span id="home-date" style="display:none"></span>
+    <span id="home-priority-list" style="display:none"></span>
   </div>
 
   <!-- ═══ MATCH STUDIO ═══ -->
@@ -1225,34 +1256,40 @@ function exportAuditCsv() { exportRowsAsCsv('log7-audit.csv', getAuditLog().map(
 
 // ═══ HOME ═══
 function refreshHome() {
-  const dateEl = document.getElementById('home-date');
-  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-  const pipeline = getPipeline(), today = new Date().toISOString().slice(0,10);
-  const due = pipeline.filter(i => { const c = getInvestorCRM(i.startup, i.investor); return c.followUp && c.followUp <= today; });
-  const hot = pipeline.filter(i => ['meeting booked','invested','replied'].includes(getInvestorCRM(i.startup, i.investor).status));
-  const contacted = pipeline.filter(i => getInvestorCRM(i.startup, i.investor).status !== 'not contacted');
-  ['home-followups'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = due.length; });
-  ['home-hot-deals'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = hot.length; });
-  ['home-stat-startups'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = startups.length; });
-  ['home-stat-investors'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = investors.length; });
-  ['home-stat-pipeline'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = pipeline.length; });
-  ['home-stat-contacted'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent = contacted.length; });
-  const notifEl = document.getElementById('home-notifications');
-  if (notifEl) {
-    let notifs = '';
-    if (due.length) notifs += '<div class="notif-banner urgent"><div class="notif-icon">⚠️</div><div>' + due.length + ' follow-up' + (due.length>1?'s':'') + ' overdue — <button class="action-btn secondary" style="padding:4px 10px;font-size:11px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';
-    if (hot.length) notifs += '<div class="notif-banner"><div class="notif-icon">🔥</div><div>' + hot.length + ' hot deal' + (hot.length>1?'s':'') + ' with active status.</div></div>';
-    notifEl.innerHTML = notifs;
+  var pipeline = getPipeline(), today = new Date().toISOString().slice(0,10);
+  var due = pipeline.filter(function(i){ var c=getInvestorCRM(i.startup,i.investor); return c.followUp&&c.followUp<=today; });
+  var hot = pipeline.filter(function(i){ return ['meeting booked','invested','replied'].includes(getInvestorCRM(i.startup,i.investor).status); });
+  var contacted = pipeline.filter(function(i){ return getInvestorCRM(i.startup,i.investor).status!=='not contacted'; });
+  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startups.length],['home-stat-investors',investors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(function(p){ var e=document.getElementById(p[0]); if(e) e.textContent=p[1]; });
+  var notifEl=document.getElementById('home-notifications');
+  if(notifEl){ var n=''; if(due.length) n+='<div class="notif-banner urgent" style="margin-bottom:8px"><div class="notif-icon">&#9888;</div><div><strong>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue</strong></div></div>'; notifEl.innerHTML=n; }
+  var snapEl=document.getElementById('home-pipeline-snapshot');
+  if(snapEl){
+    if(!pipeline.length){ snapEl.innerHTML='<div class="empty" style="padding:18px">No pipeline deals yet. Run a match to get started.</div>'; }
+    else {
+      var byStage={};PIPELINE_STAGES.forEach(function(s){byStage[s]=[];});
+      pipeline.forEach(function(item){ var s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0]; byStage[s].push(item); });
+      var maxCount=Math.max.apply(null,[1].concat(Object.values(byStage).map(function(a){return a.length;})));
+      var stageHtml='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px">'+PIPELINE_STAGES.map(function(stage){
+        var items=byStage[stage],pct=Math.round(items.length/maxCount*100);
+        var hotCount=items.filter(function(i){return['meeting booked','invested','replied'].includes(getInvestorCRM(i.startup,i.investor).status);}).length;
+        return '<div style="text-align:center"><div style="font-size:1.3rem;font-weight:700;color:'+(items.length>0?'var(--accent)':'var(--muted)')+'">'+items.length+'</div><div style="height:4px;background:var(--s3);border-radius:4px;margin:4px 0;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px"></div></div><div style="font-size:9.5px;color:var(--muted);line-height:1.3">'+stage+'</div>'+(hotCount?'<div style="font-size:9px;color:var(--green)">'+hotCount+' hot</div>':'')+'</div>';
+      }).join('')+'</div>';
+      var rowsHtml='<div style="max-height:190px;overflow-y:auto">'+pipeline.slice(0,8).map(function(item){
+        var crm=getInvestorCRM(item.startup,item.investor);
+        var isHot=['meeting booked','invested','replied'].includes(crm.status);
+        var isDue=crm.followUp&&crm.followUp<=today;
+        return '<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><div class="avatar" style="width:26px;height:26px;font-size:9px;flex-shrink:0">'+initials(item.investor)+'</div><div style="flex:1;min-width:0"><div style="font-size:11.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHtml(item.investor)+'</div><div style="font-size:10px;color:var(--muted)">'+escapeHtml(item.startup)+' &middot; '+escapeHtml(item.stage||'Sourcing')+'</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:11px;color:'+scoreColor(item.score)+';font-weight:600">'+item.score+'</div>'+(isHot?'<div style="font-size:9px;color:var(--green)">hot</div>':'')+(isDue?'<div style="font-size:9px;color:var(--amber)">due</div>':'')+'</div></div>';
+      }).join('')+'</div>';
+      snapEl.innerHTML=stageHtml+rowsHtml;
+    }
   }
-  const prEl = document.getElementById('home-priority-list');
-  if (prEl) {
-    const rows = pipeline.slice(0,6);
-    if (!rows.length) { prEl.innerHTML = '<div class="empty">Save matches to pipeline to see priorities here.</div>'; }
-    else prEl.innerHTML = rows.map(item => {
-      const crm = getInvestorCRM(item.startup, item.investor);
-      return '<div class="pipeline-row"><div class="avatar">' + initials(item.investor) + '</div><div class="row-main"><div class="row-title">' + escapeHtml(item.investor) + ' <span class="badge">' + escapeHtml(item.startup) + '</span></div><div class="row-meta">Status: ' + crm.status + ' | Score: ' + item.score + ' | Follow up: ' + (crm.followUp || 'Not set') + '</div><div class="tag-row">' + (crm.warmIntro ? '<span class="tag good">Warm intro mapped</span>' : '') + (crm.tags||[]).slice(0,3).map(t=>'<span class="tag info">'+escapeHtml(t)+'</span>').join('') + '</div></div></div>';
-    }).join('');
+  var overdueEl=document.getElementById('home-overdue-list');
+  if(overdueEl){
+    if(!due.length){ overdueEl.innerHTML='<div class="empty" style="padding:12px;font-size:12px">No overdue follow-ups.</div>'; }
+    else overdueEl.innerHTML=due.slice(0,5).map(function(item){ var crm=getInvestorCRM(item.startup,item.investor); return '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;color:var(--amber)">&#9888;</div><div style="flex:1"><div style="font-size:12px;font-weight:500">'+escapeHtml(item.investor)+'</div><div style="font-size:10.5px;color:var(--muted)">'+escapeHtml(item.startup)+' &middot; Due: '+crm.followUp+'</div></div></div>'; }).join('');
   }
+  refreshCapitalDisplay();
   renderHomeActivity();
 }
 function renderHomeActivity() {
@@ -1548,12 +1585,91 @@ function renderMatchCard(match) {
   return '<div class="match-card"><div class="match-head"><div style="display:flex;gap:12px;align-items:flex-start"><div class="avatar">' + initials(match.name) + '</div><div><div class="row-title">' + escapeHtml(match.name) + ' <span class="tag ' + verdictClass(match.verdict) + '">' + escapeHtml(match.verdict) + '</span></div><div class="row-meta">' + escapeHtml(inv?.type||'Investor') + ' | ' + escapeHtml(inv?.ticketSize||'Ticket n/a') + ' | ' + escapeHtml(inv?.email||'No email') + '</div><div class="tag-row"><span class="status-pill ' + (crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'') + '">' + crm.status + '</span>' + (crm.followUp?'<span class="tag info">Follow up '+crm.followUp+'</span>':'') + (crm.warmIntro?'<span class="tag good">Warm intro mapped</span>':'') + '</div></div></div><div class="score"><div class="score-num" style="color:' + scoreColor(match.score) + '">' + match.score + '</div><div class="score-caption">/100</div></div></div><div class="bar"><div class="bar-fill" style="width:' + match.score + '%;background:' + scoreColor(match.score) + '"></div></div>' + bdHtml + '<div class="pipeline-grid"><div><div class="card-title" style="margin-bottom:8px">Why matched</div><div class="tag-row">' + ((match.reasons||[]).map(r => '<span class="tag good">' + escapeHtml(r) + '</span>').join('')||'<span class="tag warn">No reasons captured</span>') + '</div><div class="card-title" style="margin:14px 0 8px">Concerns</div><div class="tag-row">' + ((match.concerns||[]).map(c => '<span class="tag warn">' + escapeHtml(c) + '</span>').join('')||'<span class="tag info">No major concerns</span>') + '</div><div class="card-title" style="margin:14px 0 8px">Likely objections</div><div class="tag-row">' + (objections.map(o => '<span class="tag warn">' + escapeHtml(o) + '</span>').join('')||'<span class="tag info">No objections predicted</span>') + '</div></div><div><div class="field"><label>CRM Status</label><select onchange="updateInvestorCRM(\'' + escapeQuotes(match.name) + '\',\'status\',this.value)">' + CRM_STATUSES.map(s => '<option value="' + s + '" ' + (crm.status===s?'selected':'') + '>' + s + '</option>').join('') + '</select></div><div class="field"><label>Warm Intro Mapping</label><input value="' + escapeHtml(crm.warmIntro||'') + '" placeholder="e.g. Introduced via portfolio founder" oninput="updateInvestorCRM(\'' + escapeQuotes(match.name) + '\',\'warmIntro\',this.value)"></div><div class="field-row"><div class="field"><label>Follow-Up Date</label><input type="date" value="' + (crm.followUp||'') + '" onchange="updateInvestorCRM(\'' + escapeQuotes(match.name) + '\',\'followUp\',this.value)"></div><div class="field"><label>Pipeline Stage</label><select onchange="updateInvestorCRM(\'' + escapeQuotes(match.name) + '\',\'pipelineStage\',this.value)">' + PIPELINE_STAGES.map(s => '<option value="' + s + '" ' + (crm.pipelineStage===s?'selected':'') + '>' + s + '</option>').join('') + '</select></div></div><div class="field"><label>Internal Tags</label><input value="' + escapeHtml((crm.tags||[]).join(', ')) + '" placeholder="fintech, warm, fast mover" oninput="updateInvestorTags(\'' + escapeQuotes(match.name) + '\',this.value)"></div><div class="field"><label>Internal Notes</label><textarea style="min-height:80px" oninput="updateInvestorCRM(\'' + escapeQuotes(match.name) + '\',\'notes\',this.value)">' + escapeHtml(crm.notes||'') + '</textarea></div></div></div>' + (crm.notes?'<div class="row-copy" style="margin-top:8px">'+escapeHtml(crm.notes)+'</div>':'') + '<div class="action-row"><button class="action-btn primary" onclick="emailInvestor(\'' + escapeQuotes(match.name) + '\')" ' + (inv?.email?'':'disabled') + '>Email Investor</button><button class="action-btn secondary" onclick="whatsappInvestor(\'' + escapeQuotes(match.name) + '\')" ' + (inv?.phone?'':'disabled') + '>WhatsApp Investor</button><button class="action-btn secondary" onclick="saveMatchToPipeline(\'' + escapeQuotes(match.name) + '\')">Save to Pipeline</button><button class="action-btn secondary" onclick="copySingleIntro(\'' + escapeQuotes(match.name) + '\')">Copy Intro</button></div></div>';
 }
 function renderDeckTab(payload) {
-  const n = normalizeMatchPayload(payload), deck = n.deck_insights||deriveDeckInsightsFromLocalData();
-  const readiness = n.founder_readiness||computeFounderReadiness(selectedStartup,deck);
-  const missing = n.missing_data||getMissingDataAlerts(selectedStartup);
-  const topMatches = n.matches.slice(0,5);
-  const el = document.getElementById('deck-tab-content'); if (!el) return;
-  el.innerHTML = '<div class="grid-two"><div><div class="card insight-card"><div class="card-header"><div class="card-title">Deck Summary</div></div><div style="font-size:14px;line-height:1.8">' + escapeHtml(deck.summary||'No deck summary yet.') + '</div><div class="tag-row">' + (deck.signals||[]).map(s => '<span class="tag info">' + escapeHtml(s) + '</span>').join('') + '</div></div><div class="card"><div class="card-header"><div class="card-title">Readiness Score</div></div><div class="mini-grid"><div class="mini-stat"><div class="mini-value">' + readiness.score + '</div><div class="mini-label">Score</div></div><div class="mini-stat"><div class="mini-value">' + readiness.verdict + '</div><div class="mini-label">Verdict</div></div></div><div class="template-help" style="margin-top:12px">' + (readiness.reasons||[]).join(' | ') + '</div></div></div><div><div class="card"><div class="card-header"><div class="card-title">Deck Breakdown</div></div><div class="detail-list"><div class="detail-row"><span class="detail-label">Market</span><span>' + escapeHtml(deck.market||'Not captured') + '</span></div><div class="detail-row"><span class="detail-label">Traction</span><span>' + escapeHtml(deck.traction||'Not captured') + '</span></div><div class="detail-row"><span class="detail-label">Business Model</span><span>' + escapeHtml(deck.business_model||'Not captured') + '</span></div><div class="detail-row"><span class="detail-label">Uploaded PDF</span><span>' + escapeHtml(uploadedPdfName||'None') + '</span></div></div></div><div class="card"><div class="card-header"><div class="card-title">Missing Data Alerts</div></div><div class="tag-row">' + (missing.map(m => '<span class="tag warn">' + escapeHtml(m) + '</span>').join('')||'<span class="tag info">No missing data flags</span>') + '</div></div></div></div><div class="grid-two"><div class="card"><div class="card-header"><div class="card-title">Strengths</div></div><div class="insight-list">' + (deck.strengths||['No strengths captured']).map(s => '<div>— ' + escapeHtml(s) + '</div>').join('') + '</div></div><div class="card"><div class="card-header"><div class="card-title">Risks</div></div><div class="insight-list">' + (deck.risks||['No risks captured']).map(r => '<div>— ' + escapeHtml(r) + '</div>').join('') + '</div></div></div><div class="card"><div class="card-header"><div class="card-title">Top Investor Objections</div></div><div class="tag-row">' + (uniqueList(topMatches.flatMap(m => m.objections||predictObjections(m))).map(o => '<span class="tag warn">' + escapeHtml(o) + '</span>').join('')||'<span class="tag info">No objections predicted yet</span>') + '</div></div>';
+  var n = normalizeMatchPayload(payload);
+  var deck = n.deck_insights || deriveDeckInsightsFromLocalData();
+  var readiness = n.founder_readiness || computeFounderReadiness(selectedStartup, deck);
+  var missing = n.missing_data || getMissingDataAlerts(selectedStartup);
+  var topMatches = n.matches.slice(0,5);
+  var el = document.getElementById('deck-tab-content'); if (!el) return;
+
+  var scCol = readiness.score >= 75 ? 'var(--green)' : readiness.score >= 50 ? 'var(--amber)' : 'var(--red)';
+
+  // Score ring
+  var ringHtml = '<div style="display:flex;gap:16px;align-items:center;padding:16px;background:var(--s2);border-radius:8px;border:1px solid var(--border);margin-bottom:14px">' +
+    '<div style="width:80px;height:80px;border-radius:50%;border:3px solid ' + scCol + ';background:var(--s1);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">' +
+    '<div style="font-size:1.6rem;font-weight:700;color:' + scCol + ';line-height:1">' + readiness.score + '</div>' +
+    '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px">Readiness</div>' +
+    '</div>' +
+    '<div style="flex:1">' +
+    '<div style="font-size:14px;font-weight:600;margin-bottom:4px">' + escapeHtml(readiness.verdict) + '</div>' +
+    '<div style="font-size:12px;color:var(--muted);line-height:1.7">' + escapeHtml(deck.summary || 'No deck summary available.') + '</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' +
+    (deck.signals||[]).map(function(s){ return '<span class="tag info">' + escapeHtml(s) + '</span>'; }).join('') +
+    '</div></div></div>';
+
+  // Readiness reasons as progress steps
+  var reasonsHtml = '<div style="margin-bottom:14px">' +
+    '<div class="card-title" style="margin-bottom:8px">Readiness Checklist</div>' +
+    (readiness.reasons||[]).map(function(r){ return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:12px"><span style="color:var(--green);font-size:13px">&#10003;</span>' + escapeHtml(r) + '</div>'; }).join('') +
+    (missing.length ? missing.map(function(m){ return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:12px"><span style="color:var(--amber);font-size:13px">&#9888;</span>' + escapeHtml(m) + '</div>'; }).join('') : '') +
+    '</div>';
+
+  // Key metrics grid
+  var metricsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
+    [['Market', deck.market||'Not captured'],['Traction', deck.traction||'Not captured'],
+     ['Business Model', deck.business_model||'Inferred'],['Pitch Deck', uploadedPdfName||'Not uploaded']
+    ].map(function(m){ return '<div style="padding:10px 12px;background:var(--s2);border:1px solid var(--border);border-radius:6px"><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">' + m[0] + '</div><div style="font-size:12.5px;font-weight:500">' + escapeHtml(m[1]) + '</div></div>'; }).join('') +
+    '</div>';
+
+  // Strengths vs Risks
+  var swotHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">' +
+    '<div style="padding:12px;background:rgba(62,207,142,0.06);border:1px solid rgba(62,207,142,0.2);border-radius:8px">' +
+    '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--green);font-weight:600;margin-bottom:8px">&#10003; Strengths</div>' +
+    (deck.strengths||['None captured']).map(function(s){ return '<div style="font-size:12px;line-height:1.6;padding:3px 0;border-bottom:1px solid rgba(62,207,142,0.1)">' + escapeHtml(s) + '</div>'; }).join('') +
+    '</div>' +
+    '<div style="padding:12px;background:rgba(240,101,101,0.06);border:1px solid rgba(240,101,101,0.18);border-radius:8px">' +
+    '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--red);font-weight:600;margin-bottom:8px">&#9650; Risks</div>' +
+    (deck.risks||['None captured']).map(function(r){ return '<div style="font-size:12px;line-height:1.6;padding:3px 0;border-bottom:1px solid rgba(240,101,101,0.1)">' + escapeHtml(r) + '</div>'; }).join('') +
+    '</div></div>';
+
+  // Top investor objections — per investor
+  var objHtml = '';
+  if (topMatches.length) {
+    objHtml = '<div style="margin-bottom:14px"><div class="card-title" style="margin-bottom:8px">Predicted Investor Objections</div>';
+    topMatches.slice(0,3).forEach(function(m) {
+      var objs = uniqueList(m.objections || predictObjections(m));
+      if (!objs.length) return;
+      objHtml += '<div style="padding:10px;background:var(--s2);border:1px solid var(--border);border-radius:6px;margin-bottom:8px">' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;display:flex;gap:8px;align-items:center">' +
+        '<div class="avatar" style="width:22px;height:22px;font-size:9px">' + initials(m.name) + '</div>' +
+        escapeHtml(m.name) + ' <span style="font-size:11px;color:' + scoreColor(m.score) + '">' + m.score + '/100</span></div>' +
+        objs.map(function(o){ return '<div style="font-size:11.5px;color:var(--muted);padding:3px 0;border-bottom:1px solid var(--border)">&rsaquo; ' + escapeHtml(o) + '</div>'; }).join('') +
+        '</div>';
+    });
+    objHtml += '</div>';
+  }
+
+  // Match score breakdown table
+  var matchTableHtml = '';
+  if (topMatches.length) {
+    matchTableHtml = '<div><div class="card-title" style="margin-bottom:8px">Top Match Score Breakdown</div>' +
+      '<table class="table"><thead><tr><th>Investor</th><th>Score</th><th>Sector</th><th>Stage</th><th>Thesis</th><th>Deploy</th><th>Traction</th></tr></thead><tbody>' +
+      topMatches.map(function(m) {
+        var bd = m.score_breakdown || {};
+        return '<tr>' +
+          '<td style="font-weight:500">' + escapeHtml(m.name) + '</td>' +
+          '<td style="color:' + scoreColor(m.score) + ';font-weight:700">' + m.score + '</td>' +
+          '<td>' + (bd.sector_fit||0) + '/25</td>' +
+          '<td>' + (bd.stage_fit||0) + '/25</td>' +
+          '<td>' + (bd.thesis_fit||0) + '/25</td>' +
+          '<td>' + (bd.deploying_bonus||0) + '/10</td>' +
+          '<td>' + (bd.traction_fit||0) + '/15</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
+  el.innerHTML = ringHtml + reasonsHtml + metricsHtml + swotHtml + objHtml + matchTableHtml;
 }
 
 // ═══ PIPELINE KANBAN ═══
@@ -2126,26 +2242,192 @@ function getResearchCache(company){return JSON.parse(localStorage.getItem(resear
 function setResearchCache(company,data){localStorage.setItem(researchKey(company),JSON.stringify(data));}
 
 async function runFounderResearch(){
-  if(!selectedStartup)return showError('Select a startup first from Match Studio.');
-  var apiKey=localStorage.getItem('l7_key');if(!apiKey)return showError('Add an Anthropic API key in Settings.');
-  var el=document.getElementById('founder-research-output');var badge=document.getElementById('research-status-badge');if(!el)return;
+  if(!selectedStartup) return showError('Select a startup first from Match Studio.');
+  var apiKey=localStorage.getItem('l7_key');
+  if(!apiKey) return showError('Add an Anthropic API key in Settings to run background research.');
+  var el=document.getElementById('founder-research-output');
+  var badge=document.getElementById('research-status-badge');
+  if(!el) return;
   var startup=selectedStartup;
 
-  el.innerHTML=['LinkedIn & professional profiles','MCA / ROC registration check','News archives & press mentions','SEBI / RBI regulatory check','Prior ventures & exit history','Synthesising report'].map(function(s,i){return'<div style="display:flex;gap:8px;align-items:center;padding:9px 12px;border-radius:6px;background:var(--s2);border:1px solid var(--border);margin-bottom:7px" id="rp'+i+'"><div style="width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div><span style="font-size:12px;color:var(--muted)">'+s+'</span></div>';}).join('');
-  if(badge)badge.textContent='Running...';
+  // Animated progress steps
+  var steps=[
+    'Searching web for founder profiles...',
+    'Checking LinkedIn & professional history...',
+    'Looking up MCA / ROC company registration...',
+    'Checking SEBI, RBI, GST regulatory databases...',
+    'Scanning news, press & funding announcements...',
+    'Analysing prior ventures & competitive landscape...',
+    'Compiling due diligence report...'
+  ];
+  el.innerHTML=steps.map(function(s,i){
+    return '<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:6px;background:var(--s2);border:1px solid var(--border);margin-bottom:7px" id="rp'+i+'">'
+      +'<div style="width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>'
+      +'<span style="font-size:12px;color:var(--muted)">'+s+'</span></div>';
+  }).join('');
+  if(badge){badge.textContent='Running...';badge.style.color='';}
 
-  var prompt='You are a VC due diligence analyst at Log7 Capital (India). Perform comprehensive background research on this startup.\n\nCompany: '+startup.company+'\nFounder(s): '+(startup.founder||'Unknown')+'\nSector: '+(startup.sector||'Unknown')+'\nLocation: '+(startup.location||'India')+'\nWebsite: '+(startup.website||'Not provided')+'\n\nReturn ONLY valid JSON:\n{"overall_score":72,"overall_verdict":"Positive with minor flags","summary":"Executive summary paragraph","founders":[{"name":"","linkedin_signals":"","prior_ventures":"","domain_expertise":"","education":"","red_flags":[],"positive_signals":[]}],"company_registration":{"status":"Likely registered","notes":"","cin_search":""},"regulatory":{"sebi_relevance":"","rbi_relevance":"","gst_signals":"","compliance_flags":[]},"news_and_press":{"found":true,"sentiment":"neutral","highlights":[],"concerns":[]},"competitive_intelligence":{"known_competitors":[],"market_position":"","notable_funded_rivals":[]},"flags":[{"severity":"medium","category":"Team","flag":"","recommendation":""}],"positive_signals":[],"recommended_checks":[]}';
+  // Animate steps
+  steps.forEach(function(_,i){
+    setTimeout(function(){
+      var row=document.getElementById('rp'+i);
+      if(row) row.innerHTML='<span style="color:var(--green);font-size:14px;flex-shrink:0">&#10003;</span><span style="font-size:12px;color:var(--muted)">'+steps[i]+'</span>';
+    }, 900*(i+1));
+  });
+
+  // Build rich context from everything we know
+  var founderNames=(startup.founder||'').split(/[,&\/]/).map(function(n){return n.trim();}).filter(Boolean);
+  var deckContext=pdfText?('Pitch deck text (first 1500 chars):\n'+pdfText.slice(0,1500)):'No pitch deck uploaded.';
+
+  var prompt='You are a senior due diligence analyst at Log7 Capital, an Indian VC network. '
+    +'You have been asked to perform a thorough background check on the following startup before a first investment committee review.
+
+'
+    +'=== STARTUP PROFILE ===
+'
+    +'Company: '+startup.company+'
+'
+    +'Founder(s): '+(startup.founder||'Not specified')+'
+'
+    +'Sector: '+(startup.sector||'Not specified')+'
+'
+    +'Stage: '+(startup.stage||'Not specified')+'
+'
+    +'Location: '+(startup.location||'India')+'
+'
+    +'Website: '+(startup.website||'Not provided')+'
+'
+    +'Round: '+(startup.currentRound||'Not specified')+' | Size: '+(startup.roundSize||'Not specified')+'
+'
+    +'Valuation: '+(startup.valuation||'Not specified')+'
+'
+    +'ARR: '+(startup.arr||'Not specified')+'
+'
+    +'Problem: '+(startup.problem||'Not specified')+'
+'
+    +'Previously funded: '+(startup.fundedBefore||'Not specified')+'
+
+'
+    +deckContext+'
+
+'
+    +'=== YOUR TASK ===
+'
+    +'Using your knowledge of Indian startups, the VC ecosystem, and publicly available information, '
+    +'perform a comprehensive background research report. For each founder named above, search your knowledge for:
+'
+    +'- Their LinkedIn profile, prior roles, education (IIT/IIM/other), professional networks
+'
+    +'- Any prior startups founded, shut down, pivoted, or exited
+'
+    +'- Domain expertise signals and years in the sector
+'
+    +'- Any press coverage, podcast appearances, or public mentions
+'
+    +'- Any red flags (failed ventures, legal issues, team conflicts visible online)
+
+'
+    +'For the company:
+'
+    +'- Whether it is likely registered on MCA / ROC and what CIN search terms to use
+'
+    +'- SEBI/RBI/GST regulatory requirements specific to this sector and business model
+'
+    +'- Any news coverage, funding announcements, or press the company has received
+'
+    +'- 4-6 direct Indian market competitors and where this startup sits vs them
+'
+    +'- Overall trust/credibility score out of 100 based on team quality, transparency, and data available
+
+'
+    +'Be SPECIFIC. Name actual companies, institutions, roles, dates where you know them. '
+    +'If you are uncertain about something, say so clearly rather than making it up. '
+    +'Flag gaps in information as items for manual verification.
+
+'
+    +'Return ONLY valid JSON with this exact structure (no markdown, no backticks):
+'
+    +'{"overall_score":72,"overall_verdict":"string","summary":"paragraph",'
+    +'"founders":[{"name":"","linkedin_signals":"","prior_ventures":"","domain_expertise":"","education":"","red_flags":[],"positive_signals":[]}],'
+    +'"company_registration":{"status":"","notes":"","cin_search":""},'
+    +'"regulatory":{"sebi_relevance":"","rbi_relevance":"","gst_signals":"","compliance_flags":[]},'
+    +'"news_and_press":{"found":true,"sentiment":"positive|neutral|negative|mixed","highlights":[],"concerns":[]},'
+    +'"competitive_intelligence":{"known_competitors":[],"market_position":"","notable_funded_rivals":[]},'
+    +'"flags":[{"severity":"high|medium|low","category":"Team|Legal|Regulatory|Market|Financial","flag":"","recommendation":""}],'
+    +'"positive_signals":[],'
+    +'"recommended_checks":[]}';
 
   try{
-    var text=await callClaude(apiKey,prompt,2500);
-    var data=JSON.parse(text.replace(/```json|```/g,'').trim());
+    // Use web_search tool for real-time web lookup
+    var res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:4000,
+        tools:[{"type":"web_search_20250305","name":"web_search"}],
+        tool_choice:{"type":"auto"},
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    var apiData=await res.json();
+    if(apiData.error) throw new Error(apiData.error.message);
+
+    // Extract final text response (may contain tool_use blocks, grab the last text block)
+    var textBlocks=apiData.content.filter(function(b){return b.type==='text';});
+    var rawText=textBlocks.map(function(b){return b.text||'';}).join('');
+
+    // If web search was used, there may be a follow-up — handle stop_reason
+    if(apiData.stop_reason==='tool_use'){
+      // Build follow-up with tool results
+      var toolUseBlocks=apiData.content.filter(function(b){return b.type==='tool_use';});
+      var toolResults=toolUseBlocks.map(function(b){
+        return {type:'tool_result',tool_use_id:b.id,content:'Web search performed for: '+JSON.stringify(b.input)};
+      });
+      var followUp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key':apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',
+          max_tokens:4000,
+          tools:[{"type":"web_search_20250305","name":"web_search"}],
+          messages:[
+            {role:'user',content:prompt},
+            {role:'assistant',content:apiData.content},
+            {role:'user',content:toolResults}
+          ]
+        })
+      });
+      var followData=await followUp.json();
+      if(followData.error) throw new Error(followData.error.message);
+      var followText=followData.content.filter(function(b){return b.type==='text';}).map(function(b){return b.text||'';}).join('');
+      if(followText) rawText=followText;
+    }
+
+    // Parse JSON from response
+    var jsonMatch=rawText.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('No JSON found in response. Raw: '+rawText.slice(0,200));
+    var data=JSON.parse(jsonMatch[0]);
+
     setResearchCache(startup.company,{data:data,runAt:new Date().toISOString()});
     renderFounderResearch(data);
     if(badge){badge.textContent='Complete';badge.style.color='var(--green)';}
-    addAuditEntry('diligence','Founder research completed',startup.company);
+    addAuditEntry('diligence','Founder research completed (web search)',startup.company);
   }catch(err){
-    el.innerHTML='<div class="error-box">Research failed: '+escapeHtml(err.message)+'</div>';
-    if(badge)badge.textContent='Failed';
+    el.innerHTML='<div class="error-box" style="margin-top:10px"><strong>Research failed:</strong> '+escapeHtml(err.message)
+      +'<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">Make sure your API key is valid and has web search access. '
+      +'The model used is claude-sonnet-4-20250514 with the web_search tool enabled.</div></div>';
+    if(badge){badge.textContent='Failed';badge.style.color='var(--red)';}
   }
 }
 
@@ -2251,6 +2533,27 @@ async function fetchNewsMonitor(){
   }catch(err){el.innerHTML='<div class="error-box">News fetch failed: '+escapeHtml(err.message)+'</div>';}
 }
 
+
+// ═══ SHARED CLAUDE API HELPER ═══
+async function callClaude(apiKey, prompt, maxTokens) {
+  var res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens || 1500,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  var data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(function(i){ return i.text || ''; }).join('');
+}
 
 function simSlide(k,v){if(window.simSlide)window.simSlide(k,v);}
 </script>
