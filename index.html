@@ -2414,12 +2414,18 @@ function saveNetworkEntry(){
   var ok = true;
   fields.forEach(function(f){
     var el = document.getElementById('nf-'+f.key);
-    if(!el) return;
+    if(!el){ console.warn('[Save] field not found in DOM: nf-'+f.key); return; }
     var val = el.value.trim();
     if(f.required && !val){ el.style.borderColor='var(--red)'; ok=false; return; }
     entry[f.key] = val;
   });
   if(!ok){ showError('Please fill in required fields.'); return; }
+
+  // Belt-and-suspenders: explicitly read followUpDate in case loop missed it
+  var fuEl = document.getElementById('nf-followUpDate');
+  if(fuEl){ entry.followUpDate = fuEl.value || ''; }
+  console.log('[Save] tab:', tab, '| followUpDate input el:', fuEl, '| value:', fuEl ? fuEl.value : 'NOT FOUND');
+  console.log('[Save] full entry before persist:', JSON.stringify(entry));
 
   var rows = netLoad(tab);
   if(_netEditId !== null){
@@ -2428,7 +2434,6 @@ function saveNetworkEntry(){
       var prev = rows[idx];
       entry.id = _netEditId;
       entry.dateAdded = prev.dateAdded;
-      // Preserve sheet metadata; mark as locally overridden
       if(prev._fromSheet){ entry._fromSheet=true; entry._sheetData=prev._sheetData||null; entry._localOverride=true; }
       rows[idx] = entry;
     }
@@ -2438,9 +2443,16 @@ function saveNetworkEntry(){
     rows.push(entry);
   }
   netSave(tab, rows);
+
+  // Verify what was actually written to localStorage
+  var savedRows = netLoad(tab);
+  var savedEntry = savedRows.find(function(r){ return r.id === entry.id; });
+  console.log('[Save] verified from localStorage:', JSON.stringify(savedEntry));
+
   closeNetworkModal();
   renderNetList(tab);
   syncFollowupsToServer();
+  refreshNetFollowups();
   addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
 }
 
