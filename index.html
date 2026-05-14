@@ -2716,6 +2716,11 @@ function syncFollowupsToServer(){
 }
 
 // ═══ WHATSAPP OUTREACH ═══
+
+// Legacy names kept so any cached page / old onclick handlers don't throw
+function renderBulkOutreachPanel(){ waOutreachRender(); }
+function bulkOutreachSelectAll(){ waSendAllSelected(); }
+
 function waOutreachRender(){
   // Log raw data so we can verify what exists
   var rawInv = localStorage.getItem('l7_net_investors');
