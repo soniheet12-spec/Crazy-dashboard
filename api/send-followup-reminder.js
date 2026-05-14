@@ -1,17 +1,24 @@
-const { kv } = require('@vercel/kv');
 const twilio = require('twilio');
 
 module.exports = async function handler(req, res) {
   // Today's date in IST (UTC+5:30)
   const nowUtc = new Date();
-  const istMs = nowUtc.getTime() + 5.5 * 60 * 60 * 1000;
+  const istMs  = nowUtc.getTime() + 5.5 * 60 * 60 * 1000;
   const istDate = new Date(istMs);
-  const today = istDate.toISOString().slice(0, 10); // YYYY-MM-DD
+  const today   = istDate.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // Read all follow-ups saved by the dashboard
-  const followups = (await kv.get('network_followups')) || [];
+  // Read follow-ups from Upstash Redis
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  // Keep only entries due today with an actual name
+  const kvRes = await fetch(`${url}/get/network_followups`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const kvJson = await kvRes.json();
+  // Upstash wraps the value: { result: "..." }
+  const followups = kvJson.result ? JSON.parse(kvJson.result) : [];
+
+  // Keep only entries due today
   const due = followups.filter(f => f.followUpDate === today && f.name);
 
   if (!due.length) {
@@ -27,19 +34,17 @@ module.exports = async function handler(req, res) {
 
   // Format date: "14 May 2026"
   const dateLabel = istDate.toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
   });
 
-  // Build message body
+  // Build WhatsApp message
   const lines = [`📋 *Log7 Capital — Follow-ups for ${dateLabel}*\n`];
 
-  const sections = [
+  [
     { key: 'investors',    label: 'Investors' },
     { key: 'startups',     label: 'Startups' },
     { key: 'partnerships', label: 'Partnerships' },
-  ];
-
-  sections.forEach(({ key, label }) => {
+  ].forEach(({ key, label }) => {
     if (!groups[key].length) return;
     lines.push(`*${label}:*`);
     groups[key].forEach(f => {
