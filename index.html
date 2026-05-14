@@ -593,19 +593,10 @@
         <div id="match-results"><div class="empty">Select a startup, upload a pitch deck if available, and run a match.</div></div>
 
         <!-- ═══ WHATSAPP OUTREACH PANEL ═══ -->
-        <div id="whatsapp-outreach-panel" style="margin-top:14px">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">📲 WhatsApp Outreach</div>
-              <button class="mini-btn" onclick="renderBulkOutreachPanel()">&#8635; Refresh</button>
-            </div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Select contacts below, then click Send.</div>
-            <div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Investors</div>
-            <div id="outreach-investors-list" style="margin-bottom:14px"></div>
-            <div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Partners</div>
-            <div id="outreach-partners-list" style="margin-bottom:14px"></div>
-            <button id="send-all-selected-btn" class="action-btn primary" style="width:100%" onclick="bulkOutreachSelectAll()">📲 Send to All Selected</button>
-          </div>
+        <div id="whatsapp-outreach-panel" style="margin-top:20px;padding:16px;border:1px solid #444;border-radius:8px;">
+          <h3>📲 WhatsApp Outreach</h3>
+          <div id="outreach-body">Loading...</div>
+          <button onclick="bulkOutreachSelectAll()" style="margin-top:12px;">📲 Send to All Selected</button>
         </div>
 
         <div class="mobile-sticky-actions">
@@ -2870,5 +2861,47 @@ function waSendAllSelected() {
 
 </script>
 
+<script>
+function renderBulkOutreachPanel() {
+  const investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
+  const partners = JSON.parse(localStorage.getItem('l7_net_partnerships') || '[]');
+  const body = document.getElementById('outreach-body');
+  if (!body) { console.error('outreach-body div not found'); return; }
+  let html = '';
+  html += '<strong>Investors</strong><br>';
+  investors.forEach((inv,i) => {
+    const name = inv.name||inv.investorName||'Unknown';
+    const phone = (inv.contactPhone||inv.contactNumber||inv.phone||'').replace(/\D/g,'');
+    html += `<div><input type="checkbox" data-name="${name}" data-phone="${phone}"> ${name} — ${phone||'No number'} <button onclick="sendWhatsApp('${phone}','${name.replace(/'/g,"\\'")}')">📲</button></div>`;
+  });
+  if (!investors.length) html += '<p>No investors</p>';
+  html += '<br><strong>Partners</strong><br>';
+  partners.forEach((p,i) => {
+    const name = p.name||p.partnerName||p.companyName||'Unknown';
+    const phone = (p.contactPhone||p.contactNumber||p.phone||'').replace(/\D/g,'');
+    html += `<div><input type="checkbox" data-name="${name}" data-phone="${phone}"> ${name} — ${phone||'No number'} <button onclick="sendWhatsApp('${phone}','${name.replace(/'/g,"\\'")}')">📲</button></div>`;
+  });
+  if (!partners.length) html += '<p>No partners</p>';
+  body.innerHTML = html;
+  console.log('Outreach panel rendered. Investors:', investors.length, 'Partners:', partners.length);
+}
+
+function bulkOutreachSelectAll() {
+  const checked = document.querySelectorAll('#outreach-body input[type=checkbox]:checked');
+  let delay = 0;
+  checked.forEach(cb => {
+    setTimeout(() => sendWhatsApp(cb.dataset.phone, cb.dataset.name), delay);
+    delay += 1500;
+  });
+}
+
+function sendWhatsApp(phone, name) {
+  if (!phone) { alert('No number for ' + name); return; }
+  const msg = encodeURIComponent(`Hi ${name}, sharing a startup from Log7 Capital. Let me know if you'd like to connect.`);
+  window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + msg, '_blank');
+}
+
+document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
+</script>
 </body>
 </html>
