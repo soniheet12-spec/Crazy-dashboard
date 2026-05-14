@@ -1512,10 +1512,6 @@ function renderWatchlists(){const el=document.getElementById('watchlists-list');
 function createWatchlist(){const name=document.getElementById('watchlist-name')?.value.trim(),notes=document.getElementById('watchlist-notes')?.value.trim();if(!name)return showError('Enter a watchlist name.');const lists=getWatchlists(),existing=lists.find(l=>l.name.toLowerCase()===name.toLowerCase());if(existing){existing.notes=notes;}else{lists.unshift({name,notes,items:[]});}saveWatchlists(lists);document.getElementById('watchlist-name').value='';document.getElementById('watchlist-notes').value='';renderWatchlists();addAuditEntry('match','Watchlist saved',name);}
 function saveCurrentToWatchlist(){if(!selectedStartup)return showError('Select a startup first.');const lists=getWatchlists();if(!lists.length)return showError('Create a watchlist first.');lists[0].items=uniqueList([selectedStartup.company,...(lists[0].items||[])]);saveWatchlists(lists);renderWatchlists();addAuditEntry('match','Added to watchlist',selectedStartup.company+' \u2192 '+lists[0].name);}
 
-// ═══ PORTFOLIO ═══
-// ═══ LP REPORT ═══
-}
-
 // ═══ DOCUMENT VAULT ═══
 function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('Log7DocumentVault',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('documents')){const store=db.createObjectStore('documents',{keyPath:'id',autoIncrement:true});store.createIndex('entityType','entityType',{unique:false});store.createIndex('entityName','entityName',{unique:false});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return docsDbPromise;}
 async function saveDocumentRecord(record){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').add(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
