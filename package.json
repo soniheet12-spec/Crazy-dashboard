@@ -1,0 +1,8 @@
+{
+  "name": "log7-capital-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "twilio": "^5.3.0"
+  }
+}

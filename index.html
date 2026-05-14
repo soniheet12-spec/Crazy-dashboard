@@ -2377,6 +2377,7 @@ function saveNetworkEntry(){
   netSave(tab, rows);
   closeNetworkModal();
   renderNetList(tab);
+  syncFollowupsToServer();
   addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
 }
 
@@ -2385,6 +2386,7 @@ function deleteNetEntry(tab, id){
   var rows = netLoad(tab).filter(function(r){return r.id!==id;});
   netSave(tab, rows);
   renderNetList(tab);
+  syncFollowupsToServer();
   addAuditEntry('network','Deleted '+tab.slice(0,-1),tab);
 }
 
@@ -2538,6 +2540,36 @@ function netResetToSheet(id){
   };
   netSave('investors', rows);
   renderNetList('investors');
+  syncFollowupsToServer();
+}
+
+// ── FOLLOW-UP SERVER SYNC ──────────────────────────────────────
+function syncFollowupsToServer(){
+  // Collect all entries with a followUpDate across all 3 network tabs
+  var followups = [];
+  var tabNameKeys = {
+    partnerships: 'partnerName',
+    investors:    'investorName',
+    startups:     'companyName',
+  };
+  Object.keys(tabNameKeys).forEach(function(tab){
+    netLoad(tab).forEach(function(row){
+      if(!row.followUpDate) return;
+      followups.push({
+        tab:          tab,
+        name:         row[tabNameKeys[tab]] || '',
+        followUpDate: row.followUpDate,
+        notes:        row.notes || '',
+      });
+    });
+  });
+
+  // Fire-and-forget POST — silent, never blocks the UI
+  fetch('/api/save-followups', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ followups: followups }),
+  }).catch(function(){});
 }
 
 </script>
