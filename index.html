@@ -2862,17 +2862,6 @@ function waSendAllSelected() {
 </script>
 
 <script>
-function _waRow(name, phone, safe) {
-  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2a2a2a;min-height:36px">'
-    + '<input type="checkbox" class="wa-contact-cb" data-name="' + name + '" data-phone="' + phone + '" style="width:15px;height:15px;flex-shrink:0;accent-color:#6366f1;cursor:pointer"' + (phone ? '' : ' disabled') + '>'
-    + '<span style="flex:1;font-size:13px;font-weight:500;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + name + '</span>'
-    + '<span style="font-size:11px;color:#64748b;flex-shrink:0;margin-right:4px">' + (phone ? '+' + phone : '<span style="color:#f87171">no phone</span>') + '</span>'
-    + (phone
-        ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="flex-shrink:0;padding:3px 10px;font-size:11px;background:#6366f1;color:#fff;border:none;border-radius:5px;cursor:pointer;white-space:nowrap">📲</button>'
-        : '<span style="flex-shrink:0;width:48px"></span>')
-    + '</div>';
-}
-
 function _waSelectAll(section, checked) {
   document.querySelectorAll('#outreach-' + section + ' .wa-contact-cb').forEach(cb => { if (!cb.disabled) cb.checked = checked; });
 }
@@ -2893,41 +2882,122 @@ function renderBulkOutreachPanel() {
   const body = document.getElementById('outreach-body');
   if (!body) { console.error('outreach-body div not found'); return; }
 
-  function buildSection(arr, sectionId, nameFn, phoneFn, emptyMsg) {
-    let rows = '';
-    if (!arr.length) {
-      rows = '<div style="font-size:12px;color:#64748b;padding:8px 0">' + emptyMsg + '</div>';
-    } else {
-      arr.forEach(r => {
-        const name  = nameFn(r);
-        const phone = (phoneFn(r) || '').replace(/\D/g, '');
-        const safe  = name.replace(/\\/g,'\\\\').replace(/'/g, "\\'");
-        rows += _waRow(name, phone, safe);
-      });
-    }
-    return '<div style="margin-bottom:18px">'
+  const today = new Date().toISOString().slice(0, 10);
+
+  function buildTable(rows, tab, sectionId, invFields, emptyMsg) {
+    var phoneKey = 'contactPhone';
+    var visibleFields = invFields.filter(f => f.key !== 'notes' && f.key !== 'followUpDate' && f.key !== phoneKey).slice(0, 4);
+
+    var html = '<div style="margin-bottom:20px">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-      +   '<label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;cursor:pointer">'
-      +     '<input type="checkbox" onchange="_waSelectAll(\'' + sectionId + '\', this.checked)" style="width:13px;height:13px;accent-color:#6366f1"> Select all'
+      +   '<label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);cursor:pointer">'
+      +     '<input type="checkbox" onchange="_waSelectAll(\'' + sectionId + '\', this.checked)" style="accent-color:var(--accent);width:13px;height:13px"> Select all'
       +   '</label>'
-      + '</div>'
-      + '<div id="outreach-' + sectionId + '" style="max-height:200px;overflow-y:auto">' + rows + '</div>'
       + '</div>';
+
+    if (!rows.length) {
+      return html + '<div class="empty" style="padding:12px">' + emptyMsg + '</div></div>';
+    }
+
+    html += '<div id="outreach-' + sectionId + '" style="max-height:300px;overflow-y:auto">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+      + '<thead><tr style="border-bottom:1px solid var(--border)">'
+      + '<th style="padding:8px 10px;width:28px"></th>'
+      + visibleFields.map(f => '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">' + f.label + '</th>').join('')
+      + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Contact No.</th>'
+      + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
+      + (tab === 'investors' ? '<th style="padding:8px 10px"></th>' : '')
+      + '<th style="padding:8px 10px"></th>'
+      + '</tr></thead><tbody>';
+
+    rows.forEach(row => {
+      var phone = (row[phoneKey] || '').replace(/\D/g, '');
+      var name  = row.investorName || row.partnerName || row.companyName || row.name || '';
+      var safe  = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      var isDue = row.followUpDate && row.followUpDate <= today;
+
+      html += '<tr style="border-bottom:1px solid var(--border)"'
+            + (isDue ? ' class="net-row-due"' : '')
+            + ' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+
+      // Checkbox cell
+      html += '<td style="padding:8px 10px">'
+            + '<input type="checkbox" class="wa-contact-cb" data-name="' + name + '" data-phone="' + phone + '"'
+            + ' style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer"'
+            + (phone ? '' : ' disabled title="No phone number"') + '>'
+            + '</td>';
+
+      // Same visible field cells as Network tab
+      visibleFields.forEach(f => {
+        var val = row[f.key] || '—';
+        var cell = '<td style="padding:8px 10px;white-space:nowrap">';
+        if (f.key === 'status') {
+          var sc = val==='Active'||val==='Portfolio' ? 'var(--green)'
+                 : val==='Prospecting'||val==='Evaluating'||val==='Warm' ? 'var(--amber)'
+                 : val==='Closed'||val==='Passed'||val==='Cold' ? 'var(--red)' : 'var(--muted)';
+          cell += '<span class="badge" style="background:transparent;border-color:' + sc + ';color:' + sc + '">' + (typeof escapeHtml==='function'?escapeHtml(val):val) + '</span>';
+        } else {
+          cell += (typeof escapeHtml==='function' ? escapeHtml(String(val).slice(0,40)) : String(val).slice(0,40));
+        }
+        html += cell + '</td>';
+      });
+
+      // Phone cell
+      html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'
+            + (row[phoneKey] ? '<a href="tel:' + row[phoneKey] + '" style="color:var(--muted);text-decoration:none">' + row[phoneKey] + '</a>' : '—')
+            + '</td>';
+
+      // Follow-up cell
+      var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
+      html += '<td style="padding:8px 10px;white-space:nowrap;color:' + fuColor + ';font-weight:' + (isDue?'600':'400') + '">'
+            + (row.followUpDate || '—') + (isDue ? ' ⚑' : '') + '</td>';
+
+      // Sheet badge for investors
+      if (tab === 'investors') {
+        var badge = row._fromSheet
+          ? (row._localOverride
+              ? '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--amber);color:var(--amber)">Edited</span>'
+              : '<span class="badge" style="font-size:9px;padding:2px 5px;opacity:0.6">Sheet</span>')
+          : '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--muted);color:var(--muted)">Manual</span>';
+        html += '<td style="padding:8px 10px;white-space:nowrap">' + badge + '</td>';
+      }
+
+      // 📲 Send button (replaces Edit/Delete)
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+            + (phone
+                ? '<button class="action-btn primary" style="padding:3px 8px;font-size:11px" onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')">📲 Send</button>'
+                : '<span style="color:var(--muted);font-size:11px">no phone</span>')
+            + '</td></tr>';
+    });
+
+    html += '</tbody></table></div></div>';
+    return html;
   }
 
-  let html = '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin-bottom:4px">Investors</div>';
-  html += buildSection(investors, 'investors',
-    inv => inv.investorName || inv.name || 'Unknown',
-    inv => inv.contactPhone || '',
-    'No investors in Network tab');
+  // Use same field definitions as Network tab (inline, matching netFields())
+  var invFields = [
+    {key:'investorName', label:'Investor Name'},
+    {key:'fundName',     label:'Fund Name'},
+    {key:'stageFocus',   label:'Stage Focus'},
+    {key:'checkSize',    label:'Check Size'},
+    {key:'sectorFocus',  label:'Sector Focus'},
+    {key:'status',       label:'Status'},
+  ];
+  var parFields = [
+    {key:'partnerName',  label:'Partner Name'},
+    {key:'type',         label:'Type'},
+    {key:'contactName',  label:'Contact Name'},
+    {key:'contactEmail', label:'Email'},
+    {key:'status',       label:'Status'},
+  ];
 
-  html += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin-bottom:4px">Partners</div>';
-  html += buildSection(partners, 'partners',
-    p => p.partnerName || p.companyName || p.name || 'Unknown',
-    p => p.contactPhone || '',
-    'No partners in Network tab');
+  let html = '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px">Investors</div>';
+  html += buildTable(investors, 'investors', 'investors', invFields, 'No investors in Network tab');
 
-  html += '<button onclick="bulkOutreachSelectAll()" style="width:100%;margin-top:4px;padding:9px;font-size:13px;font-weight:600;background:#6366f1;color:#fff;border:none;border-radius:7px;cursor:pointer">📲 Send to All Selected</button>';
+  html += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px">Partners</div>';
+  html += buildTable(partners, 'partnerships', 'partners', parFields, 'No partners in Network tab');
+
+  html += '<button onclick="bulkOutreachSelectAll()" style="width:100%;margin-top:4px;padding:9px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:7px;cursor:pointer">📲 Send to All Selected</button>';
 
   body.innerHTML = html;
   console.log('Outreach panel rendered. Investors:', investors.length, 'Partners:', partners.length);
