@@ -357,6 +357,7 @@
     <button class="nav-tab" onclick="showTab('comps',this)">Market Comps</button>
     <button class="nav-tab" onclick="showTab('portfolio',this)">Portfolio</button>
     <button class="nav-tab" onclick="showTab('lpreport',this)">LP Report</button>
+    <button class="nav-tab" onclick="showTab('network',this)">Network</button>
   </div>
   <div class="nav-right">
     <button class="pill-btn" onclick="generateTearsheet()">Tearsheet</button>
@@ -973,6 +974,49 @@
     </div>
     <div id="lp-report-output"><div class="empty">Click Generate to build the quarterly LP report.</div></div>
   </div>
+  <!-- NETWORK PAGE -->
+  <div id="page-network" class="page">
+    <div class="section-bar">
+      <div class="section-title">Network</div>
+      <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
+    </div>
+    <div class="subtabs" style="margin-bottom:18px">
+      <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
+      <button class="subtab" id="net-tab-investors" onclick="switchNetTab('investors',this)">Investors</button>
+      <button class="subtab" id="net-tab-startups" onclick="switchNetTab('startups',this)">Startups</button>
+    </div>
+    <div id="net-panel-partnerships" class="net-panel">
+      <div class="card" style="overflow-x:auto">
+        <div id="net-list-partnerships"><div class="empty">No partnerships yet. Click + Add New to get started.</div></div>
+      </div>
+    </div>
+    <div id="net-panel-investors" class="net-panel" style="display:none">
+      <div class="card" style="overflow-x:auto">
+        <div id="net-list-investors"><div class="empty">No investors yet. Click + Add New to get started.</div></div>
+      </div>
+    </div>
+    <div id="net-panel-startups" class="net-panel" style="display:none">
+      <div class="card" style="overflow-x:auto">
+        <div id="net-list-startups"><div class="empty">No startups yet. Click + Add New to get started.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NETWORK MODAL -->
+  <div id="network-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header" style="margin-bottom:16px">
+        <div class="card-title" id="net-modal-title">Add Partnership</div>
+        <button class="action-btn danger" onclick="closeNetworkModal()" style="padding:4px 10px">&#x2715;</button>
+      </div>
+      <div id="net-modal-form"></div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="action-btn primary" style="flex:1" onclick="saveNetworkEntry()">Save</button>
+        <button class="action-btn secondary" onclick="closeNetworkModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODALS -->
   <div id="tearsheet-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:760px;width:100%;max-height:90vh;overflow-y:auto;border-radius:10px"><div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px"><button class="action-btn primary" onclick="window.print()">Print</button><button class="action-btn danger" onclick="closeTearsheet()">&#x2715; Close</button></div><div id="tearsheet-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
@@ -1050,6 +1094,7 @@ function showTab(name,btn){
   if(name==='memo') generateICMemo();
   if(name==='portfolio') renderPortfolio();
   if(name==='comps') renderComps();
+  if(name==='network') renderNetworkTab();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
@@ -2136,8 +2181,219 @@ async function deleteExtraDoc(id){await deleteDocumentRecord(id);addAuditEntry('
 async function analyseExtraDoc(id){var apiKey=localStorage.getItem('l7_key');if(!apiKey){showError('Add an API key for AI document analysis.');return;}var docs=await getAllDocuments();var doc=docs.find(function(d){return d.id===id;});if(!doc||!doc.extractedText)return;var modal=document.getElementById('objection-modal'),content=document.getElementById('objection-content');if(modal){modal.classList.remove('hidden');modal.style.display='flex';}if(content)content.innerHTML='<div class="loading-box">Analysing '+escapeHtml(doc.fileName)+'...</div>';try{var lines=['You are a VC analyst at Log7 Capital. Analyse this data room document.','Document: '+doc.fileName+' ('+doc.category+')','Startup: '+(selectedStartup?selectedStartup.company:'Unknown'),'Text:',doc.extractedText,'','Provide: 1. What this reveals 2. Key metrics/figures 3. Positive signals 4. Risk flags 5. Follow-up questions. Be specific.'];var result=await callClaude(apiKey,lines.join('\n'),1200);if(content)content.innerHTML='<div class="row-meta" style="margin-bottom:14px">Analysis: '+escapeHtml(doc.fileName)+'</div><div style="font-size:13px;line-height:1.8;white-space:pre-wrap">'+escapeHtml(result)+'</div>';addAuditEntry('doc','AI analysis: '+doc.fileName,selectedStartup?selectedStartup.company:'');}catch(err){if(content)content.innerHTML='<div class="error-box">Analysis failed: '+escapeHtml(err.message)+'</div>';}}
 
 
-// ═══ SHOW TAB EXTENSION ═══
+// ═══ NETWORK MODULE (see showTab for trigger) ═══
+
+// ═══════════════════════════════════════════════════════════════
+//  NETWORK MODULE
+// ═══════════════════════════════════════════════════════════════
+
+let _netActiveTab = 'partnerships';
+let _netEditId = null;
+
+const NET_KEYS = {
+  partnerships: 'l7_net_partnerships',
+  investors:    'l7_net_investors',
+  startups:     'l7_net_startups',
+};
+
+function netLoad(tab){ return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]'); }
+function netSave(tab,data){ localStorage.setItem(NET_KEYS[tab], JSON.stringify(data)); }
+function netNextId(arr){ return arr.length ? Math.max(...arr.map(r=>r.id||0))+1 : 1; }
+
+function switchNetTab(tab, btn){
+  _netActiveTab = tab;
+  document.querySelectorAll('.net-panel').forEach(p=>p.style.display='none');
+  document.querySelectorAll('[id^="net-tab-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('net-panel-'+tab).style.display='block';
+  if(btn) btn.classList.add('active');
+  renderNetworkTab();
+}
+
+function renderNetworkTab(){
+  renderNetList('partnerships');
+  renderNetList('investors');
+  renderNetList('startups');
+}
+
+// ── FIELD DEFINITIONS ──────────────────────────────────────────
+
+function netFields(tab){
+  if(tab==='partnerships') return [
+    {key:'partnerName',  label:'Partner Name',    type:'text',   required:true},
+    {key:'type',         label:'Type',             type:'select', opts:['Strategic','Financial','Channel','Other']},
+    {key:'contactName',  label:'Contact Name',     type:'text'},
+    {key:'contactEmail', label:'Contact Email',    type:'email'},
+    {key:'status',       label:'Status',           type:'select', opts:['Prospecting','Active','On Hold','Closed']},
+    {key:'notes',        label:'Notes',            type:'textarea'},
+  ];
+  if(tab==='investors') return [
+    {key:'investorName', label:'Investor Name',    type:'text',   required:true},
+    {key:'fundName',     label:'Fund Name',        type:'text'},
+    {key:'stageFocus',   label:'Stage Focus',      type:'select', opts:['Pre-seed','Seed','Series A','Series B','Growth']},
+    {key:'checkSize',    label:'Typical Check Size', type:'text'},
+    {key:'geography',    label:'Geography',        type:'text'},
+    {key:'sectorFocus',  label:'Sector Focus',     type:'text'},
+    {key:'status',       label:'Status',           type:'select', opts:['Active','Warm','Cold','Passed']},
+    {key:'notes',        label:'Notes',            type:'textarea'},
+  ];
+  // startups
+  return [
+    {key:'companyName',  label:'Company Name',     type:'text',   required:true},
+    {key:'founderName',  label:'Founder Name',     type:'text'},
+    {key:'founderEmail', label:'Founder Email',    type:'email'},
+    {key:'sector',       label:'Sector',           type:'text'},
+    {key:'stage',        label:'Stage',            type:'select', opts:['Pre-seed','Seed','Series A','Series B']},
+    {key:'status',       label:'Status',           type:'select', opts:['Referred','Evaluating','Passed','Portfolio']},
+    {key:'referredBy',   label:'Referred By',      type:'text'},
+    {key:'notes',        label:'Notes',            type:'textarea'},
+  ];
+}
+
+function netPrimaryKey(tab, row){
+  if(tab==='partnerships') return row.partnerName||'—';
+  if(tab==='investors')    return row.investorName||'—';
+  return row.companyName||'—';
+}
+
+// ── RENDER TABLE ───────────────────────────────────────────────
+
+function renderNetList(tab){
+  var el = document.getElementById('net-list-'+tab);
+  if(!el) return;
+  var rows = netLoad(tab);
+  if(!rows.length){
+    el.innerHTML = '<div class="empty" style="padding:20px">No entries yet. Click + Add New to get started.</div>';
+    return;
+  }
+  var fields = netFields(tab);
+  var visibleFields = fields.filter(f=>f.key!=='notes').slice(0,5);
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    + '<thead><tr style="border-bottom:1px solid var(--border)">'
+    + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Date Added</th>'
+    + '<th style="padding:8px 10px"></th>'
+    + '</tr></thead><tbody>';
+
+  rows.forEach(function(row){
+    html += '<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    visibleFields.forEach(function(f){
+      var val = row[f.key]||'—';
+      var cell = '<td style="padding:8px 10px;white-space:nowrap">';
+      if(f.key==='status'){
+        var sc = val==='Active'||val==='Portfolio'?'var(--green)':val==='Prospecting'||val==='Evaluating'||val==='Warm'?'var(--amber)':val==='Closed'||val==='Passed'||val==='Cold'?'var(--red)':'var(--muted)';
+        cell += '<span class="badge" style="background:transparent;border-color:'+sc+';color:'+sc+'">'+escapeHtml(val)+'</span>';
+      } else {
+        cell += escapeHtml(String(val).slice(0,40));
+      }
+      html += cell + '</td>';
+    });
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
+    html += '<td style="padding:8px 10px;white-space:nowrap">'
+      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\','+row.id+')">Edit</button>'
+      + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\','+row.id+')">Delete</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── MODAL ──────────────────────────────────────────────────────
+
+function openNetworkModal(tab){
+  tab = tab || _netActiveTab;
+  _netActiveTab = tab;
+  _netEditId = null;
+  var tabLabel = tab.charAt(0).toUpperCase()+tab.slice(1,-1); // Partnerships->Partnership etc
+  if(tab==='startups') tabLabel='Startup';
+  else if(tab==='investors') tabLabel='Investor';
+  else tabLabel='Partnership';
+  document.getElementById('net-modal-title').textContent = 'Add '+tabLabel;
+  document.getElementById('net-modal-form').innerHTML = buildNetForm(tab, {});
+  var modal = document.getElementById('network-modal');
+  modal.classList.remove('hidden');
+  modal.style.display='flex';
+}
+
+function editNetEntry(tab, id){
+  var rows = netLoad(tab);
+  var row = rows.find(function(r){return r.id===id;});
+  if(!row) return;
+  _netActiveTab = tab;
+  _netEditId = id;
+  var tabLabel = tab==='startups'?'Startup':tab==='investors'?'Investor':'Partnership';
+  document.getElementById('net-modal-title').textContent = 'Edit '+tabLabel;
+  document.getElementById('net-modal-form').innerHTML = buildNetForm(tab, row);
+  var modal = document.getElementById('network-modal');
+  modal.classList.remove('hidden');
+  modal.style.display='flex';
+}
+
+function buildNetForm(tab, data){
+  var fields = netFields(tab);
+  var html = '';
+  fields.forEach(function(f){
+    html += '<div class="field" style="margin-bottom:12px"><label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px">'+f.label+(f.required?' *':'')+'</label>';
+    var val = data[f.key]||'';
+    if(f.type==='select'){
+      html += '<select id="nf-'+f.key+'" style="width:100%">';
+      html += '<option value="">— Select —</option>';
+      f.opts.forEach(function(o){ html+='<option value="'+o+'"'+(val===o?' selected':'')+'>'+o+'</option>'; });
+      html += '</select>';
+    } else if(f.type==='textarea'){
+      html += '<textarea id="nf-'+f.key+'" style="width:100%;min-height:70px">'+escapeHtml(val)+'</textarea>';
+    } else {
+      html += '<input type="'+f.type+'" id="nf-'+f.key+'" value="'+escapeHtml(val)+'" style="width:100%"'+(f.required?' required':'')+' placeholder="'+f.label+'">';
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function saveNetworkEntry(){
+  var tab = _netActiveTab;
+  var fields = netFields(tab);
+  var entry = {};
+  var ok = true;
+  fields.forEach(function(f){
+    var el = document.getElementById('nf-'+f.key);
+    if(!el) return;
+    var val = el.value.trim();
+    if(f.required && !val){ el.style.borderColor='var(--red)'; ok=false; return; }
+    entry[f.key] = val;
+  });
+  if(!ok){ showError('Please fill in required fields.'); return; }
+
+  var rows = netLoad(tab);
+  if(_netEditId !== null){
+    var idx = rows.findIndex(function(r){return r.id===_netEditId;});
+    if(idx>-1){ entry.id=_netEditId; entry.dateAdded=rows[idx].dateAdded; rows[idx]=entry; }
+  } else {
+    entry.id = netNextId(rows);
+    entry.dateAdded = new Date().toISOString();
+    rows.push(entry);
+  }
+  netSave(tab, rows);
+  closeNetworkModal();
+  renderNetList(tab);
+  addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
+}
+
+function deleteNetEntry(tab, id){
+  if(!confirm('Delete this entry?')) return;
+  var rows = netLoad(tab).filter(function(r){return r.id!==id;});
+  netSave(tab, rows);
+  renderNetList(tab);
+  addAuditEntry('network','Deleted '+tab.slice(0,-1),tab);
+}
+
+function closeNetworkModal(){
+  var modal = document.getElementById('network-modal');
+  modal.classList.add('hidden');
+  modal.style.display='none';
+  _netEditId = null;
+}
 
 </script>
+
 </body>
 </html>
