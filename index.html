@@ -1236,15 +1236,14 @@ async function fetchGvizSheet(url){
   if(!res.ok) throw new Error('Request failed ('+res.status+')');
   var text=await res.text();
   var json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,''));
-  var cols=(json.table&&json.table.cols||[]).map(function(c){return c.label||c.id||'';}).filter(Boolean);
+  var cols=(json.table&&json.table.cols||[]).map(function(c){return c.label||c.id||'';});
   console.log('[Network Investors] Raw sheet headers:',cols);
   var rows=(json.table&&json.table.rows||[]).map(function(r){
     var obj={};
-    (r.c||[]).forEach(function(cell,i){if(cols[i]) obj[cols[i]]=cell?(cell.v==null?'':String(cell.v)):'';});
-    console.log('[Network Investors] Raw row:',obj);
+    (r.c||[]).forEach(function(cell,i){obj[cols[i]]=cell?(cell.v==null?'':String(cell.v)):'';});
     return obj;
   });
-  return {rows:rows, cols:cols};
+  return rows;
 }
 function extractRows(payload){if(Array.isArray(payload))return normalizeRows(payload);if(payload?.data&&Array.isArray(payload.data))return normalizeRows(payload.data);if(payload?.rows&&Array.isArray(payload.rows))return normalizeRows(payload.rows);if(payload?.values&&Array.isArray(payload.values))return normalizeRows(payload.values);return[];}
 function normalizeRows(rows){if(!rows?.length)return[];if(!Array.isArray(rows[0]))return rows;const headers=rows[0].map(v=>String(v||'').trim());return rows.slice(1).map(row=>{const o={};headers.forEach((h,i)=>{o[h]=row[i]==null?'':String(row[i]).trim();});return o;});}
@@ -2238,71 +2237,6 @@ function renderNetList(tab){
     el.innerHTML = '<div class="empty" style="padding:20px">No entries yet. Click + Add New to get started.</div>';
     return;
   }
-
-  // Dynamic sheet-column rendering for investors tab
-  if(tab==='investors'){
-    var storedCols=[];
-    try{storedCols=JSON.parse(localStorage.getItem('l7_net_inv_cols')||'[]');}catch(e){}
-    if(storedCols.length){
-      var today2=new Date().toISOString().slice(0,10);
-      // Only show cols that have at least one non-empty value
-      var activeCols=storedCols.filter(function(col){
-        return rows.some(function(r){return r._raw&&r._raw[col]&&String(r._raw[col]).trim();});
-      });
-      var html2='<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
-        +'<thead><tr style="border-bottom:1px solid var(--border)">'
-        +activeCols.map(function(col){return '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+escapeHtml(col)+'</th>';}).join('')
-        +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
-        +'<th style="padding:8px 10px"></th>'
-        +'<th style="padding:8px 10px"></th>'
-        +'</tr></thead><tbody>';
-      rows.forEach(function(row){
-        var isDue=row.followUpDate&&row.followUpDate<=today2;
-        html2+='<tr style="border-bottom:1px solid var(--border)"'+(isDue?' class="net-row-due"':'')+' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
-        activeCols.forEach(function(col){
-          var colL=col.toLowerCase();
-          var val='';
-          if(row._raw){
-            val=row._raw[col]||'';
-          } else {
-            // Manual row — map by keyword
-            if(colL.indexOf('investor name')!==-1||colL==='name') val=row.investorName||'';
-            else if(colL.indexOf('fund')!==-1) val=row.fundName||'';
-            else if(colL.indexOf('stage')!==-1) val=row.stageFocus||'';
-            else if(colL.indexOf('check')!==-1||colL.indexOf('ticket')!==-1) val=row.checkSize||'';
-            else if(colL.indexOf('sector')!==-1) val=row.sectorFocus||'';
-            else if(colL.indexOf('geo')!==-1||colL.indexOf('location')!==-1) val=row.geography||'';
-            else if(colL.indexOf('phone')!==-1||colL.indexOf('contact no')!==-1) val=row.contactPhone||'';
-            else if(colL.indexOf('status')!==-1) val=row.status||'';
-            else if(colL.indexOf('follow')!==-1) val=row.followUpDate||'';
-          }
-          var cell='<td style="padding:8px 10px;white-space:nowrap">';
-          if(colL.indexOf('status')!==-1&&val){
-            var sc=val==='Active'||val==='Portfolio'?'var(--green)':val==='Warm'||val==='Evaluating'?'var(--amber)':val==='Cold'||val==='Passed'?'var(--red)':'var(--muted)';
-            cell+='<span class="badge" style="background:transparent;border-color:'+sc+';color:'+sc+'">'+escapeHtml(val)+'</span>';
-          } else if(colL.indexOf('follow')!==-1&&val){
-            var fuC=val<today2?'var(--red)':val===today2?'var(--amber)':'var(--text)';
-            cell+='<span style="color:'+fuC+';font-weight:'+(isDue?'600':'400')+'">'+escapeHtml(val)+(isDue?' ⚑':'')+'</span>';
-          } else if((colL.indexOf('phone')!==-1||colL==='contact no.'||colL==='contact no')&&val){
-            cell+='<a href="tel:'+escapeHtml(val)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(val)+'</a>';
-          } else {
-            cell+=escapeHtml(String(val||'—').slice(0,50));
-          }
-          html2+=cell+'</td>';
-        });
-        html2+='<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
-        html2+='<td style="padding:8px 10px;white-space:nowrap">'+(row._fromSheet?'<span class="badge" style="font-size:9px;padding:2px 6px;opacity:0.7">Sheet</span>':'')+'</td>';
-        html2+='<td style="padding:8px 10px;white-space:nowrap">'
-          +'<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\'investors\','+row.id+')">Edit</button>'
-          +'<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\'investors\','+row.id+')">Delete</button>'
-          +'</td></tr>';
-      });
-      html2+='</tbody></table>';
-      el.innerHTML=html2;
-      return;
-    }
-  }
-
   var fields = netFields(tab);
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
   var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
@@ -2475,57 +2409,61 @@ async function netFetchInvestors(){
   if(syncEl) syncEl.textContent = 'Fetching…';
 
   try {
-    var result = await fetchGvizSheet(NET_INVESTOR_URL);
-    var rawRows = result.rows, cols = result.cols;
-
-    // Persist column list for dynamic table rendering
-    localStorage.setItem('l7_net_inv_cols', JSON.stringify(cols));
-
-    // Detect key columns dynamically using keyword matching
-    function findCol(keywords){
-      return cols.find(function(c){
-        var cl = c.toLowerCase();
-        return keywords.some(function(k){ return cl.indexOf(k) !== -1; });
-      }) || '';
-    }
-    var nameCol   = findCol(['investor name','full name']) || findCol(['name']);
-    var fundCol   = findCol(['fund name','fund']);
-    var stageCol  = findCol(['stage focus','stage']);
-    var checkCol  = findCol(['typical check','check size','ticket size']);
-    var phoneCol  = findCol(['contact no','phone','mobile']);
-    var followCol = findCol(['follow-up','follow up','followup']);
-    var statusCol = findCol(['status']);
-    var sectorCol = findCol(['sector']);
-    var geoCol    = findCol(['geography','geo','location']);
+    var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
+    // Best-effort column mapping — column names logged to console for remapping
+    var sheetRows = rawRows.filter(function(r){
+      // Accept row if any value looks like a name (non-empty first few cols)
+      return Object.values(r).some(function(v){return v&&v.trim();});
+    }).map(function(r){
+      // Try common name column variants
+      var name = r['Full Name']||r['Name']||r['Investor Name']||r['Fund Name']||Object.values(r).find(function(v){return v&&v.trim();})||'';
+      return {
+        name:         name.trim(),
+        phone:        r['Phone']||r['Contact Phone']||r['Mobile']||r['Phone Number']||'',
+        email:        r['Email']||r['Contact Email']||r['Email ID']||'',
+        type:         r['Type']||r['Fund Type']||r['Investor Type']||'',
+        ticketSize:   r['Ticket Size']||r['Check Size']||r['Investment Size']||'',
+        sectors:      r['Sectors']||r['Sector Focus']||r['Sector']||'',
+        stage:        r['Stage']||r['Stage Focus']||r['Investment Stage']||'',
+        startupStage: r['Startup Stage']||'',
+        thesis:       r['Thesis']||r['Investment Thesis']||'',
+        hardNos:      r['Hard Nos']||r['Hard No']||'',
+        deploying:    r['Deploying']||r['Status']||'',
+        sendVia:      r['Send Via']||'',
+      };
+    }).filter(function(r){return r.name;});
 
     var existing = netLoad('investors');
+    // Separate manual entries from previously sheet-synced entries
     var manual = existing.filter(function(r){ return !r._fromSheet; });
     var manualNames = manual.map(function(r){ return (r.investorName||'').toLowerCase().trim(); });
+
     var nextId = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
 
+    // Build fresh sheet entries, preserving manual overrides
     var sheetEntries = [];
-    rawRows.forEach(function(r){
-      // Skip completely empty rows
-      if(!Object.values(r).some(function(v){ return v && String(v).trim(); })) return;
-      var name = (nameCol ? r[nameCol] : '') || Object.values(r).find(function(v){ return v && v.trim(); }) || '';
-      name = name.trim();
+    sheetRows.forEach(function(inv){
+      var name = (inv.name||'').trim();
       if(!name) return;
+      // If a manual entry with same name exists, leave it untouched
       if(manualNames.indexOf(name.toLowerCase()) !== -1) return;
-      var prev = existing.find(function(e){ return e._fromSheet && (e.investorName||'').toLowerCase() === name.toLowerCase(); });
+      // Find existing sheet record to preserve id / followUpDate / manual edits
+      var prev = existing.find(function(r){ return r._fromSheet && (r.investorName||'').toLowerCase()===name.toLowerCase(); });
       sheetEntries.push({
         id:           prev ? prev.id : nextId++,
         investorName: name,
-        fundName:     fundCol   ? (r[fundCol]||'')   : '',
-        stageFocus:   stageCol  ? (r[stageCol]||'')  : '',
-        checkSize:    checkCol  ? (r[checkCol]||'')  : '',
-        geography:    geoCol    ? (r[geoCol]||'')    : (prev ? (prev.geography||'') : ''),
-        sectorFocus:  sectorCol ? (r[sectorCol]||'') : '',
-        contactPhone: phoneCol  ? (r[phoneCol]||'')  : '',
-        status:       statusCol ? (r[statusCol]||'Warm') : 'Warm',
-        followUpDate: followCol ? (r[followCol]||'') : (prev ? (prev.followUpDate||'') : ''),
+        fundName:     inv.type||'',
+        stageFocus:   (inv.stage||inv.startupStage||'').trim(),
+        checkSize:    inv.ticketSize||'',
+        geography:    prev ? (prev.geography||'') : '',
+        sectorFocus:  inv.sectors||'',
+        contactPhone: inv.phone||'',
+        contactEmail: inv.email||'',
+        status:       String(inv.deploying).toLowerCase()==='true' ? 'Active' : 'Warm',
+        notes:        [inv.thesis, inv.hardNos].filter(Boolean).join(' | '),
+        followUpDate: prev ? (prev.followUpDate||'') : '',
         dateAdded:    prev ? prev.dateAdded : new Date().toISOString(),
         _fromSheet:   true,
-        _raw:         r,
       });
     });
 
