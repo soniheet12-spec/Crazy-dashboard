@@ -942,6 +942,7 @@
       <div class="section-title">Network</div>
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
       <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
+      <button class="ghost-btn" id="net-sync-btn" style="display:none" onclick="migrateInvestorsToNetwork(true)">&#8635; Sync from Investors Tab</button>
     </div>
     <div class="subtabs" style="margin-bottom:18px">
       <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
@@ -1042,6 +1043,7 @@ window.onload = async () => {
   refreshDiligence();renderKanban();renderPipelineList();
   renderAuditLog();refreshAnalytics();renderICVotes();
   refreshCapitalDisplay();
+  migrateInvestorsToNetwork();
   if(key) setKeyStatus('Saved');
 };
 
@@ -2193,6 +2195,8 @@ function switchNetTab(tab, btn){
   document.querySelectorAll('[id^="net-tab-"]').forEach(b=>b.classList.remove('active'));
   document.getElementById('net-panel-'+tab).style.display='block';
   if(btn) btn.classList.add('active');
+  var syncBtn = document.getElementById('net-sync-btn');
+  if(syncBtn) syncBtn.style.display = tab==='investors' ? 'inline-block' : 'none';
   renderNetworkTab();
 }
 
@@ -2411,6 +2415,45 @@ function exportNetCsv(){
     colMap[tab].forEach(function(k){ out[k] = r[k]||''; });
     return out;
   }));
+}
+
+// ── INVESTOR MIGRATION ─────────────────────────────────────────
+
+function migrateInvestorsToNetwork(manual){
+  if(!investors || !investors.length) return;
+  var existing = netLoad('investors');
+  var existingNames = existing.map(function(r){ return (r.investorName||'').toLowerCase().trim(); });
+  var added = 0;
+  var nextId = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
+
+  investors.forEach(function(inv){
+    var name = (inv.name||'').trim();
+    if(!name) return;
+    if(existingNames.indexOf(name.toLowerCase()) !== -1) return; // skip duplicates
+
+    existing.push({
+      id:           nextId++,
+      investorName: name,
+      fundName:     inv.type||'',
+      stageFocus:   (inv.stage||inv.startupStage||'').trim(),
+      checkSize:    inv.ticketSize||'',
+      geography:    '',
+      sectorFocus:  inv.sectors||'',
+      contactPhone: inv.phone||'',
+      status:       String(inv.deploying).toLowerCase()==='true' ? 'Active' : 'Warm',
+      notes:        [inv.thesis, inv.hardNos].filter(Boolean).join(' | '),
+      followUpDate: '',
+      dateAdded:    new Date().toISOString(),
+    });
+    existingNames.push(name.toLowerCase());
+    added++;
+  });
+
+  if(added > 0){
+    netSave('investors', existing);
+    renderNetList('investors');
+    if(manual) addAuditEntry('network', 'Synced '+added+' investor(s) from Investors tab', 'Network > Investors');
+  }
 }
 
 </script>
