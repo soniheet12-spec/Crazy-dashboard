@@ -2722,6 +2722,14 @@ function syncFollowupsToServer(){
     });
   });
 
+  // Fire-and-forget POST — silent, never blocks the UI
+  fetch('/api/save-followups', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ followups: followups }),
+  }).catch(function(){});
+}
+
 // ═══ BULK OUTREACH ═══
 function renderBulkOutreachPanel(){
   var body=document.getElementById('bulk-outreach-body');
@@ -2856,13 +2864,6 @@ function closeBulkOutreachModal(){
   if(modal){modal.classList.add('hidden');modal.style.display='none';}
 }
 
-  // Fire-and-forget POST — silent, never blocks the UI
-  fetch('/api/save-followups', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ followups: followups }),
-  }).catch(function(){});
-}
 
 </script>
 
