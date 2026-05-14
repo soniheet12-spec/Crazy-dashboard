@@ -2862,8 +2862,22 @@ function waSendAllSelected() {
 </script>
 
 <script>
+function _waRow(name, phone, safe) {
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2a2a2a;min-height:36px">'
+    + '<input type="checkbox" class="wa-contact-cb" data-name="' + name + '" data-phone="' + phone + '" style="width:15px;height:15px;flex-shrink:0;accent-color:#6366f1;cursor:pointer"' + (phone ? '' : ' disabled') + '>'
+    + '<span style="flex:1;font-size:13px;font-weight:500;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + name + '</span>'
+    + '<span style="font-size:11px;color:#64748b;flex-shrink:0;margin-right:4px">' + (phone ? '+' + phone : '<span style="color:#f87171">no phone</span>') + '</span>'
+    + (phone
+        ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="flex-shrink:0;padding:3px 10px;font-size:11px;background:#6366f1;color:#fff;border:none;border-radius:5px;cursor:pointer;white-space:nowrap">📲</button>'
+        : '<span style="flex-shrink:0;width:48px"></span>')
+    + '</div>';
+}
+
+function _waSelectAll(section, checked) {
+  document.querySelectorAll('#outreach-' + section + ' .wa-contact-cb').forEach(cb => { if (!cb.disabled) cb.checked = checked; });
+}
+
 function renderBulkOutreachPanel() {
-  // Exact keys confirmed from NET_KEYS in codebase
   const rawInv = localStorage.getItem('l7_net_investors');
   const rawPar = localStorage.getItem('l7_net_partnerships');
   console.log('[Outreach] l7_net_investors raw:', rawInv);
@@ -2879,46 +2893,48 @@ function renderBulkOutreachPanel() {
   const body = document.getElementById('outreach-body');
   if (!body) { console.error('outreach-body div not found'); return; }
 
-  let html = '<strong>Investors</strong><br>';
-  if (!investors.length) {
-    html += '<p style="color:#aaa;font-size:13px">No investors in Network tab</p>';
-  } else {
-    investors.forEach(inv => {
-      // Field names: investorName, contactPhone (confirmed from schema)
-      const name  = inv.investorName || inv.name || 'Unknown';
-      const phone = (inv.contactPhone || '').replace(/\D/g, '');
-      const safe  = name.replace(/'/g, "\\'");
-      html += '<div style="padding:5px 0;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">'
-            + '<input type="checkbox" data-name="' + name + '" data-phone="' + phone + '">'
-            + '<span style="flex:1;font-size:13px">' + name + (phone ? ' <span style="color:#888;font-size:11px">+' + phone + '</span>' : ' <span style="color:#f87">no phone</span>') + '</span>'
-            + (phone ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="padding:3px 8px;font-size:11px;cursor:pointer">📲</button>' : '')
-            + '</div>';
-    });
+  function buildSection(arr, sectionId, nameFn, phoneFn, emptyMsg) {
+    let rows = '';
+    if (!arr.length) {
+      rows = '<div style="font-size:12px;color:#64748b;padding:8px 0">' + emptyMsg + '</div>';
+    } else {
+      arr.forEach(r => {
+        const name  = nameFn(r);
+        const phone = (phoneFn(r) || '').replace(/\D/g, '');
+        const safe  = name.replace(/\\/g,'\\\\').replace(/'/g, "\\'");
+        rows += _waRow(name, phone, safe);
+      });
+    }
+    return '<div style="margin-bottom:18px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +   '<label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;cursor:pointer">'
+      +     '<input type="checkbox" onchange="_waSelectAll(\'' + sectionId + '\', this.checked)" style="width:13px;height:13px;accent-color:#6366f1"> Select all'
+      +   '</label>'
+      + '</div>'
+      + '<div id="outreach-' + sectionId + '" style="max-height:200px;overflow-y:auto">' + rows + '</div>'
+      + '</div>';
   }
 
-  html += '<br><strong>Partners</strong><br>';
-  if (!partners.length) {
-    html += '<p style="color:#aaa;font-size:13px">No partners in Network tab</p>';
-  } else {
-    partners.forEach(p => {
-      // Field names: partnerName, contactPhone (confirmed from schema)
-      const name  = p.partnerName || p.companyName || p.name || 'Unknown';
-      const phone = (p.contactPhone || '').replace(/\D/g, '');
-      const safe  = name.replace(/'/g, "\\'");
-      html += '<div style="padding:5px 0;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">'
-            + '<input type="checkbox" data-name="' + name + '" data-phone="' + phone + '">'
-            + '<span style="flex:1;font-size:13px">' + name + (phone ? ' <span style="color:#888;font-size:11px">+' + phone + '</span>' : ' <span style="color:#f87">no phone</span>') + '</span>'
-            + (phone ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="padding:3px 8px;font-size:11px;cursor:pointer">📲</button>' : '')
-            + '</div>';
-    });
-  }
+  let html = '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin-bottom:4px">Investors</div>';
+  html += buildSection(investors, 'investors',
+    inv => inv.investorName || inv.name || 'Unknown',
+    inv => inv.contactPhone || '',
+    'No investors in Network tab');
+
+  html += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin-bottom:4px">Partners</div>';
+  html += buildSection(partners, 'partners',
+    p => p.partnerName || p.companyName || p.name || 'Unknown',
+    p => p.contactPhone || '',
+    'No partners in Network tab');
+
+  html += '<button onclick="bulkOutreachSelectAll()" style="width:100%;margin-top:4px;padding:9px;font-size:13px;font-weight:600;background:#6366f1;color:#fff;border:none;border-radius:7px;cursor:pointer">📲 Send to All Selected</button>';
 
   body.innerHTML = html;
   console.log('Outreach panel rendered. Investors:', investors.length, 'Partners:', partners.length);
 }
 
 function bulkOutreachSelectAll() {
-  const checked = document.querySelectorAll('#outreach-body input[type=checkbox]:checked');
+  const checked = document.querySelectorAll('#outreach-investors .wa-contact-cb:checked, #outreach-partners .wa-contact-cb:checked');
   if (!checked.length) { alert('No contacts selected.'); return; }
   let delay = 0;
   checked.forEach(cb => {
