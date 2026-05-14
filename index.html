@@ -336,6 +336,7 @@
     .card, .match-card { border-color:#ddd; box-shadow:none; background:#fff; }
     .print-only { display:block; }
   }
+@keyframes netLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.4)}}
 </style>
 </head>
 <body>
@@ -925,8 +926,8 @@
     </div>
     <div id="net-panel-investors" class="net-panel" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <button class="ghost-btn" onclick="netFetchInvestors()">&#8635; Refresh Sheets</button>
-        <span id="net-inv-sync-time" style="font-size:11px;color:var(--muted)"></span>
+        <button class="ghost-btn" onclick="netFetchInvestors()">&#8635; Refresh</button>
+        <span id="net-inv-sync-time" style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px"></span>
       </div>
       <div class="card" style="overflow-x:auto">
         <div id="net-list-investors"><div class="empty">No investors yet. Click + Add New or Refresh Sheets.</div></div>
@@ -1018,6 +1019,7 @@ window.onload = async () => {
   renderAuditLog();refreshAnalytics();renderICVotes();
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
+  netStartPolling();
 };
 
 // ═══ NAV ═══
@@ -1236,12 +1238,9 @@ async function fetchGvizSheet(url){
   if(!res.ok) throw new Error('Request failed ('+res.status+')');
   var text=await res.text();
   var json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,''));
-  var cols=(json.table&&json.table.cols||[]).map(function(c){return c.label||c.id||'';});
-  console.log('[Network Investors] Raw sheet headers:',cols);
+  // Return raw rows as arrays indexed by column position (0=A, 1=B, ...)
   var rows=(json.table&&json.table.rows||[]).map(function(r){
-    var obj={};
-    (r.c||[]).forEach(function(cell,i){obj[cols[i]]=cell?(cell.v==null?'':String(cell.v)):'';});
-    return obj;
+    return (r.c||[]).map(function(cell){ return cell?(cell.v==null?'':String(cell.v)):''; });
   });
   return rows;
 }
@@ -2273,11 +2272,18 @@ function renderNetList(tab){
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     if(tab==='investors'){
-      html += '<td style="padding:8px 10px;white-space:nowrap">'
-        + (row._fromSheet ? '<span class="badge" style="font-size:9px;padding:2px 6px;opacity:0.7">Sheet</span>' : '')
-        + '</td>';
+      var badge = row._fromSheet
+        ? (row._localOverride
+            ? '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--amber);color:var(--amber)">Edited</span>'
+            : '<span class="badge" style="font-size:9px;padding:2px 5px;opacity:0.6">Sheet</span>')
+        : '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--muted);color:var(--muted)">Manual</span>';
+      html += '<td style="padding:8px 10px;white-space:nowrap">'+badge+'</td>';
     }
+    var resetBtn = (tab==='investors'&&row._fromSheet&&row._localOverride)
+      ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="netResetToSheet('+row.id+')">Reset</button>'
+      : '';
     html += '<td style="padding:8px 10px;white-space:nowrap">'
+      + resetBtn
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\','+row.id+')">Edit</button>'
       + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\','+row.id+')">Delete</button>'
       + '</td></tr>';
@@ -2355,7 +2361,14 @@ function saveNetworkEntry(){
   var rows = netLoad(tab);
   if(_netEditId !== null){
     var idx = rows.findIndex(function(r){return r.id===_netEditId;});
-    if(idx>-1){ entry.id=_netEditId; entry.dateAdded=rows[idx].dateAdded; rows[idx]=entry; }
+    if(idx>-1){
+      var prev = rows[idx];
+      entry.id = _netEditId;
+      entry.dateAdded = prev.dateAdded;
+      // Preserve sheet metadata; mark as locally overridden
+      if(prev._fromSheet){ entry._fromSheet=true; entry._sheetData=prev._sheetData||null; entry._localOverride=true; }
+      rows[idx] = entry;
+    }
   } else {
     entry.id = netNextId(rows);
     entry.dateAdded = new Date().toISOString();
@@ -2401,88 +2414,130 @@ function exportNetCsv(){
 // ── NETWORK INVESTORS SHEET SYNC ───────────────────────────────
 
 var _netInvFetching = false;
+var _netInvPollTimer = null;
+
+// Column index mapping (0-based, A=0, B=1, ...)
+// A=0 Investor Name, B=1 Contact Number, C=2 Email, D=3 Fund Name,
+// E=4 Check Size, F=5 Sector Focus, H=7 Stage Focus
+function _mapGvizRow(cols, rowIdx){
+  var g = function(i){ return (cols[i]||'').trim(); };
+  return {
+    investorName: g(0),
+    contactPhone: g(1),
+    contactEmail: g(2),
+    fundName:     g(3),
+    checkSize:    g(4),
+    sectorFocus:  g(5),
+    stageFocus:   g(7),
+    _sheetRowIdx: rowIdx,
+  };
+}
 
 async function netFetchInvestors(){
   if(_netInvFetching) return;
   _netInvFetching = true;
   var syncEl = document.getElementById('net-inv-sync-time');
-  if(syncEl) syncEl.textContent = 'Fetching…';
+  if(syncEl) syncEl.innerHTML = 'Fetching…';
 
   try {
     var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
-    // Best-effort column mapping — column names logged to console for remapping
-    var sheetRows = rawRows.filter(function(r){
-      // Accept row if any value looks like a name (non-empty first few cols)
-      return Object.values(r).some(function(v){return v&&v.trim();});
-    }).map(function(r){
-      // Try common name column variants
-      var name = r['Full Name']||r['Name']||r['Investor Name']||r['Fund Name']||Object.values(r).find(function(v){return v&&v.trim();})||'';
-      return {
-        name:         name.trim(),
-        phone:        r['Phone']||r['Contact Phone']||r['Mobile']||r['Phone Number']||'',
-        email:        r['Email']||r['Contact Email']||r['Email ID']||'',
-        type:         r['Type']||r['Fund Type']||r['Investor Type']||'',
-        ticketSize:   r['Ticket Size']||r['Check Size']||r['Investment Size']||'',
-        sectors:      r['Sectors']||r['Sector Focus']||r['Sector']||'',
-        stage:        r['Stage']||r['Stage Focus']||r['Investment Stage']||'',
-        startupStage: r['Startup Stage']||'',
-        thesis:       r['Thesis']||r['Investment Thesis']||'',
-        hardNos:      r['Hard Nos']||r['Hard No']||'',
-        deploying:    r['Deploying']||r['Status']||'',
-        sendVia:      r['Send Via']||'',
-      };
-    }).filter(function(r){return r.name;});
+
+    // Map using exact column indices; skip rows with no investor name
+    var sheetMapped = [];
+    rawRows.forEach(function(cols, idx){
+      var mapped = _mapGvizRow(cols, idx);
+      if(mapped.investorName) sheetMapped.push(mapped);
+    });
 
     var existing = netLoad('investors');
-    // Separate manual entries from previously sheet-synced entries
-    var manual = existing.filter(function(r){ return !r._fromSheet; });
-    var manualNames = manual.map(function(r){ return (r.investorName||'').toLowerCase().trim(); });
+    var manual   = existing.filter(function(r){ return !r._fromSheet; });
+    var nextId   = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
 
-    var nextId = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
-
-    // Build fresh sheet entries, preserving manual overrides
+    // Build sheet entries; preserve local overrides and follow-up dates
     var sheetEntries = [];
-    sheetRows.forEach(function(inv){
-      var name = (inv.name||'').trim();
-      if(!name) return;
-      // If a manual entry with same name exists, leave it untouched
-      if(manualNames.indexOf(name.toLowerCase()) !== -1) return;
-      // Find existing sheet record to preserve id / followUpDate / manual edits
-      var prev = existing.find(function(r){ return r._fromSheet && (r.investorName||'').toLowerCase()===name.toLowerCase(); });
-      sheetEntries.push({
-        id:           prev ? prev.id : nextId++,
-        investorName: name,
-        fundName:     inv.type||'',
-        stageFocus:   (inv.stage||inv.startupStage||'').trim(),
-        checkSize:    inv.ticketSize||'',
-        geography:    prev ? (prev.geography||'') : '',
-        sectorFocus:  inv.sectors||'',
-        contactPhone: inv.phone||'',
-        contactEmail: inv.email||'',
-        status:       String(inv.deploying).toLowerCase()==='true' ? 'Active' : 'Warm',
-        notes:        [inv.thesis, inv.hardNos].filter(Boolean).join(' | '),
-        followUpDate: prev ? (prev.followUpDate||'') : '',
-        dateAdded:    prev ? prev.dateAdded : new Date().toISOString(),
-        _fromSheet:   true,
-      });
+    sheetMapped.forEach(function(inv){
+      // Unique sheet key: row index in sheet
+      var sheetKey = 'sheet-'+inv._sheetRowIdx;
+      var prev = existing.find(function(r){ return r._fromSheet && r._sheetKey === sheetKey; });
+      if(prev && prev._localOverride){
+        // Keep locally edited version; just update _sheetData for Reset
+        sheetEntries.push(Object.assign({}, prev, { _sheetData: inv }));
+      } else {
+        sheetEntries.push({
+          id:           prev ? prev.id : nextId++,
+          _sheetKey:    sheetKey,
+          investorName: inv.investorName,
+          fundName:     inv.fundName,
+          stageFocus:   inv.stageFocus,
+          checkSize:    inv.checkSize,
+          geography:    prev ? (prev.geography||'') : '',
+          sectorFocus:  inv.sectorFocus,
+          contactPhone: inv.contactPhone,
+          contactEmail: inv.contactEmail,
+          status:       prev ? (prev.status||'Warm') : 'Warm',
+          notes:        prev ? (prev.notes||'') : '',
+          followUpDate: prev ? (prev.followUpDate||'') : '',
+          dateAdded:    prev ? prev.dateAdded : new Date().toISOString(),
+          _fromSheet:   true,
+          _sheetData:   inv,
+        });
+      }
     });
 
     netSave('investors', manual.concat(sheetEntries));
     renderNetList('investors');
 
-    var now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    var now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     localStorage.setItem('l7_net_inv_sync', now);
-    if(syncEl) syncEl.textContent = 'Last synced: '+now+' ('+sheetEntries.length+' from sheet, '+manual.length+' manual)';
-    addAuditEntry('network','Network Investors synced from sheet',sheetEntries.length+' records');
+    if(syncEl) syncEl.innerHTML =
+      '<span style="display:inline-flex;align-items:center;gap:4px">'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:var(--green);animation:netLivePulse 2s infinite"></span>'
+      +'<span style="color:var(--green);font-weight:600">Live</span>'
+      +'</span>'
+      +' &bull; Last synced: '+now;
 
   } catch(err) {
-    var cached = netLoad('investors');
-    var cachedTime = localStorage.getItem('l7_net_inv_sync')||'unknown';
-    if(syncEl) syncEl.textContent = 'Could not reach Google Sheet — showing cached data (last: '+cachedTime+')';
-    if(syncEl) syncEl.style.color = 'var(--amber)';
+    var cachedTime = localStorage.getItem('l7_net_inv_sync')||'—';
+    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">Sheet unreachable — cached data (last: '+cachedTime+')</span>';
   }
 
   _netInvFetching = false;
+}
+
+function netStartPolling(){
+  if(_netInvPollTimer) return;
+  netFetchInvestors();
+  _netInvPollTimer = setInterval(function(){ netFetchInvestors(); }, 60000);
+}
+
+function netResetToSheet(id){
+  if(!confirm('Reset this entry to the sheet values? Your local edits will be lost.')) return;
+  var rows = netLoad('investors');
+  var idx = rows.findIndex(function(r){ return r.id===id; });
+  if(idx===-1) return;
+  var row = rows[idx];
+  var sd = row._sheetData;
+  if(!sd) return;
+  rows[idx] = {
+    id:           row.id,
+    _sheetKey:    row._sheetKey,
+    investorName: sd.investorName,
+    fundName:     sd.fundName,
+    stageFocus:   sd.stageFocus,
+    checkSize:    sd.checkSize,
+    geography:    row.geography||'',
+    sectorFocus:  sd.sectorFocus,
+    contactPhone: sd.contactPhone,
+    contactEmail: sd.contactEmail,
+    status:       row.status||'Warm',
+    notes:        row.notes||'',
+    followUpDate: row.followUpDate||'',
+    dateAdded:    row.dateAdded,
+    _fromSheet:   true,
+    _sheetData:   sd,
+  };
+  netSave('investors', rows);
+  renderNetList('investors');
 }
 
 </script>
