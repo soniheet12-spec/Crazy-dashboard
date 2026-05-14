@@ -1472,7 +1472,7 @@ async function processPdf(file){
 // ═══ MATCHING ═══
 function shouldUseAi(){const m=document.getElementById('matching-mode').value||'auto',k=!!localStorage.getItem('l7_key');if(m==='rules')return false;if(m==='ai')return true;return k;}
 async function runMatch(){
-  if(!selectedStartup)return showError('Select a startup first.');if(!investors.length)return showError('Load investor data first.');showError('');
+  if(!selectedStartup)return showError('Select a startup first.');if(!getMatchInvestors().length)return showError('Load investor data first (or add investors in Network tab).');showError('');
   const btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching...';
   document.getElementById('match-results').innerHTML='<div class="loading-box">Generating investor ranking...</div>';
   try{
@@ -1482,20 +1482,49 @@ async function runMatch(){
   }catch(err){showError('Matching failed: '+err.message);document.getElementById('match-results').innerHTML='';}
   btn.disabled=false;btn.textContent='Run AI Match';
 }
-function runRuleBasedMatch(){if(!selectedStartup)return showError('Select a startup first.');if(!investors.length)return showError('Load investor data first.');const payload=buildRuleBasedPayload();lastPayload=payload;lastMatches=payload.matches||[];deckInsightsCache=payload.deck_insights||null;renderMatches(payload);renderDeckTab(payload);addAuditEntry('match','Rules match — '+lastMatches.length+' ranked',selectedStartup.company);}
+function runRuleBasedMatch(){if(!selectedStartup)return showError('Select a startup first.');if(!getMatchInvestors().length)return showError('Load investor data first (or add investors in Network tab).');const payload=buildRuleBasedPayload();lastPayload=payload;lastMatches=payload.matches||[];deckInsightsCache=payload.deck_insights||null;renderMatches(payload);renderDeckTab(payload);addAuditEntry('match','Rules match — '+lastMatches.length+' ranked',selectedStartup.company);}
 async function runAiMatch(apiKey){
   const info=buildStartupInfo();
-  const invList=investors.map(inv=>'- '+inv.name+' | '+inv.type+' | Ticket: '+inv.ticketSize+' | Sectors: '+inv.sectors+' | Stage: '+inv.stage+' | Startup Stage: '+inv.startupStage+' | Thesis: '+inv.thesis+' | Hard Nos: '+inv.hardNos+' | Deploying: '+inv.deploying).join('\n');
+  const matchInvs=getMatchInvestors();
+  const invList=matchInvs.map(inv=>'- '+inv.name+' | '+inv.type+' | Ticket: '+inv.ticketSize+' | Sectors: '+inv.sectors+' | Stage: '+inv.stage+' | Thesis/Notes: '+inv.thesis+' | Deploying: '+inv.deploying).join('\n');
   const src=pdfText?'Use uploaded pitch deck text as primary source.':'No uploaded PDF; use form data only.';
   const prompt='You are an expert operator for Log7 Capital, an invite-only investor network in India.\n\nStartup:\n'+info+'\n\nInvestors:\n'+invList+'\n\n'+src+'\nScore every investor 0-100. Return score_breakdown: sector_fit(0-25), stage_fit(0-25), thesis_fit(0-25), deploying_bonus(0-10), traction_fit(0-15).\n\nRespond ONLY with valid JSON:\n{"deck_insights":{"summary":"","strengths":[],"risks":[],"signals":[],"market":"","traction":"","business_model":""},"founder_readiness":{"score":78,"verdict":"Ready","reasons":[]},"missing_data":[],"matches":[{"name":"","score":85,"verdict":"Strong match","reasons":[],"concerns":[],"objections":[],"score_breakdown":{"sector_fit":20,"stage_fit":18,"thesis_fit":22,"deploying_bonus":10,"traction_fit":15}}]}\n\nSort matches descending. Verdict: Strong match, Good match, Weak match, or Poor match.';
   const text=await callClaude(apiKey,prompt,3200);
   return normalizeMatchPayload(JSON.parse(text.replace(/```json|```/g,'').trim()));
 }
+// Maps a Network > Investors record to the format expected by matching functions
+function mapNetInvForMatch(r){
+  return {
+    name:        r.investorName||r.name||'',
+    phone:       r.contactPhone||'',
+    email:       r.contactEmail||'',
+    type:        r.fundName||'VC/Angel',
+    ticketSize:  r.checkSize||'',
+    sectors:     r.sectorFocus||'',
+    stage:       r.stageFocus||'',
+    startupStage:r.stageFocus||'',
+    sweetSpot:   r.checkSize||'',
+    thesis:      r.notes||'',
+    hardNos:     '',
+    deploying:   r.status==='Active'?'true':'',
+    sendVia:     '',
+    _netRecord:  r,   // keep original for badge/score display
+  };
+}
+
+// Returns investors for matching: prefers l7_net_investors, falls back to sheet-loaded investors
+function getMatchInvestors(){
+  var netInv = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  if(netInv.length) return netInv.map(mapNetInvForMatch);
+  return investors; // fall back to sheet-loaded investors global
+}
+
 function buildStartupInfo(){return'Company: '+selectedStartup.company+'\nFounder: '+selectedStartup.founder+'\nSector: '+selectedStartup.sector+'\nLocation: '+selectedStartup.location+'\nStage: '+selectedStartup.stage+'\nCurrent Round: '+selectedStartup.currentRound+'\nRound Size: '+selectedStartup.roundSize+'\nValuation: '+selectedStartup.valuation+'\nARR: '+selectedStartup.arr+'\nPrev Revenue: '+selectedStartup.prevRevenue+'\nFunded Before: '+selectedStartup.fundedBefore+'\nWebsite: '+selectedStartup.website+'\nProblem: '+selectedStartup.problem+'\nDeck Link: '+(selectedStartup.pitchDeckUrl||'Not available')+'\nUploaded Deck Text:\n'+(pdfText||'No uploaded deck text.');}
 function normalizeMatchPayload(raw){if(Array.isArray(raw))return{deck_insights:null,founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup),matches:raw};return{deck_insights:raw.deck_insights||null,founder_readiness:raw.founder_readiness||computeFounderReadiness(selectedStartup,null),missing_data:raw.missing_data||getMissingDataAlerts(selectedStartup),matches:Array.isArray(raw.matches)?raw.matches:[]};}
 function buildRuleBasedPayload(){
   const deck=deriveDeckInsightsFromLocalData(),fr=computeFounderReadiness(selectedStartup,deck),md=getMissingDataAlerts(selectedStartup);
-  const matches=investors.map(inv=>{
+  const matchInvs=getMatchInvestors();
+  const matches=matchInvs.map(inv=>{
     const reasons=[],concerns=[],objections=[];let score=28;
     const ss=String(selectedStartup.sector||'').toLowerCase(),sstage=String(selectedStartup.stage||selectedStartup.currentRound||'').toLowerCase();
     const is=String(inv.sectors||'').toLowerCase(),istage=String(inv.stage||inv.startupStage||'').toLowerCase(),ithesis=String(inv.thesis||'').toLowerCase();
@@ -1537,6 +1566,8 @@ function clearFilters(){['filter-sector','filter-stage'].forEach(id=>{const e=do
 function renderMatches(payload){
   const n=normalizeMatchPayload(payload),filtered=applyMatchFilters(n.matches);
   lastPayload=n;lastMatches=filtered;deckInsightsCache=n.deck_insights;renderDeckTab(n);updateStats();
+  // Store scores for outreach panel
+  window._lastMatchScores={};(n.matches||[]).forEach(m=>{ window._lastMatchScores[m.name]=m.score; });
   const el=document.getElementById('match-results');if(!el)return;
   if(!filtered.length){el.innerHTML=renderInsightsSummary(n)+'<div class="card"><div class="empty">No investors match active filters.</div></div>';return;}
   el.innerHTML=renderInsightsSummary(n)+filtered.map(m=>renderMatchCard(m)).join('');
@@ -2395,11 +2426,13 @@ function renderNetList(tab){
   var fields = netFields(tab);
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
   var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
+  var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Contact No.</th>'
+    + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
     + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
@@ -2423,6 +2456,12 @@ function renderNetList(tab){
     // Phone cell
     var phone = row[phoneKey]||'—';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+(phone!=='—'?'<a href="tel:'+escapeHtml(phone)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(phone)+'</a>':'—')+'</td>';
+    // Notes cell
+    if(showNotes){
+      var notesVal = row.notes||'';
+      var notesTrunc = notesVal.slice(0,60)+(notesVal.length>60?'…':'');
+      html += '<td style="padding:8px 10px;max-width:160px;color:var(--muted);font-size:11.5px" title="'+escapeHtml(notesVal)+'">'+escapeHtml(notesTrunc||'—')+'</td>';
+    }
     // Follow-up date cell
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
@@ -2962,12 +3001,19 @@ function renderBulkOutreachPanel() {
   console.log('[Outreach] l7_net_investors raw:', rawInv);
   console.log('[Outreach] l7_net_partnerships raw:', rawPar);
 
-  const investors = JSON.parse(rawInv || '[]');
+  var investors = JSON.parse(rawInv || '[]');
   const partners  = JSON.parse(rawPar  || '[]');
   console.log('Investors found:', investors.length);
   console.log('Partners found:',  partners.length);
   if (investors.length) console.log('First investor record:', investors[0]);
   if (partners.length)  console.log('First partner record:',  partners[0]);
+
+  // Sort investors by match score descending if scores are available
+  const scores = window._lastMatchScores || {};
+  investors = investors.slice().sort((a, b) => {
+    const nm = n => n.investorName || n.name || '';
+    return (scores[nm(b)] || 0) - (scores[nm(a)] || 0);
+  });
 
   const body = document.getElementById('outreach-body');
   if (!body) { console.error('outreach-body div not found'); return; }
@@ -3005,6 +3051,10 @@ function renderBulkOutreachPanel() {
       var name  = row.investorName || row.partnerName || row.companyName || row.name || '';
       var safe  = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       var isDue = row.followUpDate && row.followUpDate <= today;
+      var matchScore = scores[name];
+      var scoreBadge = matchScore != null
+        ? ' <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:' + (matchScore>=75?'var(--green)':matchScore>=50?'var(--amber)':'var(--red)') + ';color:#fff;font-weight:700;vertical-align:middle">' + matchScore + '</span>'
+        : '';
 
       html += '<tr style="border-bottom:1px solid var(--border)"'
             + (isDue ? ' class="net-row-due"' : '')
@@ -3016,6 +3066,7 @@ function renderBulkOutreachPanel() {
             + (phone ? '' : ' disabled title="No phone number"') + '>'
             + '</td>';
 
+      var isFirstField = true;
       visibleFields.forEach(f => {
         var val  = row[f.key] || '—';
         var cell = '<td style="padding:8px 10px;white-space:nowrap">';
@@ -3025,8 +3076,12 @@ function renderBulkOutreachPanel() {
                  : val==='Closed'||val==='Passed'||val==='Cold' ? 'var(--red)' : 'var(--muted)';
           cell += '<span class="badge" style="background:transparent;border-color:' + sc + ';color:' + sc + '">' + (typeof escapeHtml==='function'?escapeHtml(val):val) + '</span>';
         } else {
-          cell += (typeof escapeHtml==='function' ? escapeHtml(String(val).slice(0,40)) : String(val).slice(0,40));
+          var display = typeof escapeHtml==='function' ? escapeHtml(String(val).slice(0,40)) : String(val).slice(0,40);
+          // Append score badge next to the name (first field)
+          if (isFirstField) display += scoreBadge;
+          cell += display;
         }
+        isFirstField = false;
         html += cell + '</td>';
       });
 
