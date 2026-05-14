@@ -1033,6 +1033,7 @@ function showTab(name,btn){
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
   if(name==='network') renderNetworkTab();
+  if(name==='home') refreshNetFollowups();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
@@ -1118,6 +1119,7 @@ function refreshNetFollowups(){
 
   var today = new Date().toISOString().slice(0,10);
   var sevenDays = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
+  console.log('[Follow-ups] Today:', today);
 
   var TAB_COLORS = {
     partnerships: {bg:'rgba(91,192,248,0.15)',border:'rgba(91,192,248,0.4)',text:'var(--blue)',label:'Partnership'},
@@ -1127,11 +1129,14 @@ function refreshNetFollowups(){
 
   var allFollowups = [];
   ['partnerships','investors','startups'].forEach(function(tab){
-    netLoad(tab).forEach(function(row){
+    var tabRows = netLoad(tab);
+    console.log('[Follow-ups] Tab:', tab, '— rows:', tabRows.length, '— with followUpDate:', tabRows.filter(function(r){return r.followUpDate;}).map(function(r){return r.followUpDate;}));
+    tabRows.forEach(function(row){
       if(!row.followUpDate) return;
-      allFollowups.push({tab:tab, row:row, date:row.followUpDate});
+      allFollowups.push({tab:tab, row:row, date:String(row.followUpDate).slice(0,10)});
     });
   });
+  console.log('[Follow-ups] All entries with dates:', allFollowups.map(function(f){return f.tab+':'+f.date;}));
 
   var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
   var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
