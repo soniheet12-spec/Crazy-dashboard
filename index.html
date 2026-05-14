@@ -515,6 +515,21 @@
           </div>
           <div id="startup-detail-content"></div>
         </div>
+        <div id="bulk-outreach-panel" class="hidden" style="margin-top:0">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📲 WhatsApp Outreach</div>
+              <button class="mini-btn" onclick="renderBulkOutreachPanel()">&#8635; Refresh</button>
+            </div>
+            <div id="bulk-outreach-body"></div>
+            <div id="bulk-outreach-footer" style="padding:10px 0 4px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="action-btn primary" onclick="openBulkOutreachPreview()">📲 Send to All Selected</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',true)">Select All Investors</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('partnerships',true)">Select All Partners</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',false);bulkOutreachSelectAll('partnerships',false)">Clear All</button>
+            </div>
+          </div>
+        </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Pitch Deck Input</div></div>
           <div class="drop-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()"
@@ -591,21 +606,6 @@
           </div>
         </div>
         <div id="match-results"><div class="empty">Select a startup, upload a pitch deck if available, and run a match.</div></div>
-        <div id="bulk-outreach-panel" class="hidden" style="margin-top:14px">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">📲 WhatsApp Outreach</div>
-              <button class="mini-btn" onclick="renderBulkOutreachPanel()">&#8635; Refresh</button>
-            </div>
-            <div id="bulk-outreach-body"></div>
-            <div style="padding:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap">
-              <button class="action-btn primary" onclick="openBulkOutreachPreview()">Preview &amp; Send to Selected</button>
-              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',true)">Select All Investors</button>
-              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('partnerships',true)">Select All Partners</button>
-              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',false);bulkOutreachSelectAll('partnerships',false)">Clear All</button>
-            </div>
-          </div>
-        </div>
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
@@ -2725,32 +2725,60 @@ function syncFollowupsToServer(){
 // ═══ BULK OUTREACH ═══
 function renderBulkOutreachPanel(){
   var body=document.getElementById('bulk-outreach-body');
-  if(!body)return;
+  if(!body){console.error('[BulkOutreach] bulk-outreach-body element not found');return;}
   var investors=netLoad('investors');
   var partners=netLoad('partnerships');
-  if(!investors.length&&!partners.length){
-    body.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px 0">No investors or partners in Network yet.</p>';
-    return;
+  console.log('[BulkOutreach] investors raw:',JSON.stringify(investors));
+  console.log('[BulkOutreach] partnerships raw:',JSON.stringify(partners));
+  console.log('[BulkOutreach] selectedStartup:',selectedStartup?selectedStartup.company:'null');
+
+  function makeSection(arr,group,nameFn,subFn,emptyMsg){
+    var header='<div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;margin-top:14px">'+group+'</div>';
+    if(!arr.length){
+      return header+'<div style="font-size:12px;color:var(--muted);padding:4px 0 8px">'+emptyMsg+'</div>';
+    }
+    return header+arr.map(function(r,i){
+      var nm=nameFn(r)||'(no name)';
+      var sub=subFn(r);
+      var ph=(r.contactPhone||'').replace(/\D/g,'');
+      var fullPh=ph;
+      if(fullPh&&!fullPh.startsWith('91')&&fullPh.length===10)fullPh='91'+fullPh;
+      var grpLower=group.toLowerCase();
+      var sendBtn=ph
+        ?'<button class="mini-btn" style="margin-left:auto;flex-shrink:0" onclick="boSendOne(\''+fullPh+'\','+i+',\''+grpLower+'\')">📲 Send</button>'
+        :'<span style="font-size:10px;color:#f87171;margin-left:auto">no phone</span>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<input type="checkbox" class="bo-check" data-group="'+grpLower+'" data-idx="'+i
+        +'" style="accent-color:var(--accent);flex-shrink:0"'+(ph?'':' disabled title="No phone number"')+'>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHtml(nm)+'</div>'
+        +(sub?'<div style="font-size:11px;color:var(--muted)">'+escapeHtml(sub)+'</div>':'')
+        +'</div>'
+        +sendBtn
+        +'</div>';
+    }).join('');
   }
-  function makeList(arr,group,nameFn,subFn){
-    if(!arr.length)return '';
-    return '<div style="flex:1;min-width:220px"><div style="font-weight:600;font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+group+'</div>'
-      +arr.map(function(r,i){
-        var nm=nameFn(r)||'(no name)';
-        var sub=subFn(r);
-        var ph=(r.contactPhone||'').replace(/\D/g,'');
-        return '<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border)">'
-          +'<input type="checkbox" class="bo-check" data-group="'+group.toLowerCase()+'" data-idx="'+i
-          +'" style="margin-top:3px;accent-color:var(--accent)"'+(ph?'':' disabled title="No phone number"')+'>'
-          +'<div><div style="font-size:13px;font-weight:500">'+escapeHtml(nm)+'</div>'
-          +(sub?'<div style="font-size:11px;color:var(--muted)">'+escapeHtml(sub)+'</div>':'')
-          +(ph?'':'<div style="font-size:10px;color:#f87">No phone number</div>')
-          +'</div></label>';
-      }).join('')+'</div>';
-  }
-  var invHtml=makeList(investors,'investors',function(r){return r.investorName||r.name;},function(r){return [r.fundName,r.checkSize].filter(Boolean).join(' · ');});
-  var parHtml=makeList(partners,'partnerships',function(r){return r.partnerName||r.companyName||r.name;},function(r){return r.partnerType||r.company||'';});
-  body.innerHTML='<div style="display:flex;gap:24px;flex-wrap:wrap">'+invHtml+parHtml+'</div>';
+
+  var invHtml=makeSection(investors,'Investors',
+    function(r){return r.investorName||r.name;},
+    function(r){return [r.fundName,r.checkSize].filter(Boolean).join(' · ');},
+    'No investors found in Network tab');
+  var parHtml=makeSection(partners,'Partnerships',
+    function(r){return r.partnerName||r.companyName||r.name;},
+    function(r){return r.partnerType||r.company||'';},
+    'No partnerships found in Network tab');
+  body.innerHTML=invHtml+parHtml;
+}
+
+function boSendOne(phone,idx,group){
+  if(!selectedStartup){alert('Please select a startup first.');return;}
+  var arr=group==='investors'?netLoad('investors'):netLoad('partnerships');
+  var r=arr[idx];
+  if(!r)return;
+  var name=r.investorName||r.partnerName||r.companyName||r.name||'';
+  var s=selectedStartup;
+  var msg='Hi '+name+',\n\nI wanted to introduce you to '+s.company+', founded by '+(s.founder||'the team')+'.\n\n'+(s.sector||'')+' | '+(s.stage||'')+' | Raising '+(s.roundSize||s.currentRound||'')+(s.roundSize?' Cr':'')+'\n\n[Add your custom message here]\n\nLet me know if you\'d like to chat.\n\nCheers';
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 function bulkOutreachSelectAll(group,val){
@@ -2785,7 +2813,8 @@ function openBulkOutreachPreview(){
     return '<div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px">'
       +'<div style="font-weight:600;font-size:13px;margin-bottom:6px">'+escapeHtml(c.name)+(c.fund?' <span style="font-weight:400;color:var(--muted)">('+escapeHtml(c.fund)+')</span>':'')
       +' <span style="font-size:11px;color:var(--muted)">+'+escapeHtml(c.phone)+'</span></div>'
-      +'<textarea id="bo-msg-'+i+'" rows="8" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;font-family:inherit;resize:vertical">'+escapeHtml(msg)+'</textarea>'
+      +'<textarea id="bo-msg-'+i+'" rows="7" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;font-family:inherit;resize:vertical">'+escapeHtml(msg)+'</textarea>'
+      +'<div style="text-align:right;margin-top:6px"><button class="action-btn primary" style="padding:5px 14px;font-size:12px" onclick="boSendFromModal('+i+')">📲 Send to '+escapeHtml(c.name)+'</button></div>'
       +'</div>';
   }).join('');
   // deck notice
@@ -2802,6 +2831,14 @@ function openBulkOutreachPreview(){
   var modal=document.getElementById('bulk-outreach-modal');
   modal.classList.remove('hidden');
   modal.style.display='flex';
+}
+
+function boSendFromModal(i){
+  var selected=window._boSelected||[];
+  var c=selected[i];if(!c)return;
+  var ta=document.getElementById('bo-msg-'+i);
+  var msg=ta?ta.value:'';
+  window.open('https://wa.me/'+c.phone+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 function sendAllBulkOutreach(){
