@@ -2863,31 +2863,63 @@ function waSendAllSelected() {
 
 <script>
 function renderBulkOutreachPanel() {
-  const investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
-  const partners = JSON.parse(localStorage.getItem('l7_net_partnerships') || '[]');
+  // Exact keys confirmed from NET_KEYS in codebase
+  const rawInv = localStorage.getItem('l7_net_investors');
+  const rawPar = localStorage.getItem('l7_net_partnerships');
+  console.log('[Outreach] l7_net_investors raw:', rawInv);
+  console.log('[Outreach] l7_net_partnerships raw:', rawPar);
+
+  const investors = JSON.parse(rawInv || '[]');
+  const partners  = JSON.parse(rawPar  || '[]');
+  console.log('Investors found:', investors.length);
+  console.log('Partners found:',  partners.length);
+  if (investors.length) console.log('First investor record:', investors[0]);
+  if (partners.length)  console.log('First partner record:',  partners[0]);
+
   const body = document.getElementById('outreach-body');
   if (!body) { console.error('outreach-body div not found'); return; }
-  let html = '';
-  html += '<strong>Investors</strong><br>';
-  investors.forEach((inv,i) => {
-    const name = inv.name||inv.investorName||'Unknown';
-    const phone = (inv.contactPhone||inv.contactNumber||inv.phone||'').replace(/\D/g,'');
-    html += `<div><input type="checkbox" data-name="${name}" data-phone="${phone}"> ${name} — ${phone||'No number'} <button onclick="sendWhatsApp('${phone}','${name.replace(/'/g,"\\'")}')">📲</button></div>`;
-  });
-  if (!investors.length) html += '<p>No investors</p>';
+
+  let html = '<strong>Investors</strong><br>';
+  if (!investors.length) {
+    html += '<p style="color:#aaa;font-size:13px">No investors in Network tab</p>';
+  } else {
+    investors.forEach(inv => {
+      // Field names: investorName, contactPhone (confirmed from schema)
+      const name  = inv.investorName || inv.name || 'Unknown';
+      const phone = (inv.contactPhone || '').replace(/\D/g, '');
+      const safe  = name.replace(/'/g, "\\'");
+      html += '<div style="padding:5px 0;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">'
+            + '<input type="checkbox" data-name="' + name + '" data-phone="' + phone + '">'
+            + '<span style="flex:1;font-size:13px">' + name + (phone ? ' <span style="color:#888;font-size:11px">+' + phone + '</span>' : ' <span style="color:#f87">no phone</span>') + '</span>'
+            + (phone ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="padding:3px 8px;font-size:11px;cursor:pointer">📲</button>' : '')
+            + '</div>';
+    });
+  }
+
   html += '<br><strong>Partners</strong><br>';
-  partners.forEach((p,i) => {
-    const name = p.name||p.partnerName||p.companyName||'Unknown';
-    const phone = (p.contactPhone||p.contactNumber||p.phone||'').replace(/\D/g,'');
-    html += `<div><input type="checkbox" data-name="${name}" data-phone="${phone}"> ${name} — ${phone||'No number'} <button onclick="sendWhatsApp('${phone}','${name.replace(/'/g,"\\'")}')">📲</button></div>`;
-  });
-  if (!partners.length) html += '<p>No partners</p>';
+  if (!partners.length) {
+    html += '<p style="color:#aaa;font-size:13px">No partners in Network tab</p>';
+  } else {
+    partners.forEach(p => {
+      // Field names: partnerName, contactPhone (confirmed from schema)
+      const name  = p.partnerName || p.companyName || p.name || 'Unknown';
+      const phone = (p.contactPhone || '').replace(/\D/g, '');
+      const safe  = name.replace(/'/g, "\\'");
+      html += '<div style="padding:5px 0;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">'
+            + '<input type="checkbox" data-name="' + name + '" data-phone="' + phone + '">'
+            + '<span style="flex:1;font-size:13px">' + name + (phone ? ' <span style="color:#888;font-size:11px">+' + phone + '</span>' : ' <span style="color:#f87">no phone</span>') + '</span>'
+            + (phone ? '<button onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')" style="padding:3px 8px;font-size:11px;cursor:pointer">📲</button>' : '')
+            + '</div>';
+    });
+  }
+
   body.innerHTML = html;
   console.log('Outreach panel rendered. Investors:', investors.length, 'Partners:', partners.length);
 }
 
 function bulkOutreachSelectAll() {
   const checked = document.querySelectorAll('#outreach-body input[type=checkbox]:checked');
+  if (!checked.length) { alert('No contacts selected.'); return; }
   let delay = 0;
   checked.forEach(cb => {
     setTimeout(() => sendWhatsApp(cb.dataset.phone, cb.dataset.name), delay);
@@ -2897,7 +2929,13 @@ function bulkOutreachSelectAll() {
 
 function sendWhatsApp(phone, name) {
   if (!phone) { alert('No number for ' + name); return; }
-  const msg = encodeURIComponent(`Hi ${name}, sharing a startup from Log7 Capital. Let me know if you'd like to connect.`);
+  const s   = window.selectedStartup || {};
+  const msg = encodeURIComponent(
+    'Hi ' + name + ', sharing a startup from Log7 Capital'
+    + (s.company ? ' — ' + s.company : '')
+    + (s.sector  ? ' (' + s.sector + ')' : '')
+    + '. Let me know if you\'d like to connect.'
+  );
   window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + msg, '_blank');
 }
 
