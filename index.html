@@ -1117,9 +1117,27 @@ function refreshNetFollowups(){
   var navBadge = document.getElementById('net-nav-badge');
   if(!el) return;
 
-  var today = new Date().toISOString().slice(0,10);
-  var sevenDays = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
-  console.log('[Follow-ups] Today:', today);
+  // YYYY-MM-DD, guaranteed no timezone shift
+  var now = new Date();
+  var today = now.getFullYear()+'-'
+    +String(now.getMonth()+1).padStart(2,'0')+'-'
+    +String(now.getDate()).padStart(2,'0');
+  var sevenDaysMs = new Date(now.getTime()+7*24*60*60*1000);
+  var sevenDays = sevenDaysMs.getFullYear()+'-'
+    +String(sevenDaysMs.getMonth()+1).padStart(2,'0')+'-'
+    +String(sevenDaysMs.getDate()).padStart(2,'0');
+
+  // Debug: dump every relevant localStorage key
+  var allKeys = Object.keys(localStorage);
+  var relevantKeys = allKeys.filter(function(k){
+    return /network|partner|investor|startup|followup/i.test(k);
+  });
+  console.log('[FollowUps] localStorage keys:', allKeys);
+  console.log('[FollowUps] Relevant keys:', relevantKeys);
+  relevantKeys.forEach(function(k){
+    console.log('[FollowUps] Raw value of', k, ':', localStorage.getItem(k));
+  });
+  console.log('[FollowUps] Today (local):', today);
 
   var TAB_COLORS = {
     partnerships: {bg:'rgba(91,192,248,0.15)',border:'rgba(91,192,248,0.4)',text:'var(--blue)',label:'Partnership'},
@@ -1127,16 +1145,28 @@ function refreshNetFollowups(){
     startups:     {bg:'rgba(245,166,35,0.13)',border:'rgba(245,166,35,0.35)',text:'var(--amber)',label:'Startup'},
   };
 
+  // Read directly from the literal keys that netSave() writes to
+  var TAB_LS_KEYS = {
+    partnerships: 'l7_net_partnerships',
+    investors:    'l7_net_investors',
+    startups:     'l7_net_startups',
+  };
+
   var allFollowups = [];
   ['partnerships','investors','startups'].forEach(function(tab){
-    var tabRows = netLoad(tab);
-    console.log('[Follow-ups] Tab:', tab, '— rows:', tabRows.length, '— with followUpDate:', tabRows.filter(function(r){return r.followUpDate;}).map(function(r){return r.followUpDate;}));
-    tabRows.forEach(function(row){
-      if(!row.followUpDate) return;
-      allFollowups.push({tab:tab, row:row, date:String(row.followUpDate).slice(0,10)});
+    var raw = localStorage.getItem(TAB_LS_KEYS[tab]);
+    var tabRows = [];
+    try { tabRows = raw ? JSON.parse(raw) : []; } catch(e){ tabRows = []; }
+    var withDates = tabRows.filter(function(r){ return r.followUpDate; });
+    console.log('[FollowUps]', tab, '— total rows:', tabRows.length,
+      '— rows with followUpDate:', withDates.map(function(r){ return r.followUpDate; }));
+    withDates.forEach(function(row){
+      // Normalise: strip time component, ensure string
+      var d = String(row.followUpDate).split('T')[0].trim();
+      console.log('[FollowUps] Entry:', tab, netPrimaryKey(tab,row), '| stored date:', row.followUpDate, '| normalised:', d, '| today:', today, '| due?', d<=today);
+      allFollowups.push({tab:tab, row:row, date:d});
     });
   });
-  console.log('[Follow-ups] All entries with dates:', allFollowups.map(function(f){return f.tab+':'+f.date;}));
 
   var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
   var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
