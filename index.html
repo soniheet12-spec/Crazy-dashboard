@@ -597,14 +597,14 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title">📲 WhatsApp Outreach</div>
-              <button class="mini-btn" onclick="waOutreachRender()">&#8635; Refresh</button>
+              <button class="mini-btn" onclick="renderBulkOutreachPanel()">&#8635; Refresh</button>
             </div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Select contacts below, then click Send.</div>
             <div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Investors</div>
             <div id="outreach-investors-list" style="margin-bottom:14px"></div>
             <div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">Partners</div>
             <div id="outreach-partners-list" style="margin-bottom:14px"></div>
-            <button id="send-all-selected-btn" class="action-btn primary" style="width:100%" onclick="waSendAllSelected()">📲 Send to All Selected</button>
+            <button id="send-all-selected-btn" class="action-btn primary" style="width:100%" onclick="bulkOutreachSelectAll()">📲 Send to All Selected</button>
           </div>
         </div>
 
@@ -983,6 +983,64 @@
 </div><!-- end container -->
 
 <script>
+function renderBulkOutreachPanel() {
+  var investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
+  var partners  = JSON.parse(localStorage.getItem('l7_net_partnerships') || '[]');
+  var invEl = document.getElementById('outreach-investors-list');
+  var parEl = document.getElementById('outreach-partners-list');
+  if (!invEl || !parEl) return;
+
+  if (investors.length === 0) {
+    invEl.innerHTML = '<p style="color:var(--muted);font-size:12px">No investors in Network tab</p>';
+  } else {
+    invEl.innerHTML = investors.map(function(inv, i) {
+      var nm  = inv.investorName || inv.name || 'Unknown';
+      var ph  = inv.contactPhone || inv.contactNumber || inv.phone || '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        + '<input type="checkbox" id="inv-'+i+'" data-name="'+nm+'" data-phone="'+ph+'" style="accent-color:var(--accent);width:15px;height:15px">'
+        + '<div style="flex:1;font-size:13px">'+nm+(ph ? ' <span style="color:var(--muted);font-size:11px">+'+ph+'</span>' : ' <span style="color:#f87171;font-size:11px">no phone</span>')+'</div>'
+        + (ph ? '<button style="padding:4px 10px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer" onclick="sendWhatsApp(\''+ph.replace(/\D/g,'')+'\',\''+nm.replace(/'/g,"\\'")+'\')">📲 Send</button>' : '')
+        + '</div>';
+    }).join('');
+  }
+
+  if (partners.length === 0) {
+    parEl.innerHTML = '<p style="color:var(--muted);font-size:12px">No partners in Network tab</p>';
+  } else {
+    parEl.innerHTML = partners.map(function(p, i) {
+      var nm  = p.partnerName || p.companyName || p.name || 'Unknown';
+      var ph  = p.contactPhone || p.contactNumber || p.phone || '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        + '<input type="checkbox" id="par-'+i+'" data-name="'+nm+'" data-phone="'+ph+'" style="accent-color:var(--accent);width:15px;height:15px">'
+        + '<div style="flex:1;font-size:13px">'+nm+(ph ? ' <span style="color:var(--muted);font-size:11px">+'+ph+'</span>' : ' <span style="color:#f87171;font-size:11px">no phone</span>')+'</div>'
+        + (ph ? '<button style="padding:4px 10px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer" onclick="sendWhatsApp(\''+ph.replace(/\D/g,'')+'\',\''+nm.replace(/'/g,"\\'")+'\')">📲 Send</button>' : '')
+        + '</div>';
+    }).join('');
+  }
+}
+
+function bulkOutreachSelectAll() {
+  var checked = document.querySelectorAll('#outreach-investors-list input[type=checkbox]:checked, #outreach-partners-list input[type=checkbox]:checked');
+  var delay = 0;
+  checked.forEach(function(cb) {
+    setTimeout(function() { sendWhatsApp(cb.dataset.phone, cb.dataset.name); }, delay);
+    delay += 1500;
+  });
+}
+
+function sendWhatsApp(phone, name) {
+  if (!phone) { alert('No contact number for ' + name); return; }
+  var s   = window.selectedStartup || {};
+  var msg = 'Hi ' + name + ', introducing '
+    + (s.company || 'a startup from Log7 Capital')
+    + (s.sector  ? ' — ' + s.sector : '')
+    + (s.stage   ? ' | ' + s.stage  : '')
+    + (s.roundSize ? ' | Raising ₹' + s.roundSize + ' Cr' : '')
+    + (s.founder ? '. Founder: ' + s.founder : '')
+    + '. Let me know if you’d like to connect.';
+  window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
@@ -1055,7 +1113,7 @@ function showTab(name,btn){
   if(name==='memo') generateICMemo();
   if(name==='network') renderNetworkTab();
   if(name==='home') refreshNetFollowups();
-  if(name==='match') waOutreachRender();
+  if(name==='match') renderBulkOutreachPanel();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
@@ -1383,7 +1441,7 @@ function selectStartup(index){
   addAuditEntry('match','Startup selected',selectedStartup.company);
   if(typeof loadResearchCache==='function')loadResearchCache();
   if(typeof renderExtraDocs==='function')renderExtraDocs();
-  waOutreachRender();
+  renderBulkOutreachPanel();
 }
 
 // ═══ PDF ═══
@@ -2718,8 +2776,6 @@ function syncFollowupsToServer(){
 // ═══ WHATSAPP OUTREACH ═══
 
 // Legacy names kept so any cached page / old onclick handlers don't throw
-function renderBulkOutreachPanel(){ waOutreachRender(); }
-function bulkOutreachSelectAll(){ waSendAllSelected(); }
 
 function waOutreachRender(){
   // Log raw data so we can verify what exists
