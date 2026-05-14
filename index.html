@@ -458,7 +458,7 @@
           <div id="home-overdue-list"><div class="empty" style="padding:12px;font-size:12px">No overdue follow-ups.</div></div>
         </div>
         <div class="card" style="margin-bottom:14px">
-          <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span></div>
+          <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span><button id="wa-remind-btn" class="mini-btn" style="margin-left:auto" onclick="sendWhatsAppReminder()">📲 Send WhatsApp Reminder Now</button></div>
           <div id="home-net-followups"><div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div></div>
         </div>
         <div class="card">
@@ -1618,6 +1618,14 @@ function initials(name){return(name||'?').split(' ').map(p=>p[0]).join('').slice
 function scoreColor(score){return score>=75?'var(--green)':score>=50?'var(--amber)':'var(--red)';}
 function verdictClass(v){return v==='Strong match'?'good':v==='Good match'?'info':'warn';}
 function showError(msg){const el=document.getElementById('error-box');if(!el)return;el.textContent=msg;el.classList.toggle('hidden',!msg);}
+function showToast(msg,type){
+  var t=document.createElement('div');
+  var bg=type==='success'?'var(--green)':type==='error'?'var(--red)':'var(--muted)';
+  t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;padding:10px 18px;border-radius:8px;background:'+bg+';color:#fff;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:opacity .4s';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},400);},3500);
+}
 function showLoading(msg){const el=document.getElementById('loading-box');if(!el)return;el.textContent=msg;el.classList.toggle('hidden',!msg);}
 function formatDate(value){if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return value;return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
 function escapeHtml(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -2541,6 +2549,25 @@ function netResetToSheet(id){
   netSave('investors', rows);
   renderNetList('investors');
   syncFollowupsToServer();
+}
+
+// ── WHATSAPP MANUAL TRIGGER ────────────────────────────────────
+async function sendWhatsAppReminder(){
+  var btn = document.getElementById('wa-remind-btn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Sending…'; }
+  try {
+    var res = await fetch('/api/send-followup-reminder?manual=true', { method: 'POST' });
+    var data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Server error');
+    if(data.sent){
+      showToast('✅ WhatsApp reminder sent to +917208554302', 'success');
+    } else {
+      showToast('No follow-ups due today — nothing sent', 'info');
+    }
+  } catch(e){
+    showToast('❌ Failed to send — check Twilio credentials', 'error');
+  }
+  if(btn){ btn.disabled=false; btn.textContent='📲 Send WhatsApp Reminder Now'; }
 }
 
 // ── FOLLOW-UP SERVER SYNC ──────────────────────────────────────

@@ -1,6 +1,12 @@
 const twilio = require('twilio');
 
 module.exports = async function handler(req, res) {
+  // Allow manual trigger via POST ?manual=true (skips cron-only guard)
+  const isManual = req.method === 'POST' || req.query.manual === 'true';
+  if (!isManual && req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   // Today's date in IST (UTC+5:30)
   const nowUtc = new Date();
   const istMs  = nowUtc.getTime() + 5.5 * 60 * 60 * 1000;
