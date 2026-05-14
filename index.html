@@ -354,9 +354,6 @@
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
-    <button class="nav-tab" onclick="showTab('comps',this)">Market Comps</button>
-    <button class="nav-tab" onclick="showTab('portfolio',this)">Portfolio</button>
-    <button class="nav-tab" onclick="showTab('lpreport',this)">LP Report</button>
     <button class="nav-tab" onclick="showTab('network',this)">Network</button>
   </div>
   <div class="nav-right">
@@ -454,8 +451,6 @@
             <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">&#128203; Pipeline</button>
             <button class="action-btn secondary" style="width:100%" onclick="showTab('analytics',document.querySelectorAll('.nav-tab')[3])">&#128202; Analytics</button>
             <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[9])">&#128269; Diligence</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('comps',document.querySelectorAll('.nav-tab')[11])">&#128200; Market Comps</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('lpreport',document.querySelectorAll('.nav-tab')[13])">&#128196; LP Report</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
@@ -937,43 +932,6 @@
   </div>
 
 
-  <!-- ═══ MARKET COMPS ═══ -->
-  <div id="page-comps" class="page">
-    <div class="section-bar"><div class="section-title">Market Comparables</div><button class="ghost-btn" onclick="fetchMarketComps()">AI Generate</button><button class="ghost-btn" onclick="exportCompsCsv()">Export CSV</button></div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Add Comparable Deal</div></div>
-        <div class="field-row"><div class="field"><label>Company</label><input id="comp-company" placeholder="e.g. Razorpay"></div><div class="field"><label>Sector</label><input id="comp-sector" placeholder="Fintech"></div></div>
-        <div class="field-row"><div class="field"><label>Stage</label><input id="comp-stage" placeholder="Series A"></div><div class="field"><label>Round Size</label><input id="comp-round" placeholder="$12M"></div></div>
-        <div class="field-row"><div class="field"><label>Valuation</label><input id="comp-valuation" placeholder="$80M"></div><div class="field"><label>Year</label><input id="comp-year" placeholder="2024"></div></div>
-        <div class="field-row"><div class="field"><label>Lead Investor</label><input id="comp-investor" placeholder="Sequoia"></div><div class="field"><label>Country</label><input id="comp-country" placeholder="India"></div></div>
-        <button class="action-btn primary" onclick="saveComp()" style="width:100%">Save Comparable</button>
-      </div>
-      <div class="card"><div class="card-header"><div class="card-title">AI Benchmark</div></div><div id="comps-benchmark"><div class="empty">Select a startup in Match Studio then click AI Generate.</div></div></div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">Deal Database</div><span class="badge" id="comps-count">0</span></div><div id="comps-list"><div class="empty">No comparable deals added yet.</div></div></div>
-  </div>
-  <!-- ═══ PORTFOLIO ═══ -->
-  <div id="page-portfolio" class="page">
-    <div class="section-bar"><div class="section-title">Portfolio &amp; Capital Tracker</div><button class="ghost-btn" onclick="addPortfolioCompany()">+ Add Company</button><button class="ghost-btn" onclick="exportPortfolioCsv()">Export CSV</button></div>
-    <div class="grid-two" style="margin-bottom:16px">
-      <div class="card"><div class="card-header"><div class="card-title">Capital Summary</div></div><div id="portfolio-capital-summary"><div class="empty">Set fund size in Settings.</div></div></div>
-      <div class="card"><div class="card-header"><div class="card-title">Sector Allocation</div></div><div id="portfolio-sector-alloc"><div class="empty">Add portfolio companies.</div></div></div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">Portfolio Companies</div><span class="badge" id="portfolio-count">0</span></div><div id="portfolio-list"><div class="empty">No portfolio companies yet.</div></div></div>
-    <div class="card"><div class="card-header"><div class="card-title">Quarterly Updates</div><button class="mini-btn" onclick="addPortfolioUpdate()">+ Add Update</button></div><div id="portfolio-updates"><div class="empty">No updates yet.</div></div></div>
-  </div>
-  <!-- ═══ LP REPORT ═══ -->
-  <div id="page-lpreport" class="page">
-    <div class="section-bar"><div class="section-title">LP Report</div><button class="ghost-btn" onclick="generateLPReport()">Generate</button><button class="ghost-btn" onclick="window.print()">Print / PDF</button></div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Report Settings</div></div>
-      <div class="field-row"><div class="field"><label>Quarter</label><select id="lp-quarter"><option>Q1 2025</option><option>Q2 2025</option><option>Q3 2025</option><option selected>Q4 2025</option><option>Q1 2026</option></select></div><div class="field"><label>Fund Name</label><input id="lp-fund-name" placeholder="Log7 Capital Fund I"></div></div>
-      <div class="field"><label>GP Message</label><textarea id="lp-gp-message" placeholder="Opening message..." style="min-height:70px"></textarea></div>
-      <button class="action-btn primary" onclick="generateLPReport()" style="width:100%">Generate LP Report</button>
-    </div>
-    <div id="lp-report-output"><div class="empty">Click Generate to build the quarterly LP report.</div></div>
-  </div>
   <!-- NETWORK PAGE -->
   <div id="page-network" class="page">
     <div class="section-bar">
@@ -1078,7 +1036,7 @@ window.onload = async () => {
   refreshDocsSelectors();refreshHome();renderWatchlists();
   refreshDiligence();renderKanban();renderPipelineList();
   renderAuditLog();refreshAnalytics();renderICVotes();
-  renderComps();renderPortfolio();refreshCapitalDisplay();
+  refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
 };
 
@@ -1092,8 +1050,6 @@ function showTab(name,btn){
   if(name==='pipeline'){renderKanban();renderPipelineList();}
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
-  if(name==='portfolio') renderPortfolio();
-  if(name==='comps') renderComps();
   if(name==='network') renderNetworkTab();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
@@ -1417,38 +1373,6 @@ function buildRulesObjections(match,inv){
 }
 function closeObjectionModal(){const m=document.getElementById('objection-modal');m.classList.add('hidden');m.style.display='none';}
 
-// ═══ MARKET COMPS ═══
-function getComps(){return JSON.parse(localStorage.getItem('l7_comps')||'[]');}
-function saveComps(comps){localStorage.setItem('l7_comps',JSON.stringify(comps));}
-function saveComp(){
-  const company=document.getElementById('comp-company').value.trim();if(!company)return showError('Enter a company name.');
-  const comps=getComps();
-  comps.unshift({id:Date.now(),company,sector:document.getElementById('comp-sector').value.trim(),stage:document.getElementById('comp-stage').value.trim(),round:document.getElementById('comp-round').value.trim(),valuation:document.getElementById('comp-valuation').value.trim(),year:document.getElementById('comp-year').value.trim(),investor:document.getElementById('comp-investor').value.trim(),country:document.getElementById('comp-country').value.trim()});
-  saveComps(comps);['comp-company','comp-sector','comp-stage','comp-round','comp-valuation','comp-year','comp-investor','comp-country'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  renderComps();addAuditEntry('match','Comparable deal added',company);
-}
-function addManualComp(){document.getElementById('comp-company')?.focus();}
-function renderComps(){
-  const el=document.getElementById('comps-list'),cEl=document.getElementById('comps-count');if(!el)return;
-  const comps=getComps();if(cEl)cEl.textContent=comps.length;
-  if(!comps.length){el.innerHTML='<div class="empty">No comparable deals added yet.</div>';return;}
-  el.innerHTML='<div class="comp-row header"><span>Company</span><span>Sector</span><span>Stage</span><span>Round Size</span><span>Valuation</span></div>'+comps.map(c=>'<div class="comp-row"><span style="font-weight:500">'+escapeHtml(c.company)+'<div style="font-size:10px;color:var(--muted)">'+escapeHtml(c.country||'')+(c.year?' \u00b7 '+c.year:'')+(c.investor?' \u00b7 '+c.investor:'')+'</div></span><span><span class="tag info">'+escapeHtml(c.sector||'\u2014')+'</span></span><span><span class="badge">'+escapeHtml(c.stage||'\u2014')+'</span></span><span>'+escapeHtml(c.round||'\u2014')+'</span><span>'+escapeHtml(c.valuation||'\u2014')+'</span></div>').join('');
-}
-async function fetchMarketComps(){
-  const apiKey=localStorage.getItem('l7_key');if(!apiKey){showError('Add an API key to use AI market comps.');return;}if(!selectedStartup){showError('Select a startup in Match Studio first.');return;}
-  const benchEl=document.getElementById('comps-benchmark');if(benchEl)benchEl.innerHTML='<div class="loading-box">Generating market comps...</div>';
-  const existing=getComps().slice(0,8);
-  try{
-    const prompt='You are an Indian VC analyst. For this startup:\nCompany: '+selectedStartup.company+'\nSector: '+selectedStartup.sector+'\nStage: '+selectedStartup.stage+'\nRound Size: '+selectedStartup.roundSize+'\nValuation: '+selectedStartup.valuation+'\nARR: '+selectedStartup.arr+'\n\nExisting comps: '+JSON.stringify(existing.map(c=>({company:c.company,sector:c.sector,round:c.round,valuation:c.valuation})))+'\n\nProvide: 1. How round size and valuation compare to Indian market 2. Whether valuation is aggressive, fair, or attractive 3. 3-5 suggested comparable deals.\n\nFormat as JSON: {"verdict":"aggressive|fair|attractive","reasoning":"...","multiple_comparison":"...","suggested_comps":[{"company":"","sector":"","stage":"","round":"","valuation":"","year":"","investor":"","country":""}]}\n\nReturn only JSON.';
-    const text=await callClaude(apiKey,prompt,1500);
-    const result=JSON.parse(text.replace(/```json|```/g,'').trim());
-    if(benchEl)benchEl.innerHTML='<div class="detail-list"><div class="detail-row"><span class="detail-label">Valuation Verdict</span><span class="tag '+(result.verdict==='attractive'?'good':result.verdict==='aggressive'?'red':'warn')+'">'+escapeHtml(result.verdict||'\u2014')+'</span></div></div><div style="font-size:13px;line-height:1.7;margin:12px 0">'+escapeHtml(result.reasoning||'')+'</div><div class="row-copy">'+escapeHtml(result.multiple_comparison||'')+'</div>'+(result.suggested_comps?.length?'<div class="action-row" style="margin-top:12px"><button class="action-btn primary" onclick=\'addSuggestedComps('+JSON.stringify(result.suggested_comps).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+')\'>\+ Add '+result.suggested_comps.length+' Suggested Comps</button></div>':'');
-    addAuditEntry('match','AI market comps generated',selectedStartup.company);
-  }catch(err){if(benchEl)benchEl.innerHTML='<div class="error-box">Comps generation failed: '+escapeHtml(err.message)+'</div>';}
-}
-function addSuggestedComps(comps){const existing=getComps();comps.forEach(c=>{if(!existing.find(e=>e.company===c.company))existing.unshift({id:Date.now()+Math.random(),...c});});saveComps(existing);renderComps();addAuditEntry('match','AI-suggested comps added',comps.map(c=>c.company).join(', '));}
-function exportCompsCsv(){exportRowsAsCsv('log7-comps.csv',getComps().map(c=>({company:c.company,sector:c.sector,stage:c.stage,round:c.round,valuation:c.valuation,year:c.year,investor:c.investor,country:c.country})));}
-
 // ═══ PIPELINE ═══
 function getPipeline(){return JSON.parse(localStorage.getItem('l7_pipeline')||'[]');}
 function saveMatchToPipeline(name){
@@ -1459,10 +1383,8 @@ function saveMatchToPipeline(name){
 }
 function movePipelineStage(startup,investor,stage){
   const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
-  if(stage==='Closed')checkAutoAddPortfolio(startup,investor);
   renderKanban();renderPipelineList();updateStats();refreshHome();
 }
-function checkAutoAddPortfolio(startup,investor){const crm=getInvestorCRM(startup,investor);if(crm.status==='invested'){const companies=getPortfolioCompanies();if(!companies.find(c=>c.name===startup)){companies.unshift({id:Date.now(),name:startup,investor,sector:'',stage:'',invested:'',amount:'',addedAt:new Date().toISOString()});localStorage.setItem('l7_portfolio',JSON.stringify(companies));addAuditEntry('portfolio','Company auto-added to portfolio',startup);}}}
 function removePipelineItem(startup,investor){let pipeline=getPipeline();pipeline=pipeline.filter(i=>!(i.startup===startup&&i.investor===investor));localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);renderKanban();renderPipelineList();updateStats();refreshHome();}
 function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
@@ -1591,46 +1513,8 @@ function createWatchlist(){const name=document.getElementById('watchlist-name')?
 function saveCurrentToWatchlist(){if(!selectedStartup)return showError('Select a startup first.');const lists=getWatchlists();if(!lists.length)return showError('Create a watchlist first.');lists[0].items=uniqueList([selectedStartup.company,...(lists[0].items||[])]);saveWatchlists(lists);renderWatchlists();addAuditEntry('match','Added to watchlist',selectedStartup.company+' \u2192 '+lists[0].name);}
 
 // ═══ PORTFOLIO ═══
-function getPortfolioCompanies(){return JSON.parse(localStorage.getItem('l7_portfolio')||'[]');}
-function addPortfolioCompany(){
-  const name=prompt('Company name:');if(!name?.trim())return;
-  const sector=prompt('Sector:','')||'',investor=prompt('Lead investor:','')||'',amount=prompt('Amount invested (\u20b9 Cr):','')||'',date=prompt('Investment date (YYYY-MM-DD):',new Date().toISOString().slice(0,10))||'';
-  const companies=getPortfolioCompanies();if(companies.find(c=>c.name===name.trim())){alert('Already in portfolio.');return;}
-  companies.unshift({id:Date.now(),name:name.trim(),sector,investor,amount,invested:date,addedAt:new Date().toISOString()});
-  localStorage.setItem('l7_portfolio',JSON.stringify(companies));renderPortfolio();addAuditEntry('portfolio','Portfolio company added',name.trim());
-}
-function renderPortfolio(){
-  const el=document.getElementById('portfolio-list'),cEl=document.getElementById('portfolio-count');if(!el)return;
-  const companies=getPortfolioCompanies();if(cEl)cEl.textContent=companies.length;
-  if(!companies.length){el.innerHTML='<div class="empty">No portfolio companies yet.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Company</th><th>Sector</th><th>Lead Investor</th><th>Amount</th><th>Date</th><th></th></tr></thead><tbody>'+companies.map(c=>'<tr><td><strong>'+escapeHtml(c.name)+'</strong></td><td>'+escapeHtml(c.sector||'\u2014')+'</td><td>'+escapeHtml(c.investor||'\u2014')+'</td><td>'+escapeHtml(c.amount?'\u20b9 '+c.amount+' Cr':'\u2014')+'</td><td>'+escapeHtml(c.invested||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 8px;font-size:10px" onclick="removePortfolioCompany('+c.id+')">Remove</button></td></tr>').join('')+'</tbody></table>';
-  renderPortfolioSectorAlloc(companies);renderPortfolioCapitalSummary(companies);renderPortfolioUpdates();
-}
-function removePortfolioCompany(id){const companies=getPortfolioCompanies().filter(c=>c.id!==id);localStorage.setItem('l7_portfolio',JSON.stringify(companies));renderPortfolio();}
-function renderPortfolioSectorAlloc(companies){const el=document.getElementById('portfolio-sector-alloc');if(!el)return;if(!companies.length){el.innerHTML='<div class="empty">No portfolio companies.</div>';return;}const sc={};companies.forEach(c=>{const s=c.sector||'Unknown';sc[s]=(sc[s]||0)+1;});const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]),maxS=Math.max(1,...sorted.map(([,v])=>v));el.innerHTML=sorted.map(([l,v])=>'<div class="funnel-bar"><div class="funnel-label">'+escapeHtml(l)+'</div><div class="funnel-track"><div class="funnel-fill" style="width:'+Math.round(v/maxS*100)+'%;background:var(--blue)"></div></div><div class="funnel-value">'+v+'</div></div>').join('');}
-function renderPortfolioCapitalSummary(companies){const el=document.getElementById('portfolio-capital-summary');if(!el)return;const{deployed,fund}=getCapitalSettings(),totalInvested=companies.reduce((s,c)=>s+(parseFloat(c.amount)||0),0);el.innerHTML='<div class="detail-list"><div class="detail-row"><span class="detail-label">Portfolio Companies</span><span>'+companies.length+'</span></div><div class="detail-row"><span class="detail-label">Total Invested</span><span>\u20b9 '+totalInvested.toFixed(1)+' Cr</span></div><div class="detail-row"><span class="detail-label">Fund Size</span><span>'+(fund?'\u20b9 '+fund+' Cr':'Not set')+'</span></div><div class="detail-row"><span class="detail-label">Remaining</span><span>'+(fund?'\u20b9 '+(fund-deployed).toFixed(1)+' Cr':'Not set')+'</span></div></div>';}
-function exportPortfolioCsv(){exportRowsAsCsv('log7-portfolio.csv',getPortfolioCompanies().map(c=>({name:c.name,sector:c.sector,investor:c.investor,amount_cr:c.amount,invested_date:c.invested})));}
-function addPortfolioUpdate(){const company=prompt('Company name:');if(!company?.trim())return;const quarter=prompt('Quarter (e.g. Q3 2025):','')||'',update=prompt('Update summary:','')||'';if(!update.trim())return;const updates=JSON.parse(localStorage.getItem('l7_portfolio_updates')||'[]');updates.unshift({id:Date.now(),company,quarter,update,addedAt:new Date().toISOString()});localStorage.setItem('l7_portfolio_updates',JSON.stringify(updates.slice(0,200)));renderPortfolioUpdates();addAuditEntry('portfolio','Portfolio update added',company+' \u2014 '+quarter);}
-function renderPortfolioUpdates(){const el=document.getElementById('portfolio-updates');if(!el)return;const updates=JSON.parse(localStorage.getItem('l7_portfolio_updates')||'[]');if(!updates.length){el.innerHTML='<div class="empty">No portfolio updates yet.</div>';return;}el.innerHTML=updates.map(u=>'<div class="news-item"><div style="display:flex;gap:8px;align-items:center"><div style="font-size:12.5px;font-weight:500">'+escapeHtml(u.company)+'</div>'+(u.quarter?'<span class="badge">'+escapeHtml(u.quarter)+'</span>':'')+'</div><div class="row-copy" style="margin-top:5px">'+escapeHtml(u.update)+'</div><div class="news-meta">'+formatDate(u.addedAt)+'</div></div>').join('');}
-
 // ═══ LP REPORT ═══
-async function generateLPReport(){
-  const el=document.getElementById('lp-report-output');if(!el)return;
-  const quarter=document.getElementById('lp-quarter')?.value||'Q4 2025';const fundName=document.getElementById('lp-fund-name')?.value||'Log7 Capital Fund I';const gpMessage=document.getElementById('lp-gp-message')?.value||'';
-  const apiKey=localStorage.getItem('l7_key');const pipeline=getPipeline();const companies=getPortfolioCompanies();const allCRMs=pipeline.map(i=>getInvestorCRM(i.startup,i.investor));
-  const contacted=allCRMs.filter(c=>c.status!=='not contacted').length,invested=allCRMs.filter(c=>c.status==='invested').length;
-  const{deployed,fund}=getCapitalSettings();const updates=JSON.parse(localStorage.getItem('l7_portfolio_updates')||'[]').slice(0,8);
-  el.innerHTML='<div class="loading-box">Generating '+quarter+' LP report...</div>';
-  if(!apiKey){el.innerHTML=buildRulesLPReport(quarter,fundName,gpMessage,pipeline,companies,contacted,invested,deployed,fund,updates);return;}
-  try{
-    const prompt='You are the General Partner of '+fundName+', writing the '+quarter+' quarterly LP report.\n\nFund data: Fund size: \u20b9 '+fund+' Cr, Deployed: \u20b9 '+deployed+' Cr, Portfolio companies: '+companies.length+', Pipeline deals: '+pipeline.length+', Investors contacted: '+contacted+', Investments made: '+invested+'\nGP message: '+gpMessage+'\nPortfolio: '+companies.map(c=>c.name+' ('+c.sector+', \u20b9'+c.amount+'Cr)').join(', ')+'\nUpdates:\n'+updates.map(u=>u.company+' ('+u.quarter+'): '+u.update).join('\n')+'\n\nWrite a professional, concise LP quarterly report with: Executive Summary, Fund Performance, Deal Activity, Portfolio Updates, Sector Observations, Outlook. Use formal investment language. Under 600 words. Return plain text only, no markdown.';
-    const text=await callClaude(apiKey,prompt,1200);
-    el.innerHTML=buildLPReportWrapper(quarter,fundName,text,companies,deployed,fund);
-    addAuditEntry('ic','LP Report generated',quarter);
-  }catch(err){el.innerHTML=buildRulesLPReport(quarter,fundName,gpMessage,pipeline,companies,contacted,invested,deployed,fund,updates);}
 }
-function buildLPReportWrapper(quarter,fundName,body,companies,deployed,fund){return'<div class="card"><div class="card-header"><div class="card-title">'+escapeHtml(fundName)+' \u2014 '+escapeHtml(quarter)+' Report</div><span class="badge">'+new Date().toLocaleDateString('en-IN')+'</span></div><div class="grid-three" style="margin-bottom:16px"><div class="mini-stat"><div class="mini-value">'+companies.length+'</div><div class="mini-label">Portfolio Cos</div></div><div class="mini-stat"><div class="mini-value">\u20b9'+deployed+'Cr</div><div class="mini-label">Deployed</div></div><div class="mini-stat"><div class="mini-value">'+(fund?Math.round(deployed/fund*100)+'%':'\u2014')+'</div><div class="mini-label">Deployed %</div></div></div><div style="font-size:13px;line-height:1.9;white-space:pre-wrap">'+escapeHtml(body)+'</div><div class="action-row" style="margin-top:18px"><button class="action-btn secondary" onclick="navigator.clipboard.writeText(document.querySelector(\'#lp-report-output .card [style*=pre-wrap]\').innerText)">Copy Report</button><button class="action-btn secondary" onclick="window.print()">Print / PDF</button></div></div>';}
-function buildRulesLPReport(quarter,fundName,gpMsg,pipeline,companies,contacted,invested,deployed,fund,updates){return'<div class="card"><div class="card-header"><div class="card-title">'+escapeHtml(fundName)+' \u2014 '+escapeHtml(quarter)+' Report</div><span class="badge">'+new Date().toLocaleDateString('en-IN')+'</span></div>'+(gpMsg?'<div class="lp-section"><div class="lp-section-title">GP Message</div><div style="font-size:13px;line-height:1.8">'+escapeHtml(gpMsg)+'</div></div>':'')+'<div class="lp-section"><div class="lp-section-title">Fund Performance</div><div class="mini-grid" style="grid-template-columns:repeat(2,1fr)"><div class="mini-stat"><div class="mini-value">\u20b9'+deployed+'Cr</div><div class="mini-label">Deployed</div></div><div class="mini-stat"><div class="mini-value">'+(fund?Math.round(deployed/fund*100)+'%':'\u2014')+'</div><div class="mini-label">of \u20b9'+fund+'Cr</div></div></div><div class="capital-bar" style="margin-top:10px"><div class="capital-fill" style="width:'+(fund?Math.min(100,Math.round(deployed/fund*100)):0)+'%"></div></div></div><div class="lp-section"><div class="lp-section-title">Deal Activity</div><div class="detail-list"><div class="detail-row"><span class="detail-label">Pipeline Deals</span><span>'+pipeline.length+'</span></div><div class="detail-row"><span class="detail-label">Investors Contacted</span><span>'+contacted+'</span></div><div class="detail-row"><span class="detail-label">Investments Made</span><span>'+invested+'</span></div><div class="detail-row"><span class="detail-label">Portfolio Companies</span><span>'+companies.length+'</span></div></div></div>'+(updates.length?'<div class="lp-section"><div class="lp-section-title">Portfolio Updates</div>'+updates.map(u=>'<div style="margin-bottom:8px"><strong style="font-size:12.5px">'+escapeHtml(u.company)+'</strong>'+(u.quarter?' <span class="badge">'+escapeHtml(u.quarter)+'</span>':'')+'<div class="row-copy" style="margin-top:4px">'+escapeHtml(u.update)+'</div></div>').join('')+'</div>':'')+'<div class="action-row"><button class="action-btn secondary" onclick="window.print()">Print / PDF</button></div></div>';}
 
 // ═══ DOCUMENT VAULT ═══
 function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('Log7DocumentVault',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('documents')){const store=db.createObjectStore('documents',{keyPath:'id',autoIncrement:true});store.createIndex('entityType','entityType',{unique:false});store.createIndex('entityName','entityName',{unique:false});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return docsDbPromise;}
