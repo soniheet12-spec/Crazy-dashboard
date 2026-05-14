@@ -591,6 +591,21 @@
           </div>
         </div>
         <div id="match-results"><div class="empty">Select a startup, upload a pitch deck if available, and run a match.</div></div>
+        <div id="bulk-outreach-panel" class="hidden" style="margin-top:14px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📲 WhatsApp Outreach</div>
+              <button class="mini-btn" onclick="renderBulkOutreachPanel()">&#8635; Refresh</button>
+            </div>
+            <div id="bulk-outreach-body"></div>
+            <div style="padding:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="action-btn primary" onclick="openBulkOutreachPreview()">Preview &amp; Send to Selected</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',true)">Select All Investors</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('partnerships',true)">Select All Partners</button>
+              <button class="action-btn secondary" onclick="bulkOutreachSelectAll('investors',false);bulkOutreachSelectAll('partnerships',false)">Clear All</button>
+            </div>
+          </div>
+        </div>
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
@@ -959,6 +974,22 @@
     </div>
   </div>
 
+  <!-- BULK OUTREACH MODAL -->
+  <div id="bulk-outreach-modal" class="hidden" style="position:fixed;inset:0;z-index:70;background:rgba(0,0,0,0.85);display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
+    <div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;margin:auto">
+      <div class="card-header" style="margin-bottom:16px">
+        <div class="card-title">📲 Preview &amp; Send WhatsApp Messages</div>
+        <button class="action-btn danger" onclick="closeBulkOutreachModal()" style="padding:4px 10px">&#x2715;</button>
+      </div>
+      <div id="bulk-outreach-deck-notice" style="margin-bottom:12px"></div>
+      <div id="bulk-outreach-previews"></div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="action-btn primary" style="flex:1" onclick="sendAllBulkOutreach()">Send All (Opens WhatsApp)</button>
+        <button class="action-btn secondary" onclick="closeBulkOutreachModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODALS -->
   <div id="tearsheet-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:760px;width:100%;max-height:90vh;overflow-y:auto;border-radius:10px"><div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px"><button class="action-btn primary" onclick="window.print()">Print</button><button class="action-btn danger" onclick="closeTearsheet()">&#x2715; Close</button></div><div id="tearsheet-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
@@ -1007,7 +1038,7 @@ const DEFAULT_WHATSAPP_TEMPLATE = 'Hi {{investor_name}}, sharing an opportunity 
 
 // STATE
 let investors=[],startups=[],selectedStartup=null;
-let pdfText='',uploadedPdfName='',deckInsightsCache=null;
+let pdfText='',uploadedPdfName='',uploadedPdfFile=null,uploadedPdfBlobUrl='',deckInsightsCache=null;
 let lastMatches=[],lastPayload=null,docsDbPromise=null;
 let dragStartup='',dragInvestor='';
 
@@ -1365,6 +1396,9 @@ function selectStartup(index){
   addAuditEntry('match','Startup selected',selectedStartup.company);
   if(typeof loadResearchCache==='function')loadResearchCache();
   if(typeof renderExtraDocs==='function')renderExtraDocs();
+  var bop=document.getElementById('bulk-outreach-panel');
+  if(bop)bop.classList.remove('hidden');
+  renderBulkOutreachPanel();
 }
 
 // ═══ PDF ═══
@@ -1372,7 +1406,7 @@ function handleDrop(e){e.preventDefault();document.getElementById('drop-zone').c
 function handlePdfSelect(e){const f=e.target.files[0];if(f)processPdf(f);}
 async function processPdf(file){
   document.getElementById('pdf-name').textContent='Reading PDF...';
-  try{const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let text='';for(let i=1;i<=Math.min(pdf.numPages,12);i++){const page=await pdf.getPage(i);const c=await page.getTextContent();text+=c.items.map(item=>item.str).join(' ')+'\n';}pdfText=text.slice(0,8000);uploadedPdfName=file.name;document.getElementById('pdf-name').textContent=file.name+' ready';addAuditEntry('doc','Pitch deck uploaded',file.name+(selectedStartup?' for '+selectedStartup.company:''));}
+  try{const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let text='';for(let i=1;i<=Math.min(pdf.numPages,12);i++){const page=await pdf.getPage(i);const c=await page.getTextContent();text+=c.items.map(item=>item.str).join(' ')+'\n';}pdfText=text.slice(0,8000);uploadedPdfName=file.name;uploadedPdfFile=file;if(uploadedPdfBlobUrl)URL.revokeObjectURL(uploadedPdfBlobUrl);uploadedPdfBlobUrl=URL.createObjectURL(file);document.getElementById('pdf-name').textContent=file.name+' ready';addAuditEntry('doc','Pitch deck uploaded',file.name+(selectedStartup?' for '+selectedStartup.company:''));}
   catch(err){document.getElementById('pdf-name').textContent='Could not read PDF';}
 }
 
@@ -1664,7 +1698,7 @@ async function deleteStoredDoc(id){await deleteDocumentRecord(id);addAuditEntry(
 
 // ═══ EXPORT & UTILS ═══
 function updateStats(){const pl=getPipeline();['stat-matches'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=lastMatches.length;});['stat-pipeline','home-stat-pipeline'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});['pipeline-count'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});}
-function resetWorkflow(){lastMatches=[];lastPayload=null;deckInsightsCache=null;pdfText='';uploadedPdfName='';const pn=document.getElementById('pdf-name');if(pn)pn.textContent='';const mr=document.getElementById('match-results');if(mr)mr.innerHTML='<div class="empty">Workspace reset. Select a startup and run a new match.</div>';const dtc=document.getElementById('deck-tab-content');if(dtc)dtc.innerHTML='<div class="empty">Run a match to generate deck insights.</div>';updateStats();}
+function resetWorkflow(){lastMatches=[];lastPayload=null;deckInsightsCache=null;pdfText='';uploadedPdfName='';uploadedPdfFile=null;if(uploadedPdfBlobUrl){URL.revokeObjectURL(uploadedPdfBlobUrl);uploadedPdfBlobUrl='';};const pn=document.getElementById('pdf-name');if(pn)pn.textContent='';const mr=document.getElementById('match-results');if(mr)mr.innerHTML='<div class="empty">Workspace reset. Select a startup and run a new match.</div>';const dtc=document.getElementById('deck-tab-content');if(dtc)dtc.innerHTML='<div class="empty">Run a match to generate deck insights.</div>';updateStats();}
 function exportMatchesCsv(){exportRowsAsCsv('log7-matches.csv',lastMatches.map(m=>({startup:selectedStartup?.company||'',investor:m.name,score:m.score,verdict:m.verdict,reasons:(m.reasons||[]).join(' | '),concerns:(m.concerns||[]).join(' | '),objections:uniqueList(m.objections||predictObjections(m)).join(' | ')})));}
 function exportPipelineCsv(){exportRowsAsCsv('log7-pipeline.csv',getPipeline().map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return{startup:item.startup,investor:item.investor,score:item.score,verdict:item.verdict,stage:item.stage||'',status:crm.status,follow_up:crm.followUp,warm_intro:crm.warmIntro,tags:(crm.tags||[]).join(' | '),notes:crm.notes};}));}
 function exportRowsAsCsv(filename,rows){if(!rows.length)return showError('Nothing to export.');const headers=Object.keys(rows[0]);const csv=[headers.join(',')].concat(rows.map(r=>headers.map(h=>'"'+String(r[h]==null?'':r[h]).replace(/"/g,'""')+'"').join(','))).join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}
@@ -2687,6 +2721,103 @@ function syncFollowupsToServer(){
       });
     });
   });
+
+// ═══ BULK OUTREACH ═══
+function renderBulkOutreachPanel(){
+  var body=document.getElementById('bulk-outreach-body');
+  if(!body)return;
+  var investors=netLoad('investors');
+  var partners=netLoad('partnerships');
+  if(!investors.length&&!partners.length){
+    body.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px 0">No investors or partners in Network yet.</p>';
+    return;
+  }
+  function makeList(arr,group,nameFn,subFn){
+    if(!arr.length)return '';
+    return '<div style="flex:1;min-width:220px"><div style="font-weight:600;font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+group+'</div>'
+      +arr.map(function(r,i){
+        var nm=nameFn(r)||'(no name)';
+        var sub=subFn(r);
+        var ph=(r.contactPhone||'').replace(/\D/g,'');
+        return '<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border)">'
+          +'<input type="checkbox" class="bo-check" data-group="'+group.toLowerCase()+'" data-idx="'+i
+          +'" style="margin-top:3px;accent-color:var(--accent)"'+(ph?'':' disabled title="No phone number"')+'>'
+          +'<div><div style="font-size:13px;font-weight:500">'+escapeHtml(nm)+'</div>'
+          +(sub?'<div style="font-size:11px;color:var(--muted)">'+escapeHtml(sub)+'</div>':'')
+          +(ph?'':'<div style="font-size:10px;color:#f87">No phone number</div>')
+          +'</div></label>';
+      }).join('')+'</div>';
+  }
+  var invHtml=makeList(investors,'investors',function(r){return r.investorName||r.name;},function(r){return [r.fundName,r.checkSize].filter(Boolean).join(' · ');});
+  var parHtml=makeList(partners,'partnerships',function(r){return r.partnerName||r.companyName||r.name;},function(r){return r.partnerType||r.company||'';});
+  body.innerHTML='<div style="display:flex;gap:24px;flex-wrap:wrap">'+invHtml+parHtml+'</div>';
+}
+
+function bulkOutreachSelectAll(group,val){
+  document.querySelectorAll('.bo-check[data-group="'+group+'"]').forEach(function(cb){
+    if(!cb.disabled)cb.checked=val;
+  });
+}
+
+function openBulkOutreachPreview(){
+  if(!selectedStartup){alert('Please select a startup first.');return;}
+  var investors=netLoad('investors');
+  var partners=netLoad('partnerships');
+  var selected=[];
+  document.querySelectorAll('.bo-check:checked').forEach(function(cb){
+    var grp=cb.dataset.group;
+    var idx=parseInt(cb.dataset.idx);
+    var r=grp==='investors'?investors[idx]:partners[idx];
+    if(!r)return;
+    var name=r.investorName||r.partnerName||r.companyName||r.name||'';
+    var phone=(r.contactPhone||'').replace(/\D/g,'');
+    if(!phone)return;
+    // Add country code if missing
+    if(!phone.startsWith('91')&&phone.length===10)phone='91'+phone;
+    selected.push({name:name,phone:phone,group:grp,fund:r.fundName||r.company||''});
+  });
+  if(!selected.length){alert('Select at least one contact with a phone number.');return;}
+  var s=selectedStartup;
+  var defaultMsg='Hi {name},\n\nI wanted to introduce you to '+escapeHtml(s.company)+', founded by '+(s.founder||'the team')+'.\n\n'+(s.sector||'')+' | '+(s.stage||'')+' | Raising '+(s.roundSize||s.currentRound||'')+(s.roundSize?' Cr':'')+'\n\n[Add your custom message here]\n\nLet me know if you\'d like to chat.\n\nCheers';
+  var previews=document.getElementById('bulk-outreach-previews');
+  previews.innerHTML=selected.map(function(c,i){
+    var msg=defaultMsg.replace('{name}',c.name);
+    return '<div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px">'
+      +'<div style="font-weight:600;font-size:13px;margin-bottom:6px">'+escapeHtml(c.name)+(c.fund?' <span style="font-weight:400;color:var(--muted)">('+escapeHtml(c.fund)+')</span>':'')
+      +' <span style="font-size:11px;color:var(--muted)">+'+escapeHtml(c.phone)+'</span></div>'
+      +'<textarea id="bo-msg-'+i+'" rows="8" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;font-family:inherit;resize:vertical">'+escapeHtml(msg)+'</textarea>'
+      +'</div>';
+  }).join('');
+  // deck notice
+  var dn=document.getElementById('bulk-outreach-deck-notice');
+  if(uploadedPdfBlobUrl){
+    dn.innerHTML='<div style="padding:8px 12px;background:rgba(34,197,94,0.1);border:1px solid var(--green);border-radius:6px;font-size:12px">📎 Pitch deck ready: <a href="'+uploadedPdfBlobUrl+'" download="'+escapeHtml(uploadedPdfName||s.company+'-deck.pdf')+'" style="color:var(--accent)">Download '+escapeHtml(uploadedPdfName||'deck.pdf')+'</a> — attach manually after opening WhatsApp</div>';
+  } else if(s.pitchDeckUrl){
+    dn.innerHTML='<div style="padding:8px 12px;background:rgba(59,130,246,0.1);border:1px solid var(--accent);border-radius:6px;font-size:12px">📎 Deck link: <a href="'+escapeHtml(s.pitchDeckUrl)+'" target="_blank" style="color:var(--accent)">'+escapeHtml(s.pitchDeckUrl)+'</a></div>';
+  } else {
+    dn.innerHTML='<div style="padding:8px 12px;background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:6px;font-size:12px;color:#f87171">No pitch deck uploaded — messages will be sent without deck reference.</div>';
+  }
+  // store selected for send
+  window._boSelected=selected;
+  var modal=document.getElementById('bulk-outreach-modal');
+  modal.classList.remove('hidden');
+  modal.style.display='flex';
+}
+
+function sendAllBulkOutreach(){
+  var selected=window._boSelected||[];
+  selected.forEach(function(c,i){
+    var ta=document.getElementById('bo-msg-'+i);
+    var msg=ta?ta.value:'';
+    var url='https://wa.me/'+c.phone+'?text='+encodeURIComponent(msg);
+    setTimeout(function(){window.open(url,'_blank');},i*600);
+  });
+}
+
+function closeBulkOutreachModal(){
+  var modal=document.getElementById('bulk-outreach-modal');
+  if(modal){modal.classList.add('hidden');modal.style.display='none';}
+}
 
   // Fire-and-forget POST — silent, never blocks the UI
   fetch('/api/save-followups', {
