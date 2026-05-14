@@ -594,9 +594,34 @@
 
         <!-- ═══ WHATSAPP OUTREACH PANEL ═══ -->
         <div id="whatsapp-outreach-panel" style="margin-top:20px;padding:16px;border:1px solid #444;border-radius:8px;">
-          <h3>📲 WhatsApp Outreach</h3>
+          <h3 style="margin:0 0 12px">📲 WhatsApp Outreach</h3>
+
+          <!-- Template editor (collapsed by default) -->
+          <div style="margin-bottom:14px">
+            <button onclick="waToggleTemplateEditor()" style="padding:5px 12px;font-size:12px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:5px;cursor:pointer">✏️ Edit Message Template</button>
+          </div>
+          <div id="wa-template-editor" style="display:none;margin-bottom:16px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:14px">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Message Template</div>
+            <textarea id="wa-template-input" rows="7" style="width:100%;box-sizing:border-box;background:var(--surface,var(--s1));border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;font-family:inherit;resize:vertical"></textarea>
+            <div style="font-size:11px;color:var(--muted);margin:8px 0 10px;line-height:1.7">
+              <strong>Placeholders:</strong>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{investor_name}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{startup_name}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{founder_name}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{sector}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{stage}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{round_size}}</code>
+              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{pitch_deck_link}}</code>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button onclick="waTemplateSave()" style="padding:5px 14px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer">Save</button>
+              <button onclick="waTemplateReset()" style="padding:5px 14px;font-size:12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer">Reset to Default</button>
+            </div>
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">Live Preview</div>
+            <div id="wa-template-preview" style="font-size:12px;background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:var(--text);line-height:1.6"></div>
+          </div>
+
           <div id="outreach-body">Loading...</div>
-          <button onclick="bulkOutreachSelectAll()" style="margin-top:12px;">📲 Send to All Selected</button>
         </div>
 
         <div class="mobile-sticky-actions">
@@ -2862,10 +2887,75 @@ function waSendAllSelected() {
 </script>
 
 <script>
+// ── TEMPLATE ─────────────────────────────────────────────────────
+var WA_DEFAULT_TEMPLATE =
+  'Hi {{investor_name}},\n\n'
+  + 'I wanted to introduce you to *{{startup_name}}*, founded by {{founder_name}}.\n\n'
+  + '🏢 Sector: {{sector}}\n'
+  + '📈 Stage: {{stage}}\n'
+  + '💰 Raising: ₹{{round_size}} Cr\n\n'
+  + '📎 Pitch Deck: {{pitch_deck_link}}\n\n'
+  + 'Let me know if you\'d like to connect.\n\nCheers,\nLog7 Capital';
+
+function waGetTemplate() {
+  return localStorage.getItem('l7_outreach_template') || WA_DEFAULT_TEMPLATE;
+}
+
+function waFillTemplate(tpl, name) {
+  var s    = window.selectedStartup || {};
+  var deck = window.uploadedPdfBlobUrl
+    ? (window.uploadedPdfName || 'pitch-deck.pdf') + ' — ' + window.uploadedPdfBlobUrl
+    : (s.pitchDeckUrl || '📎 Pitch Deck: Not attached — please request from founder');
+  return tpl
+    .replace(/{{investor_name}}/g,  name            || '')
+    .replace(/{{startup_name}}/g,   s.company       || '')
+    .replace(/{{founder_name}}/g,   s.founder       || '')
+    .replace(/{{sector}}/g,         s.sector        || '')
+    .replace(/{{stage}}/g,          s.stage         || '')
+    .replace(/{{round_size}}/g,     s.roundSize     || '')
+    .replace(/{{pitch_deck_link}}/g, deck);
+}
+
+function waToggleTemplateEditor() {
+  var ed = document.getElementById('wa-template-editor');
+  if (!ed) return;
+  var opening = ed.style.display === 'none';
+  ed.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    var ta = document.getElementById('wa-template-input');
+    if (ta) { ta.value = waGetTemplate(); ta.oninput = waUpdatePreview; }
+    waUpdatePreview();
+  }
+}
+
+function waUpdatePreview() {
+  var ta      = document.getElementById('wa-template-input');
+  var preview = document.getElementById('wa-template-preview');
+  if (!ta || !preview) return;
+  preview.textContent = waFillTemplate(ta.value, 'Investor Name');
+}
+
+function waTemplateSave() {
+  var ta = document.getElementById('wa-template-input');
+  if (!ta) return;
+  localStorage.setItem('l7_outreach_template', ta.value);
+  var btn = event.target;
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => { btn.textContent = 'Save'; }, 1500);
+}
+
+function waTemplateReset() {
+  localStorage.removeItem('l7_outreach_template');
+  var ta = document.getElementById('wa-template-input');
+  if (ta) { ta.value = WA_DEFAULT_TEMPLATE; waUpdatePreview(); }
+}
+
+// ── SELECT ALL ────────────────────────────────────────────────────
 function _waSelectAll(section, checked) {
   document.querySelectorAll('#outreach-' + section + ' .wa-contact-cb').forEach(cb => { if (!cb.disabled) cb.checked = checked; });
 }
 
+// ── RENDER ────────────────────────────────────────────────────────
 function renderBulkOutreachPanel() {
   const rawInv = localStorage.getItem('l7_net_investors');
   const rawPar = localStorage.getItem('l7_net_partnerships');
@@ -2884,9 +2974,9 @@ function renderBulkOutreachPanel() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  function buildTable(rows, tab, sectionId, invFields, emptyMsg) {
+  function buildTable(rows, tab, sectionId, fieldDefs, emptyMsg) {
     var phoneKey = 'contactPhone';
-    var visibleFields = invFields.filter(f => f.key !== 'notes' && f.key !== 'followUpDate' && f.key !== phoneKey).slice(0, 4);
+    var visibleFields = fieldDefs.filter(f => f.key !== 'notes' && f.key !== 'followUpDate' && f.key !== phoneKey).slice(0, 4);
 
     var html = '<div style="margin-bottom:20px">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
@@ -2920,16 +3010,14 @@ function renderBulkOutreachPanel() {
             + (isDue ? ' class="net-row-due"' : '')
             + ' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
 
-      // Checkbox cell
       html += '<td style="padding:8px 10px">'
             + '<input type="checkbox" class="wa-contact-cb" data-name="' + name + '" data-phone="' + phone + '"'
             + ' style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer"'
             + (phone ? '' : ' disabled title="No phone number"') + '>'
             + '</td>';
 
-      // Same visible field cells as Network tab
       visibleFields.forEach(f => {
-        var val = row[f.key] || '—';
+        var val  = row[f.key] || '—';
         var cell = '<td style="padding:8px 10px;white-space:nowrap">';
         if (f.key === 'status') {
           var sc = val==='Active'||val==='Portfolio' ? 'var(--green)'
@@ -2942,17 +3030,14 @@ function renderBulkOutreachPanel() {
         html += cell + '</td>';
       });
 
-      // Phone cell
       html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'
             + (row[phoneKey] ? '<a href="tel:' + row[phoneKey] + '" style="color:var(--muted);text-decoration:none">' + row[phoneKey] + '</a>' : '—')
             + '</td>';
 
-      // Follow-up cell
       var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
       html += '<td style="padding:8px 10px;white-space:nowrap;color:' + fuColor + ';font-weight:' + (isDue?'600':'400') + '">'
             + (row.followUpDate || '—') + (isDue ? ' ⚑' : '') + '</td>';
 
-      // Sheet badge for investors
       if (tab === 'investors') {
         var badge = row._fromSheet
           ? (row._localOverride
@@ -2962,7 +3047,6 @@ function renderBulkOutreachPanel() {
         html += '<td style="padding:8px 10px;white-space:nowrap">' + badge + '</td>';
       }
 
-      // 📲 Send button (replaces Edit/Delete)
       html += '<td style="padding:8px 10px;white-space:nowrap">'
             + (phone
                 ? '<button class="action-btn primary" style="padding:3px 8px;font-size:11px" onclick="sendWhatsApp(\'' + phone + '\',\'' + safe + '\')">📲 Send</button>'
@@ -2974,7 +3058,6 @@ function renderBulkOutreachPanel() {
     return html;
   }
 
-  // Use same field definitions as Network tab (inline, matching netFields())
   var invFields = [
     {key:'investorName', label:'Investor Name'},
     {key:'fundName',     label:'Fund Name'},
@@ -2993,16 +3076,15 @@ function renderBulkOutreachPanel() {
 
   let html = '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px">Investors</div>';
   html += buildTable(investors, 'investors', 'investors', invFields, 'No investors in Network tab');
-
   html += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px">Partners</div>';
   html += buildTable(partners, 'partnerships', 'partners', parFields, 'No partners in Network tab');
-
   html += '<button onclick="bulkOutreachSelectAll()" style="width:100%;margin-top:4px;padding:9px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:7px;cursor:pointer">📲 Send to All Selected</button>';
 
   body.innerHTML = html;
   console.log('Outreach panel rendered. Investors:', investors.length, 'Partners:', partners.length);
 }
 
+// ── SEND ─────────────────────────────────────────────────────────
 function bulkOutreachSelectAll() {
   const checked = document.querySelectorAll('#outreach-investors .wa-contact-cb:checked, #outreach-partners .wa-contact-cb:checked');
   if (!checked.length) { alert('No contacts selected.'); return; }
@@ -3015,14 +3097,8 @@ function bulkOutreachSelectAll() {
 
 function sendWhatsApp(phone, name) {
   if (!phone) { alert('No number for ' + name); return; }
-  const s   = window.selectedStartup || {};
-  const msg = encodeURIComponent(
-    'Hi ' + name + ', sharing a startup from Log7 Capital'
-    + (s.company ? ' — ' + s.company : '')
-    + (s.sector  ? ' (' + s.sector + ')' : '')
-    + '. Let me know if you\'d like to connect.'
-  );
-  window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + msg, '_blank');
+  var msg = waFillTemplate(waGetTemplate(), name);
+  window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
