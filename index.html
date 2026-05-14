@@ -354,7 +354,7 @@
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
-    <button class="nav-tab" onclick="showTab('network',this)">Network</button>
+    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
   </div>
   <div class="nav-right">
     <button class="pill-btn" onclick="generateTearsheet()">Tearsheet</button>
@@ -456,6 +456,10 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-header"><div class="card-title">Overdue Follow-ups</div></div>
           <div id="home-overdue-list"><div class="empty" style="padding:12px;font-size:12px">No overdue follow-ups.</div></div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span></div>
+          <div id="home-net-followups"><div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div></div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Recent Activity</div></div>
@@ -1118,13 +1122,115 @@ function refreshHome(){
   if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
   const prEl=document.getElementById('home-priority-list');
   if(prEl){const rows=pipeline.slice(0,6);if(!rows.length){prEl.innerHTML='<div class="empty">Save matches to pipeline to see priorities.</div>';}else prEl.innerHTML=rows.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="pipeline-row"><div class="avatar">'+initials(item.investor)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(item.investor)+' <span class="badge">'+escapeHtml(item.startup)+'</span></div><div class="row-meta">'+crm.status+' | Score: '+item.score+(crm.followUp?' | Due: '+crm.followUp:'')+'</div></div></div>';}).join('');}
-  refreshCapitalDisplay();renderHomeActivity();
+  refreshCapitalDisplay();renderHomeActivity();refreshNetFollowups();
 }
 function renderHomeActivity(){
   const el=document.getElementById('home-recent-activity');if(!el)return;
   const log=getAuditLog().slice(0,8);
   if(!log.length){el.innerHTML='<div class="empty">Activity will appear as you use the platform.</div>';return;}
   el.innerHTML=log.map(e=>'<div class="timeline-item"><div class="timeline-title">'+escapeHtml(e.action)+(e.entity?' \u2014 '+escapeHtml(e.entity):'')+'</div><div class="timeline-meta">'+formatDate(e.ts)+' \u00b7 '+escapeHtml(e.user)+'</div></div>').join('');
+}
+
+
+function refreshNetFollowups(){
+  var el = document.getElementById('home-net-followups');
+  var badge = document.getElementById('net-followup-badge');
+  var navBadge = document.getElementById('net-nav-badge');
+  if(!el) return;
+
+  var today = new Date().toISOString().slice(0,10);
+  var sevenDays = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
+
+  var TAB_COLORS = {
+    partnerships: {bg:'rgba(91,192,248,0.15)',border:'rgba(91,192,248,0.4)',text:'var(--blue)',label:'Partnership'},
+    investors:    {bg:'rgba(62,207,142,0.12)',border:'rgba(62,207,142,0.35)',text:'var(--green)',label:'Investor'},
+    startups:     {bg:'rgba(245,166,35,0.13)',border:'rgba(245,166,35,0.35)',text:'var(--amber)',label:'Startup'},
+  };
+
+  var allFollowups = [];
+  ['partnerships','investors','startups'].forEach(function(tab){
+    netLoad(tab).forEach(function(row){
+      if(!row.followUpDate) return;
+      allFollowups.push({tab:tab, row:row, date:row.followUpDate});
+    });
+  });
+
+  var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
+  var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
+                             .sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+  var dueCount = dueToday.length;
+  if(badge){  badge.textContent=dueCount; badge.style.display = dueCount ? 'inline-block' : 'none'; }
+  if(navBadge){ navBadge.textContent=dueCount; navBadge.style.display = dueCount ? 'inline-block' : 'none'; }
+
+  if(!dueToday.length && !upcoming.length){
+    el.innerHTML = '<div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div>';
+    return;
+  }
+
+  var html = '';
+
+  if(dueToday.length){
+    dueToday.forEach(function(f){
+      var c = TAB_COLORS[f.tab];
+      var name = escapeHtml(netPrimaryKey(f.tab, f.row));
+      var notes = f.row.notes ? escapeHtml(f.row.notes.slice(0,80))+(f.row.notes.length>80?'…':'') : '';
+      html += '<div style="padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(245,166,35,0.04)">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        + '<span style="font-size:13px;font-weight:600">'+name+'</span>'
+        + '<span style="font-size:10px;padding:2px 7px;border-radius:8px;border:1px solid '+c.border+';background:'+c.bg+';color:'+c.text+'">'+c.label+'</span>'
+        + '<span style="margin-left:auto;font-size:11px;color:var(--amber);font-weight:600">⚑ '+f.date+'</span>'
+        + '</div>'
+        + (notes ? '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">'+notes+'</div>' : '')
+        + '<div style="display:flex;gap:6px">'
+        + '<button class="action-btn secondary" style="padding:2px 9px;font-size:10.5px" onclick="netMarkDone(\''+f.tab+'\','+f.row.id+')">✓ Mark Done</button>'
+        + '<button class="action-btn secondary" style="padding:2px 9px;font-size:10.5px" onclick="netSnooze(\''+f.tab+'\','+f.row.id+')">⏱ Snooze 1 Day</button>'
+        + '</div></div>';
+    });
+  } else {
+    html += '<div class="empty" style="padding:10px 12px;font-size:12px">No follow-ups due today.</div>';
+  }
+
+  if(upcoming.length){
+    html += '<details style="margin-top:4px"><summary style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px">'
+      + '▸ Upcoming — Next 7 Days <span class="badge" style="font-size:10px">'+upcoming.length+'</span>'
+      + '</summary>';
+    upcoming.forEach(function(f){
+      var c = TAB_COLORS[f.tab];
+      var name = escapeHtml(netPrimaryKey(f.tab, f.row));
+      html += '<div style="padding:7px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">'
+        + '<span style="font-size:12.5px;font-weight:500;flex:1">'+name+'</span>'
+        + '<span style="font-size:10px;padding:2px 7px;border-radius:8px;border:1px solid '+c.border+';background:'+c.bg+';color:'+c.text+'">'+c.label+'</span>'
+        + '<span style="font-size:11px;color:var(--muted)">'+f.date+'</span>'
+        + '</div>';
+    });
+    html += '</details>';
+  }
+
+  el.innerHTML = html;
+}
+
+function netMarkDone(tab, id){
+  var rows = netLoad(tab);
+  var row = rows.find(function(r){ return r.id===id; });
+  if(row){ row.followUpDate = ''; netSave(tab, rows); }
+  refreshNetFollowups();
+  renderNetList(tab);
+  addAuditEntry('network','Follow-up marked done',netPrimaryKey(tab, row||{}));
+}
+
+function netSnooze(tab, id){
+  var rows = netLoad(tab);
+  var row = rows.find(function(r){ return r.id===id; });
+  if(row && row.followUpDate){
+    var d = new Date(row.followUpDate+'T00:00:00');
+    d.setDate(d.getDate()+1);
+    row.followUpDate = d.toISOString().slice(0,10);
+    netSave(tab, rows);
+  }
+  refreshNetFollowups();
+  renderNetList(tab);
+  addAuditEntry('network','Follow-up snoozed 1 day',netPrimaryKey(tab, row||{}));
 }
 
 // ═══ NEWS MONITOR ═══
@@ -2105,6 +2211,7 @@ function netFields(tab){
     {key:'contactEmail', label:'Contact Email',    type:'email'},
     {key:'status',       label:'Status',           type:'select', opts:['Prospecting','Active','On Hold','Closed']},
     {key:'notes',        label:'Notes',            type:'textarea'},
+    {key:'followUpDate', label:'Follow-up Date',   type:'date'},
   ];
   if(tab==='investors') return [
     {key:'investorName', label:'Investor Name',    type:'text',   required:true},
@@ -2115,6 +2222,7 @@ function netFields(tab){
     {key:'sectorFocus',  label:'Sector Focus',     type:'text'},
     {key:'status',       label:'Status',           type:'select', opts:['Active','Warm','Cold','Passed']},
     {key:'notes',        label:'Notes',            type:'textarea'},
+    {key:'followUpDate', label:'Follow-up Date',   type:'date'},
   ];
   // startups
   return [
@@ -2126,6 +2234,7 @@ function netFields(tab){
     {key:'status',       label:'Status',           type:'select', opts:['Referred','Evaluating','Passed','Portfolio']},
     {key:'referredBy',   label:'Referred By',      type:'text'},
     {key:'notes',        label:'Notes',            type:'textarea'},
+    {key:'followUpDate', label:'Follow-up Date',   type:'date'},
   ];
 }
 
@@ -2146,16 +2255,19 @@ function renderNetList(tab){
     return;
   }
   var fields = netFields(tab);
-  var visibleFields = fields.filter(f=>f.key!=='notes').slice(0,5);
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate').slice(0,4);
+  var today = new Date().toISOString().slice(0,10);
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
-    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Date Added</th>'
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
     + '<th style="padding:8px 10px"></th>'
     + '</tr></thead><tbody>';
 
   rows.forEach(function(row){
-    html += '<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    var isDue = row.followUpDate && row.followUpDate <= today;
+    html += '<tr style="border-bottom:1px solid var(--border)"'+(isDue?' class="net-row-due"':'')+' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
     visibleFields.forEach(function(f){
       var val = row[f.key]||'—';
       var cell = '<td style="padding:8px 10px;white-space:nowrap">';
@@ -2167,6 +2279,9 @@ function renderNetList(tab){
       }
       html += cell + '</td>';
     });
+    // Follow-up date cell
+    var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap">'
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\','+row.id+')">Edit</button>'
