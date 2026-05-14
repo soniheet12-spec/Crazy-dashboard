@@ -2623,7 +2623,37 @@ async function sendWhatsAppReminder(){
   var btn = document.getElementById('wa-remind-btn');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Sending…'; }
   try {
-    var res = await fetch('/api/send-followup-reminder?manual=true', { method: 'POST' });
+    // Build today's date in local time (same as the Home widget)
+    var now = new Date();
+    var today = now.getFullYear()+'-'
+      +String(now.getMonth()+1).padStart(2,'0')+'-'
+      +String(now.getDate()).padStart(2,'0');
+
+    // Read all network records from localStorage and filter for today
+    var nameKeys = { partnerships:'partnerName', investors:'investorName', startups:'companyName' };
+    var lsKeys   = { partnerships:'l7_net_partnerships', investors:'l7_net_investors', startups:'l7_net_startups' };
+    var followups = [];
+    ['partnerships','investors','startups'].forEach(function(tab){
+      var rows = [];
+      try { rows = JSON.parse(localStorage.getItem(lsKeys[tab])||'[]'); } catch(e){}
+      rows.forEach(function(row){
+        var d = row.followUpDate ? String(row.followUpDate).split('T')[0].trim() : '';
+        if(d === today){
+          followups.push({
+            tab:          tab,
+            name:         row[nameKeys[tab]]||'',
+            followUpDate: d,
+            notes:        row.notes||'',
+          });
+        }
+      });
+    });
+
+    var res = await fetch('/api/send-followup-reminder', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ manual: true, followups: followups }),
+    });
     var data = await res.json();
     if(!res.ok) throw new Error(data.error||'Server error');
     if(data.sent){
