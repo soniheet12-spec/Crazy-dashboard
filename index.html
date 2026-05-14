@@ -941,6 +941,7 @@
     <div class="section-bar">
       <div class="section-title">Network</div>
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
+      <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
     </div>
     <div class="subtabs" style="margin-bottom:18px">
       <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
@@ -2209,6 +2210,7 @@ function netFields(tab){
     {key:'type',         label:'Type',             type:'select', opts:['Strategic','Financial','Channel','Other']},
     {key:'contactName',  label:'Contact Name',     type:'text'},
     {key:'contactEmail', label:'Contact Email',    type:'email'},
+    {key:'contactPhone', label:'Contact Number',   type:'tel'},
     {key:'status',       label:'Status',           type:'select', opts:['Prospecting','Active','On Hold','Closed']},
     {key:'notes',        label:'Notes',            type:'textarea'},
     {key:'followUpDate', label:'Follow-up Date',   type:'date'},
@@ -2220,6 +2222,7 @@ function netFields(tab){
     {key:'checkSize',    label:'Typical Check Size', type:'text'},
     {key:'geography',    label:'Geography',        type:'text'},
     {key:'sectorFocus',  label:'Sector Focus',     type:'text'},
+    {key:'contactPhone', label:'Contact Number',   type:'tel'},
     {key:'status',       label:'Status',           type:'select', opts:['Active','Warm','Cold','Passed']},
     {key:'notes',        label:'Notes',            type:'textarea'},
     {key:'followUpDate', label:'Follow-up Date',   type:'date'},
@@ -2229,6 +2232,7 @@ function netFields(tab){
     {key:'companyName',  label:'Company Name',     type:'text',   required:true},
     {key:'founderName',  label:'Founder Name',     type:'text'},
     {key:'founderEmail', label:'Founder Email',    type:'email'},
+    {key:'founderPhone', label:'Founder Number',   type:'tel'},
     {key:'sector',       label:'Sector',           type:'text'},
     {key:'stage',        label:'Stage',            type:'select', opts:['Pre-seed','Seed','Series A','Series B']},
     {key:'status',       label:'Status',           type:'select', opts:['Referred','Evaluating','Passed','Portfolio']},
@@ -2255,11 +2259,13 @@ function renderNetList(tab){
     return;
   }
   var fields = netFields(tab);
-  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate').slice(0,4);
+  var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
   var today = new Date().toISOString().slice(0,10);
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Contact No.</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
     + '<th style="padding:8px 10px"></th>'
@@ -2279,6 +2285,9 @@ function renderNetList(tab){
       }
       html += cell + '</td>';
     });
+    // Phone cell
+    var phone = row[phoneKey]||'—';
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+(phone!=='—'?'<a href="tel:'+escapeHtml(phone)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(phone)+'</a>':'—')+'</td>';
     // Follow-up date cell
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
@@ -2386,6 +2395,22 @@ function closeNetworkModal(){
   modal.classList.add('hidden');
   modal.style.display='none';
   _netEditId = null;
+}
+
+function exportNetCsv(){
+  var tab = _netActiveTab;
+  var rows = netLoad(tab);
+  if(!rows.length){ showError('No entries to export.'); return; }
+  var colMap = {
+    partnerships: ['partnerName','type','contactName','contactEmail','contactPhone','status','notes','followUpDate','dateAdded'],
+    investors:    ['investorName','fundName','stageFocus','checkSize','geography','sectorFocus','contactPhone','status','notes','followUpDate','dateAdded'],
+    startups:     ['companyName','founderName','founderEmail','founderPhone','sector','stage','status','referredBy','notes','followUpDate','dateAdded'],
+  };
+  exportRowsAsCsv('log7-network-'+tab+'.csv', rows.map(function(r){
+    var out = {};
+    colMap[tab].forEach(function(k){ out[k] = r[k]||''; });
+    return out;
+  }));
 }
 
 </script>
