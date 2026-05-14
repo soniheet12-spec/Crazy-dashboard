@@ -460,6 +460,10 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span><button id="wa-remind-btn" class="mini-btn" style="margin-left:auto" onclick="sendWhatsAppReminder()">📲 Send WhatsApp Reminder Now</button></div>
           <div id="home-net-followups"><div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div></div>
+          <details id="fu-debug-wrap" style="margin:8px 12px 4px;font-size:11px;color:var(--muted)">
+            <summary style="cursor:pointer;font-weight:600;padding:4px 0">🔍 Follow-up Debug Panel</summary>
+            <div id="fu-debug-body" style="margin-top:6px;padding:8px;background:var(--s2);border-radius:6px;white-space:pre-wrap;font-family:monospace;font-size:10.5px;max-height:300px;overflow-y:auto">loading…</div>
+          </details>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Recent Activity</div></div>
@@ -1115,9 +1119,15 @@ function refreshNetFollowups(){
   var el = document.getElementById('home-net-followups');
   var badge = document.getElementById('net-followup-badge');
   var navBadge = document.getElementById('net-nav-badge');
+  var debugEl = document.getElementById('fu-debug-body');
   if(!el) return;
 
-  // YYYY-MM-DD, guaranteed no timezone shift
+  var debugLines = [];
+  function dbg(s){ debugLines.push(s); }
+
+  try {
+
+  // Today in local time — no UTC shift
   var now = new Date();
   var today = now.getFullYear()+'-'
     +String(now.getMonth()+1).padStart(2,'0')+'-'
@@ -1127,17 +1137,9 @@ function refreshNetFollowups(){
     +String(sevenDaysMs.getMonth()+1).padStart(2,'0')+'-'
     +String(sevenDaysMs.getDate()).padStart(2,'0');
 
-  // Debug: dump every relevant localStorage key
-  var allKeys = Object.keys(localStorage);
-  var relevantKeys = allKeys.filter(function(k){
-    return /network|partner|investor|startup|followup/i.test(k);
-  });
-  console.log('[FollowUps] localStorage keys:', allKeys);
-  console.log('[FollowUps] Relevant keys:', relevantKeys);
-  relevantKeys.forEach(function(k){
-    console.log('[FollowUps] Raw value of', k, ':', localStorage.getItem(k));
-  });
-  console.log('[FollowUps] Today (local):', today);
+  dbg('Today: '+today);
+  dbg('All localStorage keys: '+Object.keys(localStorage).join(', '));
+  dbg('');
 
   var TAB_COLORS = {
     partnerships: {bg:'rgba(91,192,248,0.15)',border:'rgba(91,192,248,0.4)',text:'var(--blue)',label:'Partnership'},
@@ -1145,7 +1147,6 @@ function refreshNetFollowups(){
     startups:     {bg:'rgba(245,166,35,0.13)',border:'rgba(245,166,35,0.35)',text:'var(--amber)',label:'Startup'},
   };
 
-  // Read directly from the literal keys that netSave() writes to
   var TAB_LS_KEYS = {
     partnerships: 'l7_net_partnerships',
     investors:    'l7_net_investors',
@@ -1154,19 +1155,31 @@ function refreshNetFollowups(){
 
   var allFollowups = [];
   ['partnerships','investors','startups'].forEach(function(tab){
-    var raw = localStorage.getItem(TAB_LS_KEYS[tab]);
+    var lsKey = TAB_LS_KEYS[tab];
+    var raw = localStorage.getItem(lsKey);
+    dbg('--- '+tab+' (key: "'+lsKey+'") ---');
+    dbg('Raw present: '+(raw!==null ? 'YES ('+raw.length+' chars)' : 'NO / NULL'));
     var tabRows = [];
-    try { tabRows = raw ? JSON.parse(raw) : []; } catch(e){ tabRows = []; }
-    var withDates = tabRows.filter(function(r){ return r.followUpDate; });
-    console.log('[FollowUps]', tab, '— total rows:', tabRows.length,
-      '— rows with followUpDate:', withDates.map(function(r){ return r.followUpDate; }));
-    withDates.forEach(function(row){
-      // Normalise: strip time component, ensure string
-      var d = String(row.followUpDate).split('T')[0].trim();
-      console.log('[FollowUps] Entry:', tab, netPrimaryKey(tab,row), '| stored date:', row.followUpDate, '| normalised:', d, '| today:', today, '| due?', d<=today);
-      allFollowups.push({tab:tab, row:row, date:d});
+    try { tabRows = raw ? JSON.parse(raw) : []; } catch(e){ dbg('PARSE ERROR: '+e); }
+    dbg('Total records: '+tabRows.length);
+    tabRows.forEach(function(row, i){
+      var nameKey = tab==='partnerships'?'partnerName':tab==='investors'?'investorName':'companyName';
+      var name = row[nameKey]||'(no name)';
+      var fud = row.followUpDate;
+      var d = fud ? String(fud).split('T')[0].trim() : '';
+      var match = d ? (d <= today ? 'DUE ✓' : (d <= sevenDays ? 'UPCOMING' : 'FUTURE')) : 'NO DATE';
+      dbg('  ['+i+'] '+name+' | followUpDate: "'+fud+'" | normalised: "'+d+'" | '+match);
+      if(d) allFollowups.push({tab:tab, row:row, date:d});
     });
+    dbg('');
   });
+
+  dbg('Total with any followUpDate: '+allFollowups.length);
+  var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
+  var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
+                             .sort(function(a,b){ return a.date.localeCompare(b.date); });
+  dbg('Due today (<='+today+'): '+dueToday.length);
+  dbg('Upcoming 7 days: '+upcoming.length);
 
   var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
   var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
@@ -1221,6 +1234,13 @@ function refreshNetFollowups(){
   }
 
   el.innerHTML = html;
+
+  } catch(err) {
+    dbg('EXCEPTION: '+err);
+    el.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Error in refreshNetFollowups: '+escapeHtml(String(err))+'</div>';
+  }
+
+  if(debugEl) debugEl.textContent = debugLines.join('\n');
 }
 
 function netMarkDone(tab, id){
