@@ -965,6 +965,7 @@
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbyDvK8t4E9_5ZMLv0WfYrmtomcOBFKNxOdBqj5VbzvGxa1AdohX1aWIQDFeMVN32S0s/exec';
+const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0/gviz/tq?tqx=out:json&sheet=Sheet1';
 const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -1230,6 +1231,20 @@ function saveKey(){const k=document.getElementById('api-key').value;localStorage
 function setKeyStatus(text){const el=document.getElementById('key-status');if(el)el.textContent=text?'API key '+text:'';}
 function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.now());return u.toString();}
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
+async function fetchGvizSheet(url){
+  var res=await fetch(url+'&_ts='+Date.now(),{cache:'no-store'});
+  if(!res.ok) throw new Error('Request failed ('+res.status+')');
+  var text=await res.text();
+  var json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,''));
+  var cols=(json.table&&json.table.cols||[]).map(function(c){return c.label||c.id||'';});
+  console.log('[Network Investors] Raw sheet headers:',cols);
+  var rows=(json.table&&json.table.rows||[]).map(function(r){
+    var obj={};
+    (r.c||[]).forEach(function(cell,i){obj[cols[i]]=cell?(cell.v==null?'':String(cell.v)):'';});
+    return obj;
+  });
+  return rows;
+}
 function extractRows(payload){if(Array.isArray(payload))return normalizeRows(payload);if(payload?.data&&Array.isArray(payload.data))return normalizeRows(payload.data);if(payload?.rows&&Array.isArray(payload.rows))return normalizeRows(payload.rows);if(payload?.values&&Array.isArray(payload.values))return normalizeRows(payload.values);return[];}
 function normalizeRows(rows){if(!rows?.length)return[];if(!Array.isArray(rows[0]))return rows;const headers=rows[0].map(v=>String(v||'').trim());return rows.slice(1).map(row=>{const o={};headers.forEach((h,i)=>{o[h]=row[i]==null?'':String(row[i]).trim();});return o;});}
 function normalizeKey(k){return String(k||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
@@ -2394,8 +2409,29 @@ async function netFetchInvestors(){
   if(syncEl) syncEl.textContent = 'Fetching…';
 
   try {
-    var data = await fetchSheetJson(INVESTOR_URL);
-    var sheetRows = extractRows(data).filter(function(r){ return r['Full Name']; }).map(mapInvestor);
+    var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
+    // Best-effort column mapping — column names logged to console for remapping
+    var sheetRows = rawRows.filter(function(r){
+      // Accept row if any value looks like a name (non-empty first few cols)
+      return Object.values(r).some(function(v){return v&&v.trim();});
+    }).map(function(r){
+      // Try common name column variants
+      var name = r['Full Name']||r['Name']||r['Investor Name']||r['Fund Name']||Object.values(r).find(function(v){return v&&v.trim();})||'';
+      return {
+        name:         name.trim(),
+        phone:        r['Phone']||r['Contact Phone']||r['Mobile']||r['Phone Number']||'',
+        email:        r['Email']||r['Contact Email']||r['Email ID']||'',
+        type:         r['Type']||r['Fund Type']||r['Investor Type']||'',
+        ticketSize:   r['Ticket Size']||r['Check Size']||r['Investment Size']||'',
+        sectors:      r['Sectors']||r['Sector Focus']||r['Sector']||'',
+        stage:        r['Stage']||r['Stage Focus']||r['Investment Stage']||'',
+        startupStage: r['Startup Stage']||'',
+        thesis:       r['Thesis']||r['Investment Thesis']||'',
+        hardNos:      r['Hard Nos']||r['Hard No']||'',
+        deploying:    r['Deploying']||r['Status']||'',
+        sendVia:      r['Send Via']||'',
+      };
+    }).filter(function(r){return r.name;});
 
     var existing = netLoad('investors');
     // Separate manual entries from previously sheet-synced entries
