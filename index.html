@@ -530,36 +530,9 @@
           <div class="subtle" style="margin-top:10px">Uploaded deck text improves match reasons, readiness scoring, and objection prediction.</div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Pre-Match Filters</div></div>
-          <div class="field-row">
-            <div class="field">
-              <label>Sector Filter</label>
-              <input id="filter-sector" placeholder="e.g. Fintech" oninput="renderMatches(window.lastPayload||{matches:[]})">
-            </div>
-            <div class="field">
-              <label>Stage Filter</label>
-              <input id="filter-stage" placeholder="e.g. Pre-Seed" oninput="renderMatches(window.lastPayload||{matches:[]})">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>Require Deploying</label>
-              <select id="filter-deploying" onchange="renderMatches(window.lastPayload||{matches:[]})">
-                <option value="">Any</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Min Match Score</label>
-              <input id="filter-score" type="number" min="0" max="100" value="0" oninput="renderMatches(window.lastPayload||{matches:[]})">
-            </div>
-          </div>
-          <button class="action-btn primary" id="match-btn" onclick="runMatch()" disabled style="width:100%">Run AI Match</button>
-          <div class="action-row">
-            <button class="action-btn secondary" onclick="runRuleBasedMatch()">Run No-API Match</button>
-            <button class="action-btn secondary" onclick="clearFilters()">Clear Filters</button>
-          </div>
+          <div class="card-header"><div class="card-title">Match Investors</div></div>
+          <div class="template-help" style="margin-bottom:10px">Reads all investors from your Network tab and scores each one against the selected startup using AI.</div>
+          <button class="action-btn primary" id="match-btn" onclick="runMatch()" disabled style="width:100%">Run Match</button>
         </div>
         <div class="card template-card">
           <div class="card-header"><div class="card-title">Outreach Templates</div></div>
@@ -1415,8 +1388,10 @@ async function loadData(){
 }
 
 // ═══ CLAUDE API HELPER ═══
-async function callClaude(apiKey,prompt,maxTokens){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens||1500,messages:[{role:'user',content:prompt}]})});
+async function callClaude(apiKey,prompt,maxTokens,systemPrompt){
+  const body={model:'claude-sonnet-4-20250514',max_tokens:maxTokens||1500,messages:[{role:'user',content:prompt}]};
+  if(systemPrompt)body.system=systemPrompt;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
   const data=await res.json();if(data.error)throw new Error(data.error.message);
   return data.content.map(i=>i.text||'').join('');
 }
@@ -1470,123 +1445,93 @@ async function processPdf(file){
 }
 
 // ═══ MATCHING ═══
-function shouldUseAi(){const m=document.getElementById('matching-mode').value||'auto',k=!!localStorage.getItem('l7_key');if(m==='rules')return false;if(m==='ai')return true;return k;}
 async function runMatch(){
-  if(!selectedStartup)return showError('Select a startup first.');if(!getMatchInvestors().length)return showError('Load investor data first (or add investors in Network tab).');showError('');
-  const btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching...';
-  document.getElementById('match-results').innerHTML='<div class="loading-box">Generating investor ranking...</div>';
+  if(!selectedStartup)return showError('Select a startup first.');
+  var netInvs=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  if(!netInvs.length){document.getElementById('match-results').innerHTML='<div class="empty">No investors in Network tab — add investors first.</div>';return;}
+  showError('');
+  var btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching...';
+  document.getElementById('match-results').innerHTML='<div class="loading-box">Matching against '+netInvs.length+' investors from your network...</div>';
+  var apiKey=localStorage.getItem('l7_key');
+  if(!apiKey){btn.disabled=false;btn.textContent='Run Match';return showError('Add a Claude API key in Settings first.');}
   try{
-    let payload;if(shouldUseAi()){const apiKey=localStorage.getItem('l7_key');if(!apiKey)throw new Error('AI mode but no API key saved.');payload=await runAiMatch(apiKey);}else{payload=buildRuleBasedPayload();}
-    lastPayload=payload;lastMatches=payload.matches||[];deckInsightsCache=payload.deck_insights||null;
-    renderMatches(payload);renderDeckTab(payload);addAuditEntry('match','Match run ('+(shouldUseAi()?'AI':'rules')+') — '+lastMatches.length+' ranked',selectedStartup.company);
+    var startupJson=JSON.stringify(selectedStartup);
+    var deckText=pdfText?'\n\nPitch Deck Text:\n'+pdfText.slice(0,3000):'';
+    var systemPrompt='You are a VC analyst. Score this investor-startup match out of 100. Return ONLY valid JSON, no markdown, no explanation. Format: {"score":number,"verdict":"Strong Match|Good Match|Weak Match|Poor Match","reasons":["..."],"concerns":["..."]}';
+    var results=await Promise.all(netInvs.map(async function(inv){
+      var userMsg='Investor: '+JSON.stringify(inv)+'\n\nStartup: '+startupJson+deckText;
+      try{
+        var text=await callClaude(apiKey,userMsg,600,systemPrompt);
+        var parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+        return{inv:inv,score:parsed.score||0,verdict:parsed.verdict||'Weak Match',reasons:parsed.reasons||[],concerns:parsed.concerns||[]};
+      }catch(e){
+        return{inv:inv,score:0,verdict:'Error',reasons:[],concerns:['Match failed: '+e.message]};
+      }
+    }));
+    results.sort(function(a,b){return b.score-a.score;});
+    lastMatches=results.map(function(r){return{name:r.inv.investorName||r.inv.name||'',score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
+    lastPayload={matches:lastMatches};
+    window._lastMatchScores={};lastMatches.forEach(function(m){window._lastMatchScores[m.name]=m.score;});
+    renderMatches(results);
+    updateStats();
+    addAuditEntry('match','Network AI match — '+results.length+' investors ranked',selectedStartup.company);
   }catch(err){showError('Matching failed: '+err.message);document.getElementById('match-results').innerHTML='';}
-  btn.disabled=false;btn.textContent='Run AI Match';
-}
-function runRuleBasedMatch(){if(!selectedStartup)return showError('Select a startup first.');if(!getMatchInvestors().length)return showError('Load investor data first (or add investors in Network tab).');const payload=buildRuleBasedPayload();lastPayload=payload;lastMatches=payload.matches||[];deckInsightsCache=payload.deck_insights||null;renderMatches(payload);renderDeckTab(payload);addAuditEntry('match','Rules match — '+lastMatches.length+' ranked',selectedStartup.company);}
-async function runAiMatch(apiKey){
-  const info=buildStartupInfo();
-  const matchInvs=getMatchInvestors();
-  const invList=matchInvs.map(inv=>'- '+inv.name+' | '+inv.type+' | Ticket: '+inv.ticketSize+' | Sectors: '+inv.sectors+' | Stage: '+inv.stage+' | Thesis/Notes: '+inv.thesis+' | Deploying: '+inv.deploying).join('\n');
-  const src=pdfText?'Use uploaded pitch deck text as primary source.':'No uploaded PDF; use form data only.';
-  const prompt='You are an expert operator for Log7 Capital, an invite-only investor network in India.\n\nStartup:\n'+info+'\n\nInvestors:\n'+invList+'\n\n'+src+'\nScore every investor 0-100. Return score_breakdown: sector_fit(0-25), stage_fit(0-25), thesis_fit(0-25), deploying_bonus(0-10), traction_fit(0-15).\n\nRespond ONLY with valid JSON:\n{"deck_insights":{"summary":"","strengths":[],"risks":[],"signals":[],"market":"","traction":"","business_model":""},"founder_readiness":{"score":78,"verdict":"Ready","reasons":[]},"missing_data":[],"matches":[{"name":"","score":85,"verdict":"Strong match","reasons":[],"concerns":[],"objections":[],"score_breakdown":{"sector_fit":20,"stage_fit":18,"thesis_fit":22,"deploying_bonus":10,"traction_fit":15}}]}\n\nSort matches descending. Verdict: Strong match, Good match, Weak match, or Poor match.';
-  const text=await callClaude(apiKey,prompt,3200);
-  return normalizeMatchPayload(JSON.parse(text.replace(/```json|```/g,'').trim()));
-}
-// Maps a Network > Investors record to the format expected by matching functions
-function mapNetInvForMatch(r){
-  return {
-    name:        r.investorName||r.name||'',
-    phone:       r.contactPhone||'',
-    email:       r.contactEmail||'',
-    type:        r.fundName||'VC/Angel',
-    ticketSize:  r.checkSize||'',
-    sectors:     r.sectorFocus||'',
-    stage:       r.stageFocus||'',
-    startupStage:r.stageFocus||'',
-    sweetSpot:   r.checkSize||'',
-    thesis:      r.notes||'',
-    hardNos:     '',
-    deploying:   r.status==='Active'?'true':'',
-    sendVia:     '',
-    _netRecord:  r,   // keep original for badge/score display
-  };
+  btn.disabled=false;btn.textContent='Run Match';
 }
 
-// Returns investors for matching: prefers l7_net_investors, falls back to sheet-loaded investors
-function getMatchInvestors(){
-  var netInv = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-  if(netInv.length) return netInv.map(mapNetInvForMatch);
-  return investors; // fall back to sheet-loaded investors global
+function renderMatches(results){
+  var el=document.getElementById('match-results');if(!el)return;
+  if(!results||!results.length){el.innerHTML='<div class="empty">No results.</div>';return;}
+  el.innerHTML=results.map(function(r){return renderMatchCard(r);}).join('');
+}
+
+function renderMatchCard(r){
+  var inv=r.inv;
+  var name=inv.investorName||inv.name||'Unknown';
+  var fund=inv.fundName||'';
+  var phone=(inv.contactPhone||'').replace(/\D/g,'');
+  var sc=r.score||0;
+  var color=sc>=70?'#4caf50':sc>=40?'#ff9800':'#f44336';
+  var verdictBg=r.verdict==='Strong Match'?'#4caf50':r.verdict==='Good Match'?'#2196f3':r.verdict==='Weak Match'?'#ff9800':'#9e9e9e';
+  return '<div class="match-card" style="margin-bottom:14px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--s2)">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">'
+    +'<div><div style="font-size:15px;font-weight:600;color:var(--text)">'+escapeHtml(name)+'</div>'
+    +(fund?'<div style="font-size:12px;color:var(--muted);margin-top:2px">'+escapeHtml(fund)+'</div>':'')
+    +'</div>'
+    +'<div style="text-align:right;flex-shrink:0;margin-left:12px">'
+    +'<div style="font-size:30px;font-weight:700;color:'+color+';line-height:1">'+sc+'<span style="font-size:13px;font-weight:400;color:var(--muted)">/100</span></div>'
+    +'<span style="display:inline-block;margin-top:5px;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;background:'+verdictBg+';color:#fff">'+escapeHtml(r.verdict)+'</span>'
+    +'</div></div>'
+    +(r.reasons&&r.reasons.length?'<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);margin-bottom:5px">WHY MATCHED</div>'+r.reasons.map(function(x){return'<div style="font-size:12.5px;color:var(--text);padding:2px 0">✓ '+escapeHtml(x)+'</div>';}).join('')+'</div>':'')
+    +(r.concerns&&r.concerns.length?'<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);margin-bottom:5px">CONCERNS</div>'+r.concerns.map(function(x){return'<div style="font-size:12.5px;color:var(--muted);padding:2px 0">⚠ '+escapeHtml(x)+'</div>';}).join('')+'</div>':'')
+    +(phone?'<button onclick="sendWhatsApp(''+phone+'',''+name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'')" style="padding:6px 14px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer">📲 Send WhatsApp</button>':'')
+    +'</div>';
 }
 
 function buildStartupInfo(){return'Company: '+selectedStartup.company+'\nFounder: '+selectedStartup.founder+'\nSector: '+selectedStartup.sector+'\nLocation: '+selectedStartup.location+'\nStage: '+selectedStartup.stage+'\nCurrent Round: '+selectedStartup.currentRound+'\nRound Size: '+selectedStartup.roundSize+'\nValuation: '+selectedStartup.valuation+'\nARR: '+selectedStartup.arr+'\nPrev Revenue: '+selectedStartup.prevRevenue+'\nFunded Before: '+selectedStartup.fundedBefore+'\nWebsite: '+selectedStartup.website+'\nProblem: '+selectedStartup.problem+'\nDeck Link: '+(selectedStartup.pitchDeckUrl||'Not available')+'\nUploaded Deck Text:\n'+(pdfText||'No uploaded deck text.');}
 function normalizeMatchPayload(raw){if(Array.isArray(raw))return{deck_insights:null,founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup),matches:raw};return{deck_insights:raw.deck_insights||null,founder_readiness:raw.founder_readiness||computeFounderReadiness(selectedStartup,null),missing_data:raw.missing_data||getMissingDataAlerts(selectedStartup),matches:Array.isArray(raw.matches)?raw.matches:[]};}
-function buildRuleBasedPayload(){
-  const deck=deriveDeckInsightsFromLocalData(),fr=computeFounderReadiness(selectedStartup,deck),md=getMissingDataAlerts(selectedStartup);
-  const matchInvs=getMatchInvestors();
-  const matches=matchInvs.map(inv=>{
-    const reasons=[],concerns=[],objections=[];let score=28;
-    const ss=String(selectedStartup.sector||'').toLowerCase(),sstage=String(selectedStartup.stage||selectedStartup.currentRound||'').toLowerCase();
-    const is=String(inv.sectors||'').toLowerCase(),istage=String(inv.stage||inv.startupStage||'').toLowerCase(),ithesis=String(inv.thesis||'').toLowerCase();
-    const prob=String(selectedStartup.problem||'').toLowerCase(),dk=String(pdfText||'').toLowerCase();
-    let sf=0,stf=0,tf=0,db=0,trf=0;
-    if(ss&&is.includes(ss)){score+=24;sf=20;reasons.push('Sector fit: '+selectedStartup.sector);}else{concerns.push('Sector not clearly aligned');objections.push('May not be a core sector priority');}
-    if(sstage&&istage.includes(sstage)){score+=18;stf=18;reasons.push('Stage aligns: '+(selectedStartup.stage||selectedStartup.currentRound));}else{concerns.push('Stage fit uncertain');objections.push('May be too early or late');}
-    if(String(inv.deploying).toLowerCase()==='true'){score+=10;db=10;reasons.push('Investor is actively deploying');}else{concerns.push('Investor may not be actively deploying');}
-    const hits=countKeywordHits(ss+' '+prob+' '+dk,is+' '+ithesis);if(hits>0){const pts=Math.min(18,hits*4);score+=pts;tf=pts;reasons.push('Thesis keywords overlap');}else{concerns.push('Low thesis overlap');}
-    if(selectedStartup.arr){score+=8;trf=8;reasons.push('Traction or revenue available');}else{objections.push('Limited traction visibility');}
-    if(selectedStartup.pitchDeckUrl||pdfText){score+=6;reasons.push('Deck material available');}else{objections.push('No deck attached');}
-    if(String(inv.hardNos||'').toLowerCase().includes(ss)){score-=20;concerns.push('Potential hard-no conflict');objections.push('Sector may trigger hard no');}
-    score=Math.max(8,Math.min(95,Math.round(score)));
-    const verdict=score>=75?'Strong match':score>=58?'Good match':score>=40?'Weak match':'Poor match';
-    return{name:inv.name,score,verdict,reasons:uniqueList(reasons),concerns:uniqueList(concerns),objections:uniqueList(objections),score_breakdown:{sector_fit:sf,stage_fit:stf,thesis_fit:tf,deploying_bonus:db,traction_fit:trf}};
-  }).sort((a,b)=>b.score-a.score);
-  return normalizeMatchPayload({deck_insights:deck,founder_readiness:fr,missing_data:md,matches});
-}
-function countKeywordHits(a,b){const words=uniqueList((a+' '+b).split(/[^a-z0-9]+/).filter(w=>w.length>4));return words.filter(w=>a.includes(w)&&b.includes(w)).length;}
 function deriveDeckInsightsFromLocalData(){
-  const parts=[];if(selectedStartup.sector)parts.push(selectedStartup.company+' operates in '+selectedStartup.sector);if(selectedStartup.stage)parts.push('at '+selectedStartup.stage+' stage');if(selectedStartup.currentRound||selectedStartup.roundSize)parts.push('raising '+(selectedStartup.roundSize||'an active round'));
-  const summary=parts.length?parts.join(', ')+'.':'Startup profile insights from form data.';
-  const strengths=uniqueList([selectedStartup.arr?'ARR: '+selectedStartup.arr:'',selectedStartup.prevRevenue?'Recent revenue: '+selectedStartup.prevRevenue:'',selectedStartup.website?'Website available':'',pdfText?'Uploaded pitch deck available':'',selectedStartup.pitchDeckUrl?'Founder submitted deck link':'']).filter(Boolean);
-  const risks=uniqueList([!selectedStartup.arr?'No ARR disclosed':'',!selectedStartup.prevRevenue?'No recent revenue figure':'',!selectedStartup.website?'No website shared':'',!pdfText?'No deck text for richer analysis':'',!selectedStartup.problem?'Problem statement missing':'']).filter(Boolean);
-  const signals=uniqueList([selectedStartup.sector,selectedStartup.stage,selectedStartup.currentRound,pdfText?'Deck uploaded':'Deck not uploaded']).filter(Boolean);
-  const bm=pdfText.includes('saas')||pdfText.includes('subscription')?'SaaS/Recurring':pdfText.includes('marketplace')?'Marketplace':pdfText.includes('lending')||pdfText.includes('credit')?'Lending/Fintech':'Inferred from profile';
-  return{summary,strengths,risks,signals,market:selectedStartup.sector||'Not specified',traction:selectedStartup.arr||selectedStartup.prevRevenue||'Not specified',business_model:bm};
+  var parts=[];if(selectedStartup.sector)parts.push(selectedStartup.company+' operates in '+selectedStartup.sector);if(selectedStartup.stage)parts.push('at '+selectedStartup.stage+' stage');if(selectedStartup.currentRound||selectedStartup.roundSize)parts.push('raising '+(selectedStartup.roundSize||'an active round'));
+  var summary=parts.length?parts.join(', ')+'.':'Startup profile insights from form data.';
+  var strengths=uniqueList([selectedStartup.arr?'ARR: '+selectedStartup.arr:'',selectedStartup.prevRevenue?'Recent revenue: '+selectedStartup.prevRevenue:'',selectedStartup.website?'Website available':'',pdfText?'Uploaded pitch deck available':'',selectedStartup.pitchDeckUrl?'Founder submitted deck link':'']).filter(Boolean);
+  var risks=uniqueList([!selectedStartup.arr?'No ARR disclosed':'',!selectedStartup.prevRevenue?'No recent revenue figure':'',!selectedStartup.website?'No website shared':'',!pdfText?'No deck text for richer analysis':'',!selectedStartup.problem?'Problem statement missing':'']).filter(Boolean);
+  var signals=uniqueList([selectedStartup.sector,selectedStartup.stage,selectedStartup.currentRound,pdfText?'Deck uploaded':'Deck not uploaded']).filter(Boolean);
+  var bm=pdfText.includes('saas')||pdfText.includes('subscription')?'SaaS/Recurring':pdfText.includes('marketplace')?'Marketplace':pdfText.includes('lending')||pdfText.includes('credit')?'Lending/Fintech':'Inferred from profile';
+  return{summary:summary,strengths:strengths,risks:risks,signals:signals,market:selectedStartup.sector||'Not specified',traction:selectedStartup.arr||selectedStartup.prevRevenue||'Not specified',business_model:bm};
 }
 function computeFounderReadiness(startup,deckInsights){
-  let score=35;const reasons=[];if(startup.problem){score+=10;reasons.push('Problem statement present');}if(startup.sector){score+=8;reasons.push('Sector clearly defined');}if(startup.stage){score+=8;reasons.push('Stage specified');}if(startup.roundSize){score+=8;reasons.push('Round size included');}if(startup.arr||startup.prevRevenue){score+=12;reasons.push('Revenue or traction shared');}if(startup.website){score+=5;reasons.push('Website available');}if(startup.pitchDeckUrl||pdfText){score+=10;reasons.push('Deck materials available');}if(deckInsights?.strengths?.length){score+=4;reasons.push('Deck insights extracted');}
-  score=Math.min(95,score);const verdict=score>=78?'Ready':score>=60?'Promising':score>=45?'Needs polish':'Needs work';return{score,verdict,reasons};
+  var score=35;var reasons=[];if(startup.problem){score+=10;reasons.push('Problem statement present');}if(startup.sector){score+=8;reasons.push('Sector clearly defined');}if(startup.stage){score+=8;reasons.push('Stage specified');}if(startup.roundSize){score+=8;reasons.push('Round size included');}if(startup.arr||startup.prevRevenue){score+=12;reasons.push('Revenue or traction shared');}if(startup.website){score+=5;reasons.push('Website available');}if(startup.pitchDeckUrl||pdfText){score+=10;reasons.push('Deck materials available');}if(deckInsights&&deckInsights.strengths&&deckInsights.strengths.length){score+=4;reasons.push('Deck insights extracted');}
+  score=Math.min(95,score);var verdict=score>=78?'Ready':score>=60?'Promising':score>=45?'Needs polish':'Needs work';return{score:score,verdict:verdict,reasons:reasons};
 }
 function getMissingDataAlerts(startup){return uniqueList([!startup.website?'Website missing':'',!startup.arr?'ARR missing':'',!startup.prevRevenue?'Monthly revenue missing':'',!startup.roundSize?'Round size missing':'',!startup.currentRound?'Current round missing':'',(!startup.pitchDeckUrl&&!pdfText)?'Pitch deck missing':'',!startup.email?'Founder email missing':'',!startup.problem?'Problem statement missing':'']).filter(Boolean);}
-function predictObjections(match){const o=[];if(!selectedStartup?.arr)o.push('Traction metrics may feel thin');if(!selectedStartup?.website)o.push('No website may slow diligence');if(!pdfText&&!selectedStartup?.pitchDeckUrl)o.push('No deck attached');if((match.concerns||[]).some(c=>c.toLowerCase().includes('stage')))o.push('Stage fit needs closer discussion');if((match.concerns||[]).some(c=>c.toLowerCase().includes('sector')))o.push('Sector thesis may not be direct');return uniqueList(o);}
-
-// ═══ RENDER MATCHES ═══
-function applyMatchFilters(matches){const sf=(document.getElementById('filter-sector')?.value||'').toLowerCase().trim();const stf=(document.getElementById('filter-stage')?.value||'').toLowerCase().trim();const df=document.getElementById('filter-deploying')?.value||'';const ms=Number(document.getElementById('filter-score')?.value||0);return(matches||[]).filter(m=>{const inv=findInvestorByName(m.name);const is=String(inv?.sectors||'').toLowerCase(),istage=String(inv?.stage||inv?.startupStage||'').toLowerCase();const dep=String(inv?.deploying||'').toLowerCase()==='true';if(sf&&!is.includes(sf))return false;if(stf&&!istage.includes(stf))return false;if(df==='yes'&&!dep)return false;if(df==='no'&&dep)return false;if(Number(m.score||0)<ms)return false;return true;});}
-function clearFilters(){['filter-sector','filter-stage'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});const fd=document.getElementById('filter-deploying');if(fd)fd.value='';const fs=document.getElementById('filter-score');if(fs)fs.value='0';renderMatches(lastPayload||{matches:[]});}
-function renderMatches(payload){
-  const n=normalizeMatchPayload(payload),filtered=applyMatchFilters(n.matches);
-  lastPayload=n;lastMatches=filtered;deckInsightsCache=n.deck_insights;renderDeckTab(n);updateStats();
-  // Store scores for outreach panel
-  window._lastMatchScores={};(n.matches||[]).forEach(m=>{ window._lastMatchScores[m.name]=m.score; });
-  const el=document.getElementById('match-results');if(!el)return;
-  if(!filtered.length){el.innerHTML=renderInsightsSummary(n)+'<div class="card"><div class="empty">No investors match active filters.</div></div>';return;}
-  el.innerHTML=renderInsightsSummary(n)+filtered.map(m=>renderMatchCard(m)).join('');
-}
-function renderInsightsSummary(payload){return'<div class="card insight-card"><div class="card-header"><div class="card-title">Deck & Founder Insights</div><span class="badge">'+payload.matches.length+' total matches</span></div><div style="font-size:13px;line-height:1.7">'+escapeHtml(payload.deck_insights?.summary||'Insights based on startup data.')+'</div><div class="insight-grid" style="margin-top:12px"><div class="insight-list"><b>Strengths</b>'+(payload.deck_insights?.strengths||['None captured']).map(s=>'<div>\u2014 '+escapeHtml(s)+'</div>').join('')+'</div><div class="insight-list"><b>Risks</b>'+(payload.deck_insights?.risks||['None captured']).map(r=>'<div>\u2014 '+escapeHtml(r)+'</div>').join('')+'</div></div><div class="mini-grid" style="margin-top:12px"><div class="mini-stat"><div class="mini-value">'+(payload.founder_readiness?.score||0)+'</div><div class="mini-label">Founder Readiness</div></div><div class="mini-stat"><div class="mini-value">'+(payload.missing_data||[]).length+'</div><div class="mini-label">Missing Data Flags</div></div></div><div class="tag-row">'+(payload.deck_insights?.signals||[]).map(s=>'<span class="tag info">'+escapeHtml(s)+'</span>').join('')+(payload.missing_data||[]).map(m=>'<span class="tag warn">'+escapeHtml(m)+'</span>').join('')+'</div></div>';}
-function renderMatchCard(match){
-  const inv=findInvestorByName(match.name),crm=getInvestorCRM(selectedStartup?.company||'',match.name);
-  const obj=uniqueList(match.objections||predictObjections(match));const bd=match.score_breakdown||{};
-  const bdHtml=Object.keys(bd).length?'<div style="margin-bottom:12px">'+[['Sector Fit',bd.sector_fit,25],['Stage Fit',bd.stage_fit,25],['Thesis Fit',bd.thesis_fit,25],['Deploying Bonus',bd.deploying_bonus,10],['Traction Fit',bd.traction_fit,15]].map(([l,v,max])=>'<div class="score-dimension"><div class="score-dim-label">'+l+'</div><div class="score-dim-bar"><div class="score-dim-fill" style="width:'+Math.round((v||0)/max*100)+'%;background:'+scoreColor(Math.round((v||0)/max*100))+'"></div></div><div class="score-dim-val">'+(v||0)+'/'+max+'</div></div>').join('')+'</div>':'';
-  return'<div class="match-card"><div class="match-head"><div style="display:flex;gap:10px;align-items:flex-start"><div class="avatar">'+initials(match.name)+'</div><div><div class="row-title">'+escapeHtml(match.name)+' <span class="tag '+verdictClass(match.verdict)+'">'+escapeHtml(match.verdict)+'</span></div><div class="row-meta">'+escapeHtml(inv?.type||'Investor')+' | '+escapeHtml(inv?.ticketSize||'Ticket n/a')+' | '+escapeHtml(inv?.email||'No email')+'</div><div class="tag-row"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn">Due '+crm.followUp+'</span>':'')+(crm.warmIntro?'<span class="tag good">Warm intro</span>':'')+'</div></div></div><div class="score"><div class="score-num" style="color:'+scoreColor(match.score)+'">'+match.score+'</div><div class="score-caption">/100</div></div></div><div class="bar"><div class="bar-fill" style="width:'+match.score+'%;background:'+scoreColor(match.score)+'"></div></div>'+bdHtml+'<div class="pipeline-grid"><div><div class="card-title" style="margin-bottom:7px">Why matched</div><div class="tag-row">'+((match.reasons||[]).map(r=>'<span class="tag good">'+escapeHtml(r)+'</span>').join('')||'<span class="tag warn">No reasons captured</span>')+'</div><div class="card-title" style="margin:12px 0 7px">Concerns</div><div class="tag-row">'+((match.concerns||[]).map(c=>'<span class="tag warn">'+escapeHtml(c)+'</span>').join('')||'<span class="tag info">No major concerns</span>')+'</div><div class="card-title" style="margin:12px 0 7px">Likely objections</div><div class="tag-row">'+(obj.map(o=>'<span class="tag warn">'+escapeHtml(o)+'</span>').join('')||'<span class="tag info">No objections predicted</span>')+'</div></div><div><div class="field"><label>CRM Status</label><select onchange="updateInvestorCRM(\''+escapeQ(match.name)+'\',\'status\',this.value)">'+CRM_STATUSES.map(s=>'<option value="'+s+'" '+(crm.status===s?'selected':'')+'>'+s+'</option>').join('')+'</select></div><div class="field"><label>Warm Intro</label><input value="'+escapeHtml(crm.warmIntro||'')+'" placeholder="e.g. Via portfolio founder" oninput="updateInvestorCRM(\''+escapeQ(match.name)+'\',\'warmIntro\',this.value)"></div><div class="field-row"><div class="field"><label>Follow-Up</label><input type="date" value="'+(crm.followUp||'')+'" onchange="updateInvestorCRM(\''+escapeQ(match.name)+'\',\'followUp\',this.value)"></div><div class="field"><label>Pipeline Stage</label><select onchange="updateInvestorCRM(\''+escapeQ(match.name)+'\',\'pipelineStage\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(crm.pipelineStage===s?'selected':'')+'>'+s+'</option>').join('')+'</select></div></div><div class="field"><label>Tags</label><input value="'+escapeHtml((crm.tags||[]).join(', '))+'" placeholder="fintech, warm, fast" oninput="updateInvestorTags(\''+escapeQ(match.name)+'\',this.value)"></div><div class="field"><label>Notes</label><textarea style="min-height:70px" oninput="updateInvestorCRM(\''+escapeQ(match.name)+'\',\'notes\',this.value)">'+escapeHtml(crm.notes||'')+'</textarea></div></div></div><div class="action-row"><button class="action-btn primary" onclick="emailInvestor(\''+escapeQ(match.name)+'\')" '+(inv?.email?'':'disabled')+'>Email</button><button class="action-btn secondary" onclick="whatsappInvestor(\''+escapeQ(match.name)+'\')" '+(inv?.phone?'':'disabled')+'>WhatsApp</button><button class="action-btn secondary" onclick="saveMatchToPipeline(\''+escapeQ(match.name)+'\')">&#8594; Pipeline</button><button class="action-btn secondary" onclick="copySingleIntro(\''+escapeQ(match.name)+'\')">Copy Intro</button><button class="action-btn secondary" onclick="runObjectionSimulatorFor(\''+escapeQ(match.name)+'\')">Prep Q&A</button></div></div>';
-}
+function predictObjections(match){var o=[];if(!selectedStartup?.arr)o.push('Traction metrics may feel thin');if(!selectedStartup?.website)o.push('No website may slow diligence');if(!pdfText&&!selectedStartup?.pitchDeckUrl)o.push('No deck attached');if((match.concerns||[]).some(c=>c.toLowerCase().includes('stage')))o.push('Stage fit needs closer discussion');if((match.concerns||[]).some(c=>c.toLowerCase().includes('sector')))o.push('Sector thesis may not be direct');return uniqueList(o);}
 function renderDeckTab(payload){
-  const n=normalizeMatchPayload(payload),deck=n.deck_insights||deriveDeckInsightsFromLocalData();
-  const readiness=n.founder_readiness||computeFounderReadiness(selectedStartup,deck);
-  const missing=n.missing_data||getMissingDataAlerts(selectedStartup);
-  const el=document.getElementById('deck-tab-content');if(!el)return;
-  el.innerHTML='<div class="grid-two"><div><div class="card insight-card"><div class="card-header"><div class="card-title">Deck Summary</div></div><div style="font-size:13px;line-height:1.8">'+escapeHtml(deck.summary||'No deck summary yet.')+'</div><div class="tag-row">'+(deck.signals||[]).map(s=>'<span class="tag info">'+escapeHtml(s)+'</span>').join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Readiness Score</div></div><div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+readiness.score+'</div><div class="mini-label">Score</div></div><div class="mini-stat"><div class="mini-value">'+readiness.verdict+'</div><div class="mini-label">Verdict</div></div></div><div class="template-help" style="margin-top:10px">'+(readiness.reasons||[]).join(' \u00b7 ')+'</div></div></div><div><div class="card"><div class="card-header"><div class="card-title">Deck Breakdown</div></div><div class="detail-list"><div class="detail-row"><span class="detail-label">Market</span><span>'+escapeHtml(deck.market||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Traction</span><span>'+escapeHtml(deck.traction||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Business Model</span><span>'+escapeHtml(deck.business_model||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">PDF Uploaded</span><span>'+escapeHtml(uploadedPdfName||'None')+'</span></div></div></div><div class="card"><div class="card-header"><div class="card-title">Missing Data</div></div><div class="tag-row">'+(missing.map(m=>'<span class="tag warn">'+escapeHtml(m)+'</span>').join('')||'<span class="tag good">No missing data flags</span>')+'</div></div></div></div><div class="grid-two"><div class="card"><div class="card-header"><div class="card-title">Strengths</div></div><div class="insight-list">'+(deck.strengths||['None captured']).map(s=>'<div>\u2014 '+escapeHtml(s)+'</div>').join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Risks</div></div><div class="insight-list">'+(deck.risks||['None captured']).map(r=>'<div>\u2014 '+escapeHtml(r)+'</div>').join('')+'</div></div></div>';
+  var n=normalizeMatchPayload(payload),deck=n.deck_insights||deriveDeckInsightsFromLocalData();
+  var readiness=n.founder_readiness||computeFounderReadiness(selectedStartup,deck);
+  var missing=n.missing_data||getMissingDataAlerts(selectedStartup);
+  var el=document.getElementById('deck-tab-content');if(!el)return;
+  el.innerHTML='<div class="grid-two"><div><div class="card insight-card"><div class="card-header"><div class="card-title">Deck Summary</div></div><div style="font-size:13px;line-height:1.8">'+escapeHtml(deck.summary||'No deck summary yet.')+'</div><div class="tag-row">'+(deck.signals||[]).map(function(s){return'<span class="tag info">'+escapeHtml(s)+'</span>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Readiness Score</div></div><div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+readiness.score+'</div><div class="mini-label">Score</div></div><div class="mini-stat"><div class="mini-value">'+readiness.verdict+'</div><div class="mini-label">Verdict</div></div></div><div class="template-help" style="margin-top:10px">'+(readiness.reasons||[]).join(' · ')+'</div></div></div><div><div class="card"><div class="card-header"><div class="card-title">Deck Breakdown</div></div><div class="detail-list"><div class="detail-row"><span class="detail-label">Market</span><span>'+escapeHtml(deck.market||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Traction</span><span>'+escapeHtml(deck.traction||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Business Model</span><span>'+escapeHtml(deck.business_model||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">PDF Uploaded</span><span>'+escapeHtml(uploadedPdfName||'None')+'</span></div></div></div><div class="card"><div class="card-header"><div class="card-title">Missing Data</div></div><div class="tag-row">'+(missing.map(function(m){return'<span class="tag warn">'+escapeHtml(m)+'</span>';}).join('')||'<span class="tag good">No missing data flags</span>')+'</div></div></div></div><div class="grid-two"><div class="card"><div class="card-header"><div class="card-title">Strengths</div></div><div class="insight-list">'+(deck.strengths||['None captured']).map(function(s){return'<div>— '+escapeHtml(s)+'</div>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Risks</div></div><div class="insight-list">'+(deck.risks||['None captured']).map(function(r){return'<div>— '+escapeHtml(r)+'</div>';}).join('')+'</div></div></div>';
 }
-
 // ═══ TEARSHEET ═══
 function generateTearsheet(){
   const modal=document.getElementById('tearsheet-modal'),content=document.getElementById('tearsheet-content');
@@ -1704,7 +1649,7 @@ function saveTemplates(){localStorage.setItem('l7_email_subject_template',docume
 function generateICMemo(){
   const el=document.getElementById('memo-content'),badge=document.getElementById('memo-badge');if(!el)return;
   if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to generate the IC memo.</div>';return;}
-  const payload=lastPayload||buildRuleBasedPayload();const topMatches=(payload.matches||[]).slice(0,5);
+  const payload=lastPayload||{matches:[],deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};const topMatches=(payload.matches||[]).slice(0,5);
   const readiness=payload.founder_readiness||computeFounderReadiness(selectedStartup,payload.deck_insights);
   const missing=payload.missing_data||getMissingDataAlerts(selectedStartup);
   const objections=uniqueList(topMatches.flatMap(m=>m.objections||predictObjections(m)));
