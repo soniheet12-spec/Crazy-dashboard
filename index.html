@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log7 Capital</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="backup.js" defer></script>
+<script>
+  // Set your Google OAuth Client ID here
+  window.LOG7_GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
     /* ── Pearl (White & Purple) default ── */
@@ -363,6 +369,7 @@
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
+    <button class="nav-tab" onclick="showTab('backup',this)">&#128190; Backup</button>
   </div>
   <div class="nav-right">
     <div id="global-search-wrap" style="position:relative;margin-right:10px">
@@ -906,6 +913,21 @@
   <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
+  <!-- ═══ BACKUP ═══ -->
+  <div id="page-backup" class="page">
+    <div class="section-bar">
+      <div class="section-title">Data Backup</div>
+      <button class="ghost-btn" onclick="Log7Backup.renderPanel('backup-panel-container')">&#8635; Refresh</button>
+    </div>
+    <div class="module-banner">
+      <strong>Google Drive backup.</strong>
+      Backs up all dashboard localStorage data to your Google Drive folder. Restore any previous snapshot with one click.
+    </div>
+    <div class="card" style="max-width:640px">
+      <div id="backup-panel-container"></div>
+    </div>
+  </div>
+
 </div><!-- end container -->
 
 <script>
@@ -1051,6 +1073,7 @@ window.onload = async () => {
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
+  if(window.Log7Backup) Log7Backup.init();
 };
 
 // ═══ NAV ═══
@@ -1065,6 +1088,7 @@ function showTab(name,btn){
   if(name==='network') renderNetworkTab();
   if(name==='home'){refreshHome();}
   if(name==='match') renderBulkOutreachPanel();
+  if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
