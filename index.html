@@ -371,7 +371,6 @@
     </div>
         <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
-    <span id="sheets-offline-badge" style="display:none;font-size:11px;font-weight:600;color:#f06565;padding:4px 8px;border:1px solid rgba(240,101,101,0.3);border-radius:4px">● Offline — cached data</span>
     <div class="settings-wrap" id="settings-wrap">
       <button class="settings-toggle" onclick="toggleSettings()">Settings ▾</button>
       <div class="settings-menu">
@@ -424,15 +423,6 @@
         <div class="settings-section">
           <div class="settings-label">Fund Size (&#8377; Cr)</div>
           <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
-        </div>
-        <div class="settings-section">
-          <div class="settings-label">Google Sheets API URL</div>
-          <input type="url" id="sheets-api-url" placeholder="https://script.google.com/macros/s/…/exec" oninput="saveSheetsUrl()">
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button class="action-btn" onclick="testSheetsConnection()" style="font-size:11px;padding:5px 10px">Test Connection</button>
-            <span id="sheets-conn-status" style="font-size:11px;color:var(--muted);align-self:center"></span>
-          </div>
-          <div id="sheets-last-sync" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
         </div>
       </div>
     </div>
@@ -919,219 +909,31 @@
 </div><!-- end container -->
 
 <script>
-// ═══ GOOGLE SHEETS DATA LAYER ═══
 const NET_KEYS = {
   partnerships: 'l7_net_partnerships',
   investors:    'l7_net_investors',
   startups:     'l7_net_startups',
 };
-const SHEET_MAP = {
-  'l7_net_investors':    'network_investors',
-  'l7_net_startups':     'network_startups',
-  'l7_net_partnerships': 'network_partnerships',
-  'l7_pipeline':         'pipeline',
-  'l7_audit':            'audit_log',
-  'l7_match_scores':     'match_scores',
-};
-const ARRAY_SHEETS = new Set(['network_investors','network_startups','network_partnerships','pipeline','audit_log']);
-let _sheetsOnline = null; // null=unknown, true=online, false=offline
-let _lastSyncTime = null;
 
-function getSheetsUrl(){return '/api/sheets';}
-function saveSheetsUrl(){const v=document.getElementById('sheets-api-url').value.trim();localStorage.setItem('l7_sheets_api_url',v);if(v)syncFromSheets();}
-
-function _setSheetsOnline(online){
-  _sheetsOnline = online;
-  const badge = document.getElementById('sheets-offline-badge');
-  if(badge) badge.style.display = online ? 'none' : 'inline';
-  if(online){_lastSyncTime=new Date();_updateSyncTime();}
-}
-function _updateSyncTime(){
-  const el=document.getElementById('sheets-last-sync');
-  if(el&&_lastSyncTime) el.textContent='Last synced: '+_lastSyncTime.toLocaleTimeString();
-}
-
-const db = {
-  async read(sheet){
-    const url = getSheetsUrl();
-    const cacheKey = 'cache_'+sheet;
-    if(!url) return JSON.parse(localStorage.getItem(cacheKey)||'[]');
-    try{
-      const res = await fetch(url+'?action=read&sheet='+encodeURIComponent(sheet),{signal:AbortSignal.timeout(8000)});
-      const data = await res.json();
-      const rows = data.rows || data || [];
-      localStorage.setItem(cacheKey, JSON.stringify(rows));
-      _setSheetsOnline(true);
-      return rows;
-    }catch(e){
-      _setSheetsOnline(false);
-      return JSON.parse(localStorage.getItem(cacheKey)||'[]');
-    }
-  },
-  async insert(sheet, record){
-    const url = getSheetsUrl();
-    const cacheKey = 'cache_'+sheet;
-    if(!url) return record;
-    try{
-      const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'insert',sheet,record})});
-      const data = await res.json();
-      _setSheetsOnline(true);
-      return data.record || record;
-    }catch(e){_setSheetsOnline(false);}
-    return record;
-  },
-  async update(sheet, record){
-    const url = getSheetsUrl();
-    if(!url) return;
-    try{
-      await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'update',sheet,record})});
-      _setSheetsOnline(true);
-    }catch(e){_setSheetsOnline(false);}
-  },
-  async delete(sheet, id){
-    const url = getSheetsUrl();
-    if(!url) return;
-    try{
-      await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'delete',sheet,id})});
-      _setSheetsOnline(true);
-    }catch(e){_setSheetsOnline(false);}
-  },
-  async bulkInsert(sheet, records){
-    const url = getSheetsUrl();
-    if(!url||!records.length) return;
-    try{
-      await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'bulkInsert',sheet,records})});
-      _setSheetsOnline(true);
-    }catch(e){_setSheetsOnline(false);}
-  },
-  async writeObject(sheet, obj){
-    // For non-array sheets like match_scores — store as a single-row JSON blob
-    const url = getSheetsUrl();
-    const cacheKey = 'cache_'+sheet;
-    localStorage.setItem(cacheKey, JSON.stringify(obj));
-    if(!url) return;
-    try{
-      await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'writeObject',sheet,data:obj})});
-      _setSheetsOnline(true);
-    }catch(e){_setSheetsOnline(false);}
-  },
-  async readObject(sheet){
-    const url = getSheetsUrl();
-    const cacheKey = 'cache_'+sheet;
-    if(!url) return JSON.parse(localStorage.getItem(cacheKey)||'{}');
-    try{
-      const res = await fetch(url+'?action=readObject&sheet='+encodeURIComponent(sheet),{signal:AbortSignal.timeout(8000)});
-      const data = await res.json();
-      const obj = data.data || data || {};
-      localStorage.setItem(cacheKey, JSON.stringify(obj));
-      _setSheetsOnline(true);
-      return obj;
-    }catch(e){
-      _setSheetsOnline(false);
-      return JSON.parse(localStorage.getItem(cacheKey)||'{}');
-    }
+function netLoad(tab){
+  if(tab === 'investors'){
+    var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
+    var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
+    return manual.concat(sheetOnly);
   }
-};
-
-async function syncFromSheets(){
-  const url = getSheetsUrl();
-  if(!url) return;
-  try{
-    for(const [lsKey, sheet] of Object.entries(SHEET_MAP)){
-      if(ARRAY_SHEETS.has(sheet)){
-        const rows = await db.read(sheet);
-        localStorage.setItem(lsKey, JSON.stringify(rows));
-      } else {
-        const obj = await db.readObject(sheet);
-        localStorage.setItem(lsKey, JSON.stringify(obj));
-      }
-    }
-    _setSheetsOnline(true);
-    renderNetworkTab();renderKanban();renderPipelineList();renderAuditLog();refreshHome();updateStats();
-    showToast('Synced from Google Sheets ✓');
-  }catch(e){
-    _setSheetsOnline(false);
-  }
+  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
 }
-
-async function testSheetsConnection(){
-  const url = document.getElementById('sheets-api-url').value.trim();
-  const el = document.getElementById('sheets-conn-status');
-  if(!url){if(el)el.textContent='No URL set.';return;}
-  if(el)el.textContent='Testing…';
-  try{
-    const res = await fetch(url+'?action=ping',{signal:AbortSignal.timeout(8000)});
-    const data = await res.json();
-    if(el)el.style.color='var(--green)';
-    if(el)el.textContent='✓ Connected';
-    showToast('Google Sheets connected ✓');
-    saveSheetsUrl();
-  }catch(e){
-    if(el){el.style.color='var(--red)';el.textContent='✗ Failed: '+e.message;}
-    showToast('Connection failed: '+e.message,'error');
-  }
-}
-
-async function runOneTimeMigration(){
-  if(localStorage.getItem('l7_sheets_migrated')) return;
-  const url = getSheetsUrl();
-  if(!url) return;
-  let migrated = false;
-  for(const [lsKey, sheet] of Object.entries(SHEET_MAP)){
-    const raw = localStorage.getItem(lsKey);
-    if(!raw) continue;
-    try{
-      const data = JSON.parse(raw);
-      if(ARRAY_SHEETS.has(sheet) && Array.isArray(data) && data.length>0){
-        await db.bulkInsert(sheet, data);
-        migrated = true;
-      } else if(!ARRAY_SHEETS.has(sheet) && typeof data==='object' && data!==null && Object.keys(data).length>0){
-        await db.writeObject(sheet, data);
-        migrated = true;
-      }
-    }catch(e){}
-  }
-  if(migrated){
-    localStorage.setItem('l7_sheets_migrated','1');
-    showToast('✓ Data migrated to Google Sheets');
-  }
-}
-
-// Override netLoad/netSave to sync writes to sheets
-function netLoad(tab){ return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]'); }
 function netSave(tab,data){
+  if(tab === 'investors'){
+    var manualOnly = data.filter(function(r){ return !r._fromSheet; });
+    localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
+    return;
+  }
   localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
-  const sheet = {partnerships:'network_partnerships',investors:'network_investors',startups:'network_startups'}[tab];
-  if(sheet && getSheetsUrl()) db.bulkInsert(sheet, data);
 }
 
-// Wrapped pipeline save: syncs to sheets
-function _savePipeline(pipeline){
-  localStorage.setItem('l7_pipeline', JSON.stringify(pipeline));
-  if(getSheetsUrl()) db.bulkInsert('pipeline', pipeline);
-}
-
-// Wrapped audit save: syncs to sheets
-function _saveAuditLog(log){
-  localStorage.setItem('l7_audit', JSON.stringify(log.slice(0,500)));
-  if(getSheetsUrl()) db.bulkInsert('audit_log', log.slice(0,200));
-}
-
-// Wrapped match scores save: syncs to sheets
-function _saveMatchScores(scoreMap){
-  localStorage.setItem('l7_match_scores', JSON.stringify(scoreMap));
-  if(getSheetsUrl()) db.writeObject('match_scores', scoreMap);
-}
-
-// Retry sync every 60s when offline
-setInterval(function(){
-  if(_sheetsOnline===false && getSheetsUrl()) syncFromSheets();
-},60000);
 
 function renderBulkOutreachPanel() {
   var investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
@@ -1239,9 +1041,6 @@ let dragStartup='',dragInvestor='';
 // ═══ INIT ═══
 window.onload = async () => {
   const key=localStorage.getItem('l7_key')||'';
-  const sheetsUrl=localStorage.getItem('l7_sheets_api_url')||'';
-  const sheetsUrlEl=document.getElementById('sheets-api-url');
-  if(sheetsUrlEl&&sheetsUrl) sheetsUrlEl.value=sheetsUrl;
   document.getElementById('api-key').value=key;
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
@@ -1252,7 +1051,6 @@ window.onload = async () => {
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
-  if(getSheetsUrl()){syncFromSheets();setTimeout(runOneTimeMigration,3000);}
 };
 
 // ═══ NAV ═══
@@ -1317,7 +1115,7 @@ function refreshCapitalDisplay(){
 
 // ═══ AUDIT LOG ═══
 function getAuditLog(){return JSON.parse(localStorage.getItem('l7_audit')||'[]');}
-function saveAuditLog(log){_saveAuditLog(log);}
+function saveAuditLog(log){localStorage.setItem('l7_audit',JSON.stringify(log.slice(0,500)));}
 function addAuditEntry(type,action,entity){
   const u=getCurrentUser(),log=getAuditLog();
   log.unshift({id:Date.now(),ts:new Date().toISOString(),type,action,entity:entity||'',user:u.name,role:u.role});
@@ -1663,7 +1461,7 @@ async function runMatch(){
     lastPayload={matches:lastMatches};
     // Save scores to localStorage keyed by investor name
     var scoreMap={};results.forEach(function(r){var n=r.inv.investorName||r.inv.name||'';scoreMap[n]={score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
-    _saveMatchScores(scoreMap);
+    localStorage.setItem('l7_match_scores',JSON.stringify(scoreMap));
     window._lastMatchScores={};lastMatches.forEach(function(m){window._lastMatchScores[m.name]=m.score;});
     // Refresh Network investors tab and outreach panel to show badges
     renderNetList('investors');
@@ -1773,12 +1571,12 @@ function getPipeline(){return JSON.parse(localStorage.getItem('l7_pipeline')||'[
 function saveMatchToPipeline(name){
   const match=(lastPayload?.matches||[]).find(m=>m.name===name);if(!match||!selectedStartup)return;
   const pipeline=getPipeline();
-  if(!pipeline.find(item=>item.startup===selectedStartup.company&&item.investor===name)){pipeline.unshift({startup:selectedStartup.company,investor:name,score:match.score,verdict:match.verdict,reasons:match.reasons||[],concerns:match.concerns||[],savedAt:new Date().toISOString(),stage:PIPELINE_STAGES[0]});_savePipeline(pipeline.slice(0,500));addAuditEntry('pipeline','Deal saved to pipeline',selectedStartup.company+' \u2194 '+name);}
+  if(!pipeline.find(item=>item.startup===selectedStartup.company&&item.investor===name)){pipeline.unshift({startup:selectedStartup.company,investor:name,score:match.score,verdict:match.verdict,reasons:match.reasons||[],concerns:match.concerns||[],savedAt:new Date().toISOString(),stage:PIPELINE_STAGES[0]});localStorage.setItem('l7_pipeline',JSON.stringify(pipeline.slice(0,500)));addAuditEntry('pipeline','Deal saved to pipeline',selectedStartup.company+' \u2194 '+name);}
   renderKanban();renderPipelineList();refreshHome();updateStats();
 }
 function movePipelineStage(startup,investor,stage){
   const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;
-  const prev=item.stage;item.stage=stage;_savePipeline(pipeline);addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
+  const prev=item.stage;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
   // Auto-create diligence checklist when stage moves to IC Review (treated as "IC Ready")
   if(stage==='IC Review' && prev!=='IC Review'){
     var dKey='l7_diligence_'+startup;
@@ -1790,7 +1588,7 @@ function movePipelineStage(startup,investor,stage){
   }
   renderKanban();renderPipelineList();updateStats();refreshHome();
 }
-function removePipelineItem(startup,investor){let pipeline=getPipeline();pipeline=pipeline.filter(i=>!(i.startup===startup&&i.investor===investor));_savePipeline(pipeline);addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);renderKanban();renderPipelineList();updateStats();refreshHome();}
+function removePipelineItem(startup,investor){let pipeline=getPipeline();pipeline=pipeline.filter(i=>!(i.startup===startup&&i.investor===investor));localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);renderKanban();renderPipelineList();updateStats();refreshHome();}
 function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
@@ -1810,7 +1608,7 @@ function renderPipelineList(){
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
   el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
-function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;_savePipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.setItem('l7_pipeline',JSON.stringify([]));localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
 
 // ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
 function findNetEntity(type,name){
@@ -1878,7 +1676,7 @@ function submitAddDeal(){
     return showError('That deal is already in the pipeline.');
   }
   pipeline.unshift({startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage});
-  _savePipeline(pipeline.slice(0,500));
+  localStorage.setItem('l7_pipeline',JSON.stringify(pipeline.slice(0,500)));
   addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
   closeAddDealModal();
   renderKanban();renderPipelineList();refreshHome();updateStats();
@@ -2957,7 +2755,7 @@ async function netFetchInvestors(){
       }
     });
 
-    netSave('investors', manual.concat(sheetEntries));
+    localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetEntries));
     renderNetList('investors');
 
     var now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -2985,13 +2783,13 @@ function netStartPolling(){
 
 function netResetToSheet(id){
   if(!confirm('Reset this entry to the sheet values? Your local edits will be lost.')) return;
-  var rows = netLoad('investors');
-  var idx = rows.findIndex(function(r){ return r.id===id; });
+  var sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+  var idx = sheetCache.findIndex(function(r){ return r.id===id; });
   if(idx===-1) return;
-  var row = rows[idx];
+  var row = sheetCache[idx];
   var sd = row._sheetData;
   if(!sd) return;
-  rows[idx] = {
+  sheetCache[idx] = {
     id:           row.id,
     _sheetKey:    row._sheetKey,
     investorName: sd.investorName,
@@ -3009,7 +2807,7 @@ function netResetToSheet(id){
     _fromSheet:   true,
     _sheetData:   sd,
   };
-  netSave('investors', rows);
+  localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetCache));
   renderNetList('investors');
   syncFollowupsToServer();
 }
