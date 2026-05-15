@@ -909,6 +909,31 @@
 </div><!-- end container -->
 
 <script>
+const NET_KEYS = {
+  partnerships: 'l7_net_partnerships',
+  investors:    'l7_net_investors',
+  startups:     'l7_net_startups',
+};
+
+function netLoad(tab){
+  if(tab === 'investors'){
+    var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
+    var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
+    return manual.concat(sheetOnly);
+  }
+  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+}
+function netSave(tab,data){
+  if(tab === 'investors'){
+    var manualOnly = data.filter(function(r){ return !r._fromSheet; });
+    localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
+    return;
+  }
+  localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
+}
+
 function renderBulkOutreachPanel() {
   var investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
   var partners  = JSON.parse(localStorage.getItem('l7_net_partnerships') || '[]');
@@ -2362,32 +2387,6 @@ async function analyseExtraDoc(id){var apiKey=localStorage.getItem('l7_key');if(
 let _netActiveTab = 'partnerships';
 let _netEditId = null;
 
-const NET_KEYS = {
-  partnerships: 'l7_net_partnerships',
-  investors:    'l7_net_investors',
-  startups:     'l7_net_startups',
-};
-
-function netLoad(tab){
-  if(tab === 'investors'){
-    var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-    // Manual entries first, then sheet rows (deduplicated by investorName)
-    var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
-    var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
-    return manual.concat(sheetOnly);
-  }
-  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
-}
-function netSave(tab,data){
-  if(tab === 'investors'){
-    // Only persist manually-added entries; sheet rows live in l7_net_inv_sheet_cache
-    var manualOnly = data.filter(function(r){ return !r._fromSheet; });
-    localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
-    return;
-  }
-  localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
-}
 function netNextId(arr){ return arr.length ? Math.max(...arr.map(r=>r.id||0))+1 : 1; }
 
 function switchNetTab(tab, btn){
@@ -2636,15 +2635,12 @@ function saveNetworkEntry(){
     entry.dateAdded = new Date().toISOString();
     rows.push(entry);
   }
-  if(tab === 'investors' && entry._fromSheet){
-    // Sheet-origin edit: persist override into sheet cache
-    var cache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-    var ci = cache.findIndex(function(r){ return r.id===entry.id; });
-    if(ci>-1) cache[ci]=entry; else cache.push(entry);
-    localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(cache));
-  } else {
-    netSave(tab, rows);
-  }
+  netSave(tab, rows);
+
+  // Verify what was actually written to localStorage
+  var savedRows = netLoad(tab);
+  var savedEntry = savedRows.find(function(r){ return r.id === entry.id; });
+  console.log('[Save] verified from localStorage:', JSON.stringify(savedEntry));
 
   closeNetworkModal();
   renderNetList(tab);
@@ -2655,20 +2651,8 @@ function saveNetworkEntry(){
 
 function deleteNetEntry(tab, id){
   if(!confirm('Delete this entry?')) return;
-  if(tab === 'investors'){
-    var allRows = netLoad('investors');
-    var target = allRows.find(function(r){ return r.id===id; });
-    if(target && target._fromSheet){
-      var cache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-      localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(cache.filter(function(r){ return r.id!==id; })));
-    } else {
-      var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-      localStorage.setItem('l7_net_investors', JSON.stringify(manual.filter(function(r){ return r.id!==id; })));
-    }
-  } else {
-    var rows = netLoad(tab).filter(function(r){return r.id!==id;});
-    netSave(tab, rows);
-  }
+  var rows = netLoad(tab).filter(function(r){return r.id!==id;});
+  netSave(tab, rows);
   renderNetList(tab);
   syncFollowupsToServer();
   addAuditEntry('network','Deleted '+tab.slice(0,-1),tab);
@@ -2728,39 +2712,46 @@ async function netFetchInvestors(){
   try {
     var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
 
+    // Map using exact column indices; skip rows with no investor name
     var sheetMapped = [];
     rawRows.forEach(function(cols, idx){
       var mapped = _mapGvizRow(cols, idx);
       if(mapped.investorName) sheetMapped.push(mapped);
     });
 
-    // Build sheet entries, preserving local overrides from previous cache
-    var prevCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-    var nextId = _netInvNextId();
-    var sheetEntries = sheetMapped.map(function(inv){
+    var existing = netLoad('investors');
+    var manual   = existing.filter(function(r){ return !r._fromSheet; });
+    var nextId   = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
+
+    // Build sheet entries; preserve local overrides and follow-up dates
+    var sheetEntries = [];
+    sheetMapped.forEach(function(inv){
+      // Unique sheet key: row index in sheet
       var sheetKey = 'sheet-'+inv._sheetRowIdx;
-      var prev = prevCache.find(function(r){ return r._sheetKey === sheetKey; });
+      var prev = existing.find(function(r){ return r._fromSheet && r._sheetKey === sheetKey; });
       if(prev && prev._localOverride){
-        return Object.assign({}, prev, { _sheetData: inv });
+        // Keep locally edited version; just update _sheetData for Reset
+        sheetEntries.push(Object.assign({}, prev, { _sheetData: inv }));
+      } else {
+        sheetEntries.push({
+          id:           prev ? prev.id : nextId++,
+          _sheetKey:    sheetKey,
+          investorName: inv.investorName,
+          fundName:     inv.fundName,
+          stageFocus:   inv.stageFocus,
+          checkSize:    inv.checkSize,
+          geography:    prev ? (prev.geography||'') : '',
+          sectorFocus:  inv.sectorFocus,
+          contactPhone: inv.contactPhone,
+          contactEmail: inv.contactEmail,
+          status:       prev ? (prev.status||'Warm') : 'Warm',
+          notes:        prev ? (prev.notes||'') : '',
+          followUpDate: prev ? (prev.followUpDate||'') : '',
+          dateAdded:    prev ? prev.dateAdded : new Date().toISOString(),
+          _fromSheet:   true,
+          _sheetData:   inv,
+        });
       }
-      return {
-        id:           prev ? prev.id : nextId++,
-        _sheetKey:    sheetKey,
-        _fromSheet:   true,
-        _sheetData:   inv,
-        investorName: inv.investorName,
-        fundName:     inv.fundName,
-        stageFocus:   inv.stageFocus,
-        checkSize:    inv.checkSize,
-        sectorFocus:  inv.sectorFocus,
-        contactPhone: inv.contactPhone,
-        contactEmail: inv.contactEmail,
-        geography:    prev ? (prev.geography||'') : '',
-        status:       prev ? (prev.status||'Warm') : 'Warm',
-        notes:        prev ? (prev.notes||'') : '',
-        followUpDate: prev ? (prev.followUpDate||'') : '',
-        dateAdded:    prev ? prev.dateAdded : new Date().toISOString(),
-      };
     });
 
     localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetEntries));
@@ -2783,13 +2774,6 @@ async function netFetchInvestors(){
   _netInvFetching = false;
 }
 
-function _netInvNextId(){
-  var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-  var cache  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-  var all    = manual.concat(cache);
-  return all.length ? Math.max.apply(null, all.map(function(r){ return r.id||0; })) + 1 : 1;
-}
-
 function netStartPolling(){
   if(_netInvPollTimer) return;
   netFetchInvestors();
@@ -2798,17 +2782,15 @@ function netStartPolling(){
 
 function netResetToSheet(id){
   if(!confirm('Reset this entry to the sheet values? Your local edits will be lost.')) return;
-  var cache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-  var idx = cache.findIndex(function(r){ return r.id===id; });
+  var sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+  var idx = sheetCache.findIndex(function(r){ return r.id===id; });
   if(idx===-1) return;
-  var row = cache[idx];
+  var row = sheetCache[idx];
   var sd = row._sheetData;
   if(!sd) return;
-  cache[idx] = {
+  sheetCache[idx] = {
     id:           row.id,
     _sheetKey:    row._sheetKey,
-    _fromSheet:   true,
-    _sheetData:   sd,
     investorName: sd.investorName,
     fundName:     sd.fundName,
     stageFocus:   sd.stageFocus,
@@ -2821,8 +2803,10 @@ function netResetToSheet(id){
     notes:        row.notes||'',
     followUpDate: row.followUpDate||'',
     dateAdded:    row.dateAdded,
+    _fromSheet:   true,
+    _sheetData:   sd,
   };
-  localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(cache));
+  localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetCache));
   renderNetList('investors');
   syncFollowupsToServer();
 }
@@ -2840,10 +2824,11 @@ async function sendWhatsAppReminder(){
 
     // Read all network records from localStorage and filter for today
     var nameKeys = { partnerships:'partnerName', investors:'investorName', startups:'companyName' };
+    var lsKeys   = { partnerships:'l7_net_partnerships', investors:'l7_net_investors', startups:'l7_net_startups' };
     var followups = [];
     ['partnerships','investors','startups'].forEach(function(tab){
       var rows = [];
-      try { rows = netLoad(tab); } catch(e){}
+      try { rows = JSON.parse(localStorage.getItem(lsKeys[tab])||'[]'); } catch(e){}
       rows.forEach(function(row){
         var d = row.followUpDate ? String(row.followUpDate).split('T')[0].trim() : '';
         if(d === today){
