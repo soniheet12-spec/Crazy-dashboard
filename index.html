@@ -4,12 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log7 Capital</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="backup.js" defer></script>
-<script>
-  // Set your Google OAuth Client ID here
-  window.LOG7_GOOGLE_CLIENT_ID = '918188740743-36sgbscqcjpr3lftb4b81jq6uts60qgl.apps.googleusercontent.com';
-</script>
+<script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
     /* ── Pearl (White & Purple) default ── */
@@ -354,6 +349,304 @@
   }
 @keyframes netLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.4)}}
 </style>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// LOG7 BACKUP SYSTEM — inlined
+// ═══════════════════════════════════════════════════════════════
+(function(){
+var GOOGLE_CLIENT_ID = '918188740743-36sgbscqcjpr3lftb4b81jq6uts60qgl.apps.googleusercontent.com';
+var DRIVE_FOLDER_ID  = '1rwJ3Gx992uo5Ol41-ry2oIvBwHWe4J5A';
+var TOKEN_KEY        = 'log7_gapi_token';
+var SETTINGS_KEY     = 'log7_backup_settings';
+var HISTORY_KEY      = 'log7_backup_history';
+var BACKUP_PREFIX    = 'log7_backup_';
+var MAX_HISTORY      = 20;
+
+// ── Snapshot ──────────────────────────────────────────────────
+function collectSnapshot(){
+  var snap={version:'1.0',timestamp:new Date().toISOString(),source:window.location.hostname,data:{},meta:{totalKeys:0,sizeBytes:0}};
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k&&k.startsWith('l7_'))snap.data[k]=localStorage.getItem(k);
+  }
+  var str=JSON.stringify(snap.data);
+  snap.meta.totalKeys=Object.keys(snap.data).length;
+  snap.meta.sizeBytes=new Blob([str]).size;
+  return snap;
+}
+
+// ── Token ─────────────────────────────────────────────────────
+function getToken(){return sessionStorage.getItem(TOKEN_KEY)||null;}
+
+// ── Drive upload ──────────────────────────────────────────────
+async function uploadToDrive(snap){
+  var token=getToken();
+  if(!token)throw new Error('Not connected to Google Drive. Click "Connect Google Drive" first.');
+  var filename=BACKUP_PREFIX+snap.timestamp.replace(/[:.]/g,'-')+'.json';
+  var body=JSON.stringify(snap,null,2);
+  var boundary='l7bk';
+  var meta={name:filename,parents:[DRIVE_FOLDER_ID],mimeType:'application/json',
+    description:'Log7 backup — '+snap.meta.totalKeys+' keys, '+fmtBytes(snap.meta.sizeBytes)};
+  var mp=['--'+boundary,'Content-Type: application/json; charset=UTF-8','',JSON.stringify(meta),
+    '--'+boundary,'Content-Type: application/json','',body,'--'+boundary+'--'].join('\r\n');
+  var r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
+    body:mp});
+  if(!r.ok){
+    if(r.status===401){sessionStorage.removeItem(TOKEN_KEY);throw new Error('Session expired. Reconnect Google Drive.');}
+    var e=await r.json();throw new Error((e&&e.error&&e.error.message)||'Upload failed: '+r.status);
+  }
+  return await r.json();
+}
+
+// ── List backups ──────────────────────────────────────────────
+async function listBackups(){
+  var token=getToken();if(!token)return[];
+  var q=encodeURIComponent("'"+DRIVE_FOLDER_ID+"' in parents and name contains '"+BACKUP_PREFIX+"' and trashed=false");
+  var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime+desc&pageSize=30&fields=files(id,name,createdTime,description,size)',
+    {headers:{Authorization:'Bearer '+token}});
+  if(!r.ok){if(r.status===401)sessionStorage.removeItem(TOKEN_KEY);return[];}
+  var d=await r.json();return d.files||[];
+}
+
+// ── Restore ───────────────────────────────────────────────────
+async function restoreFromDrive(fileId,filename){
+  var token=getToken();if(!token)throw new Error('Not connected to Google Drive.');
+  var r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
+    {headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error('Download failed: '+r.status);
+  var snap=await r.json();
+  if(!snap||!snap.data)throw new Error('Invalid backup format.');
+  localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(collectSnapshot()));
+  var n=0;
+  Object.keys(snap.data).forEach(function(k){localStorage.setItem(k,snap.data[k]);n++;});
+  addHistory({action:'restore',filename:filename,fileId:fileId,timestamp:new Date().toISOString(),keysRestored:n,fromTimestamp:snap.timestamp});
+  return{restored:n,fromTimestamp:snap.timestamp};
+}
+
+// ── History / Settings ────────────────────────────────────────
+function getHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return[];}}
+function addHistory(e){var h=getHistory();h.unshift(e);localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,MAX_HISTORY)));}
+function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};}}
+function saveSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
+
+// ── Auto-backup ───────────────────────────────────────────────
+var _timer=null;
+function startAuto(){
+  stopAuto();
+  var s=getSettings();var h=s.intervalHours||6;
+  _timer=setInterval(async function(){try{await doBackup('auto');}catch(e){console.warn('[Backup] auto failed:',e.message);}},h*3600000);
+}
+function stopAuto(){if(_timer){clearInterval(_timer);_timer=null;}}
+
+// ── Main backup trigger ───────────────────────────────────────
+async function doBackup(src){
+  var snap=collectSnapshot();
+  var file=await uploadToDrive(snap);
+  addHistory({action:'backup',source:src||'manual',filename:file.name,fileId:file.id,timestamp:snap.timestamp,keys:snap.meta.totalKeys,sizeBytes:snap.meta.sizeBytes});
+  var s=getSettings();s.lastBackupAt=snap.timestamp;s.lastBackupFile=file.name;saveSettings(s);
+  return{file:file,snapshot:snap};
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB';}
+function fmtAgo(iso){
+  if(!iso)return'Never';
+  var d=Date.now()-new Date(iso).getTime();var m=Math.floor(d/60000);
+  if(m<1)return'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);
+  if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── OAuth ─────────────────────────────────────────────────────
+var _tc=null;
+function initTokenClient(){
+  if(_tc||!window.google||!window.google.accounts)return;
+  _tc=window.google.accounts.oauth2.initTokenClient({
+    client_id:GOOGLE_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/drive.file',
+    callback:function(resp){
+      if(resp.error){_toast('Sign-in failed: '+resp.error,'error');return;}
+      sessionStorage.setItem(TOKEN_KEY,resp.access_token);
+      _toast('Google Drive connected ✓');
+      renderPanel('backup-panel-container');
+      startAuto();
+    }
+  });
+}
+function connectDrive(){
+  initTokenClient();
+  if(!_tc){
+    // GIS not loaded yet — retry once
+    setTimeout(function(){initTokenClient();if(_tc)_tc.requestAccessToken({prompt:'consent'});else _toast('Google Identity Services not ready. Try again.','error');},600);
+    return;
+  }
+  _tc.requestAccessToken({prompt:'consent'});
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function _toast(msg,kind){
+  if(typeof window.showToast==='function'){window.showToast(msg,kind==='error'?'error':undefined);return;}
+  var t=document.createElement('div');t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;background:'+(kind==='error'?'#f44336':'#4caf50')+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  document.body.appendChild(t);setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},3000);
+}
+
+// ── Render panel ──────────────────────────────────────────────
+function renderPanel(containerId){
+  var el=document.getElementById(containerId);if(!el)return;
+  var s=getSettings(),hist=getHistory(),snap=collectSnapshot(),connected=!!getToken();
+  var rows=hist.slice(0,10).map(function(h){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:14px;width:20px;text-align:center">'+(h.action==='restore'?'&#8681;':h.source==='auto'?'&#8635;':'&#8679;')+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      +esc(h.action==='restore'?'Restored: '+(h.fromTimestamp?new Date(h.fromTimestamp).toLocaleString('en-IN'):h.filename):(h.filename||'Backup'))+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(h.source==='auto'?'Auto':'Manual')+' &middot; '+(h.keys||h.keysRestored||'?')+' keys'+(h.sizeBytes?' &middot; '+fmtBytes(h.sizeBytes):'')+'</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);white-space:nowrap">'+fmtAgo(h.timestamp)+'</div>'
+      +'</div>';
+  }).join('');
+
+  el.innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:16px">'
+
+    // Header
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--text)">&#128190; Data Backup</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:2px">All dashboard data backed up to Google Drive</div></div>'
+    +'<div style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;white-space:nowrap;'
+    +(s.lastBackupAt?'background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)':'background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)')+'">'+
+    (s.lastBackupAt?'&#9679; Last: '+fmtAgo(s.lastBackupAt):'&#9888; Never backed up')+'</div>'
+    +'</div>'
+
+    // Connect row
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px">'
+    +(connected
+      ?'<div style="flex:1;font-size:13px;font-weight:600;color:var(--green)">&#10003; Google Drive connected</div>'
+       +'<button onclick="sessionStorage.removeItem(\''+TOKEN_KEY+'\');stopAutoBackup();window.Log7Backup.renderPanel(\'backup-panel-container\');_backupToast(\'Disconnected.\')" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif">Disconnect</button>'
+      :'<button onclick="window.Log7Backup._connect()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Poppins\',sans-serif">&#128279; Connect Google Drive</button>')
+    +'</div>'
+
+    // Action buttons
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button onclick="window.Log7Backup._backupNow(this)" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8679; Back Up Now</button>'
+    +'<button onclick="window.Log7Backup._restore()" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8681; Restore</button>'
+    +'<a href="https://drive.google.com/drive/folders/'+DRIVE_FOLDER_ID+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--s2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:12px;text-decoration:none;font-family:\'Poppins\',sans-serif">&#128193; Open Drive</a>'
+    +'</div>'
+
+    // Auto-backup
+    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'
+    +'<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px">Auto-backup interval</div>'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<select onchange="window.Log7Backup._setInterval(this.value)" style="background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">'
+    +'<option value="2"'  +((s.intervalHours||6)==2 ?' selected':'')+'>Every 2 hours</option>'
+    +'<option value="6"'  +((s.intervalHours||6)==6 ?' selected':'')+'>Every 6 hours</option>'
+    +'<option value="12"' +((s.intervalHours||6)==12?' selected':'')+'>Every 12 hours</option>'
+    +'<option value="24"' +((s.intervalHours||6)==24?' selected':'')+'>Every 24 hours</option>'
+    +'</select>'
+    +'<span style="font-size:12px;color:var(--muted)">Active every '+(s.intervalHours||6)+'h</span>'
+    +'</div></div>'
+
+    // History
+    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+    +'<div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted)">'
+    +'<span>Backup History</span><span>'+hist.length+' entries</span></div>'
+    +'<div style="max-height:220px;overflow-y:auto">'
+    +(rows||'<div style="padding:20px 14px;text-align:center;color:var(--muted);font-size:13px">No backups yet</div>')
+    +'</div></div>'
+
+    // Stats
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    +['<div>'+snap.meta.totalKeys+'</div><div>Keys in storage</div>',
+      '<div>'+fmtBytes(snap.meta.sizeBytes)+'</div><div>Current size</div>',
+      '<div>'+hist.filter(function(h){return h.action==='backup';}).length+'</div><div>Total backups</div>']
+    .map(function(s){return '<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">'+s.replace('<div>','<div style="font-size:18px;font-weight:700;color:var(--accent)">').replace('<div>','<div style="font-size:11px;color:var(--muted);margin-top:3px">')+'</div>';}).join('')
+    +'</div>'
+
+    +'</div>'
+
+    // Restore modal
+    +'<div id="l7-restore-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px">'
+    +'<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;padding:24px;display:flex;flex-direction:column;gap:16px;max-height:90vh">'
+    +'<div style="font-size:15px;font-weight:700;color:var(--text)">&#8681; Restore from Backup</div>'
+    +'<div style="font-size:13px;color:var(--muted);line-height:1.6">Choose a backup. Current data is saved as emergency snapshot first.</div>'
+    +'<div id="l7-restore-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"><div style="padding:20px;text-align:center;color:var(--muted)">Loading…</div></div>'
+    +'<div style="display:flex;justify-content:flex-end"><button onclick="document.getElementById(\'l7-restore-modal\').style.display=\'none\'" style="background:var(--s2);color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">Cancel</button></div>'
+    +'</div></div>';
+}
+
+// ── Public action handlers ─────────────────────────────────────
+window._backupToast = _toast; // allow disconnect button inline
+window.stopAutoBackup = stopAuto;
+
+window.Log7Backup={
+  init:function(){
+    // Try to init token client now; if GIS not yet ready, wait
+    if(window.google&&window.google.accounts){initTokenClient();}
+    else{
+      var tries=0;
+      var iv=setInterval(function(){
+        tries++;
+        if(window.google&&window.google.accounts){initTokenClient();clearInterval(iv);}
+        else if(tries>20){clearInterval(iv);}
+      },300);
+    }
+    if(getToken())startAuto();
+    console.log('[Log7 Backup] Inlined backup system ready.');
+  },
+  renderPanel:renderPanel,
+  _connect:connectDrive,
+  _backupNow:async function(btn){
+    var orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='&#8987; Backing up…';
+    try{
+      var r=await doBackup('manual');
+      btn.innerHTML='&#10003; Done!';
+      _toast('Backed up '+r.snapshot.meta.totalKeys+' keys → '+r.file.name);
+      setTimeout(function(){btn.disabled=false;btn.innerHTML=orig;renderPanel('backup-panel-container');},2000);
+    }catch(e){btn.disabled=false;btn.innerHTML=orig;_toast('Backup failed: '+e.message,'error');}
+  },
+  _restore:async function(){
+    var modal=document.getElementById('l7-restore-modal');
+    if(!modal)return;
+    modal.style.display='flex';
+    var listEl=document.getElementById('l7-restore-list');
+    try{
+      var files=await listBackups();
+      if(!files.length){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">No backups found in Drive folder.</div>';return;}
+      listEl.innerHTML=files.map(function(f){
+        return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name.replace(BACKUP_PREFIX,''))+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(f.description||'')+'</div>'
+          +'</div>'
+          +'<button onclick="window.Log7Backup._doRestore(\''+f.id+'\',\''+esc(f.name)+'\',this)" style="background:var(--s2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif;flex-shrink:0">Restore</button>'
+          +'</div>';
+      }).join('');
+    }catch(e){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--red)">Error: '+esc(e.message)+'</div>';}
+  },
+  _doRestore:async function(fileId,filename,btn){
+    if(!confirm('Restore from "'+filename+'"?\n\nYour current data will be saved as an emergency snapshot.'))return;
+    btn.disabled=true;btn.textContent='Restoring…';
+    try{
+      var r=await restoreFromDrive(fileId,filename);
+      document.getElementById('l7-restore-modal').style.display='none';
+      _toast('Restored '+r.restored+' keys. Reloading…');
+      setTimeout(function(){location.reload();},1800);
+    }catch(e){btn.disabled=false;btn.textContent='Restore';_toast('Restore failed: '+e.message,'error');}
+  },
+  _setInterval:function(val){
+    var s=getSettings();s.intervalHours=parseInt(val,10);saveSettings(s);stopAuto();startAuto();
+    _toast('Auto-backup set to every '+val+' hours');
+  },
+  backup:doBackup,
+  collectSnapshot:collectSnapshot,
+  getHistory:getLocalHistory,
+};
+function getLocalHistory(){return getHistory();}
+})();
+</script>
 </head>
 <body>
 <nav>
