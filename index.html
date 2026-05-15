@@ -607,6 +607,7 @@
   <div id="page-pipeline" class="page">
     <div class="section-bar">
       <div class="section-title">Deal Pipeline</div>
+      <button class="ghost-btn" onclick="openAddDealModal()">+ Add Deal</button>
       <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
       <button class="ghost-btn" onclick="renderPipelineList()">List View</button>
       <button class="ghost-btn" onclick="renderKanban()">Board View</button>
@@ -882,6 +883,8 @@
   </div>
 
   <!-- MODALS -->
+  <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
+  <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
 </div><!-- end container -->
@@ -1518,16 +1521,88 @@ function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+'</span><span class="badge">'+byStage[stage].length+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title">'+escapeHtml(item.investor)+'</div><div class="kanban-card-meta">'+escapeHtml(item.startup)+' \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+'</span><span class="badge">'+byStage[stage].length+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
   const el=document.getElementById('pipeline-list');if(!el)return;const pipeline=getPipeline();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><strong>'+escapeHtml(item.investor)+'</strong></td><td>'+escapeHtml(item.startup)+'</td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
+  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
 function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+
+// ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
+function findNetEntity(type,name){
+  var key = type==='investor' ? 'l7_net_investors' : 'l7_net_startups';
+  var arr = JSON.parse(localStorage.getItem(key)||'[]');
+  var lc = String(name||'').toLowerCase();
+  return arr.find(function(r){
+    var n = (r.investorName||r.companyName||r.name||'').toLowerCase();
+    return n===lc;
+  }) || null;
+}
+function openNetEntityModal(type,name){
+  var rec = findNetEntity(type,name);
+  var modal = document.getElementById('net-entity-modal');
+  var title = document.getElementById('net-entity-title');
+  var body  = document.getElementById('net-entity-content');
+  title.textContent = (type==='investor'?'Investor: ':'Startup: ') + (name||'Unknown');
+  if(!rec){
+    body.innerHTML = '<div class="empty" style="padding:20px">No matching record in Network &gt; '+(type==='investor'?'Investors':'Startups')+'.</div>'
+      + '<div style="margin-top:12px"><button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);">Open Network Tab</button></div>';
+  } else {
+    var rows = Object.keys(rec).filter(function(k){return !k.startsWith('_')&&k!=='id'&&rec[k]!=null&&rec[k]!=='';}).map(function(k){
+      var label = k.replace(/([A-Z])/g,' $1').replace(/^./,function(c){return c.toUpperCase();});
+      return '<div class="detail-row"><span class="detail-label">'+escapeHtml(label)+'</span><span>'+escapeHtml(String(rec[k]))+'</span></div>';
+    }).join('');
+    body.innerHTML = '<div class="detail-list">'+rows+'</div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);switchNetTab(\''+(type==='investor'?'investors':'startups')+'\',document.getElementById(\'net-tab-\'+(type===\'investor\'?\'investors\':\'startups\')));">Open in Network</button>'
+      + '</div>';
+  }
+  modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeNetEntityModal(){var m=document.getElementById('net-entity-modal');m.classList.add('hidden');m.style.display='none';}
+
+// ═══ ADD DEAL MODAL ═══
+function openAddDealModal(){
+  var invs = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var sts  = JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  var body = document.getElementById('add-deal-content');
+  if(!invs.length || !sts.length){
+    body.innerHTML = '<div class="empty" style="padding:18px">'
+      + (!sts.length?'Add at least one startup in <strong>Network &gt; Startups</strong>. ':'')
+      + (!invs.length?'Add at least one investor in <strong>Network &gt; Investors</strong>.':'')
+      + '</div>';
+  } else {
+    var stOpts  = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var invOpts = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var stageOpts = PIPELINE_STAGES.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+    body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
+      + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
+      + '<div class="field-row"><div class="field"><label>Score (0-100)</label><input id="add-deal-score" type="number" min="0" max="100" value="50"></div><div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div></div>'
+      + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
+  }
+  var modal=document.getElementById('add-deal-modal');modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeAddDealModal(){var m=document.getElementById('add-deal-modal');m.classList.add('hidden');m.style.display='none';}
+function submitAddDeal(){
+  var startup  = document.getElementById('add-deal-startup').value;
+  var investor = document.getElementById('add-deal-investor').value;
+  var score    = +document.getElementById('add-deal-score').value || 0;
+  var stage    = document.getElementById('add-deal-stage').value;
+  if(!startup || !investor) return showError('Pick both a startup and an investor.');
+  var pipeline = getPipeline();
+  if(pipeline.find(function(i){return i.startup===startup&&i.investor===investor;})){
+    return showError('That deal is already in the pipeline.');
+  }
+  pipeline.unshift({startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage});
+  localStorage.setItem('l7_pipeline',JSON.stringify(pipeline.slice(0,500)));
+  addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
+  closeAddDealModal();
+  renderKanban();renderPipelineList();refreshHome();updateStats();
+}
 
 // ═══ ANALYTICS ═══
 
