@@ -937,7 +937,7 @@ const ARRAY_SHEETS = new Set(['network_investors','network_startups','network_pa
 let _sheetsOnline = null; // null=unknown, true=online, false=offline
 let _lastSyncTime = null;
 
-function getSheetsUrl(){return localStorage.getItem('l7_sheets_api_url')||'';}
+function getSheetsUrl(){return '/api/sheets';}
 function saveSheetsUrl(){const v=document.getElementById('sheets-api-url').value.trim();localStorage.setItem('l7_sheets_api_url',v);if(v)syncFromSheets();}
 
 function _setSheetsOnline(online){
