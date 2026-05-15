@@ -713,6 +713,7 @@
       <strong>Structured diligence tracker.</strong>
       Track legal, finance, product, market, team, and customer validation across multiple sections. Assign owners and record notes per item.
     </div>
+    <div id="diligence-ic-ready" style="margin-bottom:12px"></div>
     <div class="grid-two">
       <div>
         <div class="card">
@@ -1051,6 +1052,16 @@ function refreshCapitalDisplay(){
 }
 
 // ═══ AUDIT LOG ═══
+// ═══ TOAST ═══
+function showToast(msg, kind){
+  var c=document.getElementById('toast-container');
+  if(!c){c=document.createElement('div');c.id='toast-container';c.style.cssText='position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';document.body.appendChild(c);}
+  var bg = kind==='error' ? '#f44336' : kind==='warn' ? '#ff9800' : '#4caf50';
+  var t=document.createElement('div');
+  t.style.cssText='background:'+bg+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:auto;animation:fadeIn .2s';
+  t.textContent=msg;c.appendChild(t);
+  setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},2200);
+}
 function getAuditLog(){return JSON.parse(localStorage.getItem('l7_audit')||'[]');}
 function saveAuditLog(log){localStorage.setItem('l7_audit',JSON.stringify(log.slice(0,500)));}
 function addAuditEntry(type,action,entity){
@@ -1510,7 +1521,17 @@ function saveMatchToPipeline(name){
   renderKanban();renderPipelineList();refreshHome();updateStats();
 }
 function movePipelineStage(startup,investor,stage){
-  const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
+  const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;
+  const prev=item.stage;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
+  // Auto-create diligence checklist when stage moves to IC Review (treated as "IC Ready")
+  if(stage==='IC Review' && prev!=='IC Review'){
+    var dKey='l7_diligence_'+startup;
+    if(!localStorage.getItem(dKey)){
+      localStorage.setItem(dKey,JSON.stringify({}));
+      addAuditEntry('diligence','Diligence checklist created (IC Ready trigger)',startup);
+      showToast('Diligence checklist created for '+startup);
+    }
+  }
   renderKanban();renderPipelineList();updateStats();refreshHome();
 }
 function removePipelineItem(startup,investor){let pipeline=getPipeline();pipeline=pipeline.filter(i=>!(i.startup===startup&&i.investor===investor));localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);renderKanban();renderPipelineList();updateStats();refreshHome();}
@@ -1518,7 +1539,13 @@ function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+'</span><span class="badge">'+byStage[stage].length+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title">'+escapeHtml(item.investor)+'</div><div class="kanban-card-meta">'+escapeHtml(item.startup)+' \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  // Build startup\u2192roundSize lookup from Network startups for \u20b9 totals
+  var netSt=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  var sizeBy={};netSt.forEach(function(s){var n=s.companyName||s.name||'';if(n)sizeBy[n.toLowerCase()]=s.roundSize||s.roundSizeCr||s.fundraise||'';});
+  function parseCr(v){if(v==null)return 0;var s=String(v);var m=s.replace(/,/g,'').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;}
+  function stageTotal(items){return items.reduce(function(acc,it){return acc+parseCr(sizeBy[String(it.startup).toLowerCase()]||0);},0);}
+  function fmtCr(n){return n>0?' \u2022 \u20b9'+(n>=1?n.toFixed(n%1===0?0:1):n)+'Cr':'';}
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title">'+escapeHtml(item.investor)+'</div><div class="kanban-card-meta">'+escapeHtml(item.startup)+' \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
@@ -1557,8 +1584,17 @@ function saveTemplates(){localStorage.setItem('l7_email_subject_template',docume
 // ═══ IC MEMO ═══
 function generateICMemo(){
   const el=document.getElementById('memo-content'),badge=document.getElementById('memo-badge');if(!el)return;
-  if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to generate the IC memo.</div>';return;}
-  const payload=lastPayload||{matches:[],deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};const topMatches=(payload.matches||[]).slice(0,5);
+  if(!selectedStartup){
+    // Auto-pick the first Network startup if no Match Studio selection yet
+    var netStartups=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+    if(netStartups.length){selectedStartup={company:netStartups[0].companyName||netStartups[0].name||'',founder:netStartups[0].founderName||'',sector:netStartups[0].sector||'',stage:netStartups[0].stage||'',currentRound:netStartups[0].currentRound||'',roundSize:netStartups[0].roundSize||'',valuation:netStartups[0].valuation||'',arr:netStartups[0].arr||'',prevRevenue:netStartups[0].prevRevenue||'',website:netStartups[0].website||'',email:netStartups[0].founderEmail||'',problem:netStartups[0].problem||netStartups[0].notes||'',pitchDeckUrl:netStartups[0].pitchDeckUrl||''};}
+    else {el.innerHTML='<div class="empty">Add a startup in Network &gt; Startups or select one in Match Studio.</div>';return;}
+  }
+  // Build payload from lastPayload if a match has run, else from l7_match_scores
+  var matchScores=JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
+  var scoredMatches=Object.keys(matchScores).map(function(name){var d=matchScores[name];return{name:name,score:d.score||0,verdict:d.verdict||'',reasons:d.reasons||[],concerns:d.concerns||[]};}).sort(function(a,b){return b.score-a.score;});
+  const payload=(lastPayload&&lastPayload.matches&&lastPayload.matches.length)?lastPayload:{matches:scoredMatches,deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};
+  const topMatches=(payload.matches||[]).slice(0,3);
   const readiness=payload.founder_readiness||computeFounderReadiness(selectedStartup,payload.deck_insights);
   const missing=payload.missing_data||getMissingDataAlerts(selectedStartup);
   const objections=uniqueList(topMatches.flatMap(m=>m.objections||predictObjections(m)));
@@ -1588,6 +1624,15 @@ function diligenceKey(){return'l7_diligence_'+(selectedStartup?.company||'global
 function getDiligenceState(){return JSON.parse(localStorage.getItem(diligenceKey())||'{}');}
 function saveDiligenceState(state){localStorage.setItem(diligenceKey(),JSON.stringify(state));}
 function refreshDiligence(){
+  // IC Ready badge banner
+  var icEl=document.getElementById('diligence-ic-ready');
+  if(icEl){
+    var pipeline=getPipeline();
+    var icReady=[...new Set(pipeline.filter(function(i){return i.stage==='IC Review';}).map(function(i){return i.startup;}))];
+    icEl.innerHTML=icReady.length
+      ? '<div style="padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px;font-size:12.5px"><strong style="color:var(--amber)">IC Ready:</strong> '+icReady.map(function(s){return '<span class="badge" style="background:var(--amber);color:#fff;border-color:transparent;margin-left:6px;cursor:pointer" onclick="(function(){var idx=startups.findIndex(function(x){return x.company===\''+escapeQ(s)+'\';});if(idx>=0)selectStartup(idx);})()">'+escapeHtml(s)+'</span>';}).join(' ')+'</div>'
+      : '';
+  }
   const el=document.getElementById('diligence-checklist'),sumEl=document.getElementById('diligence-summary'),badge=document.getElementById('diligence-progress-badge');if(!el)return;
   if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to begin diligence tracking.</div>';if(sumEl)sumEl.innerHTML='<div class="empty">Select a startup first.</div>';return;}
   const state=getDiligenceState(),sections={};
@@ -3020,6 +3065,7 @@ function sendWhatsApp(phone, name) {
   if (!phone) { alert('No number for ' + name); return; }
   var msg = waFillTemplate(waGetTemplate(), name);
   window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(msg), '_blank');
+  if (typeof addAuditEntry === 'function') addAuditEntry('outreach','WhatsApp sent',name+' ('+phone+')');
 }
 
 document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
