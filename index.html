@@ -724,6 +724,14 @@ function getLocalHistory(){return getHistory();}
           <div class="settings-label">Fund Size (&#8377; Cr)</div>
           <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
         </div>
+        <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
+          <div class="settings-label">&#128190; Google Drive Backup</div>
+          <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
+            <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1383,7 +1391,50 @@ function showTab(name,btn){
   if(name==='match') renderBulkOutreachPanel();
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
-function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
+function toggleSettings(){
+  document.getElementById('settings-wrap').classList.toggle('open');
+  _refreshSettingsBackupStatus();
+}
+function _refreshSettingsBackupStatus(){
+  var statusEl=document.getElementById('settings-backup-status');
+  var connectBtn=document.getElementById('settings-backup-connect-btn');
+  var nowBtn=document.getElementById('settings-backup-now-btn');
+  if(!statusEl) return;
+  var connected=!!sessionStorage.getItem('log7_gapi_token');
+  var s={};try{s=JSON.parse(localStorage.getItem('log7_backup_settings')||'{}');}catch(e){}
+  if(connected){
+    statusEl.style.color='var(--green)';
+    statusEl.textContent='&#10003; Connected'+(s.lastBackupAt?' · Last: '+_fmtAgoShort(s.lastBackupAt):'');
+    if(connectBtn){connectBtn.textContent='Disconnect';connectBtn.onclick=function(){sessionStorage.removeItem('log7_gapi_token');_refreshSettingsBackupStatus();};}
+    if(nowBtn) nowBtn.style.opacity='1';
+  } else {
+    statusEl.style.color='var(--muted)';
+    statusEl.textContent='Not connected';
+    if(connectBtn){connectBtn.textContent='Connect Drive';connectBtn.onclick=window._settingsBackupConnect;}
+    if(nowBtn) nowBtn.style.opacity='.4';
+  }
+}
+function _fmtAgoShort(iso){
+  var d=Date.now()-new Date(iso).getTime(),m=Math.floor(d/60000);
+  if(m<1)return'just now';if(m<60)return m+'m ago';
+  var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
+}
+window._settingsBackupConnect=function(){
+  if(!window.Log7Backup){showToast('Backup system not ready','error');return;}
+  window.Log7Backup._connect();
+  // Refresh status after short delay to pick up token
+  setTimeout(_refreshSettingsBackupStatus,2000);
+};
+window._settingsBackupNow=async function(btn){
+  if(!sessionStorage.getItem('log7_gapi_token')){showToast('Connect Google Drive first','error');return;}
+  var orig=btn.textContent;btn.disabled=true;btn.textContent='Backing up…';
+  try{
+    var r=await window.Log7Backup.backup('manual');
+    showToast('Backed up '+r.snapshot.meta.totalKeys+' keys ✓');
+    _refreshSettingsBackupStatus();
+  }catch(e){showToast('Backup failed: '+e.message,'error');}
+  btn.disabled=false;btn.textContent=orig;
+};
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
 // ═══ THEME ═══
