@@ -344,20 +344,17 @@
   <div class="logo">Log7 Capital</div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showTab('home',this)">Home</button>
+    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
     <button class="nav-tab" onclick="showTab('match',this)">Match Studio</button>
     <button class="nav-tab" onclick="showTab('pipeline',this)">Pipeline</button>
-    <button class="nav-tab" onclick="showTab('analytics',this)">Analytics</button>
     <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
     <button class="nav-tab" onclick="showTab('deck',this)">Deck Insights</button>
-    <button class="nav-tab" onclick="showTab('watchlists',this)">Watchlists</button>
     <button class="nav-tab" onclick="showTab('memo',this)">IC Memo</button>
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
-    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
   </div>
   <div class="nav-right">
-    <button class="pill-btn" onclick="generateTearsheet()">Tearsheet</button>
         <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
     <div class="settings-wrap" id="settings-wrap">
@@ -435,7 +432,7 @@
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start">
       <div>
         <div class="card" style="margin-bottom:14px">
-          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Full Board &#8599;</button></div></div>
+          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Full Board &#8599;</button></div></div>
           <div id="home-pipeline-snapshot"><div class="empty" style="padding:18px">No pipeline deals yet.</div></div>
         </div>
         <div class="card">
@@ -447,10 +444,9 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
           <div style="display:grid;gap:6px">
-            <button class="action-btn primary" style="width:100%" onclick="showTab('match',document.querySelectorAll('.nav-tab')[1])">&#9889; New Match</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">&#128203; Pipeline</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('analytics',document.querySelectorAll('.nav-tab')[3])">&#128202; Analytics</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[9])">&#128269; Diligence</button>
+            <button class="action-btn primary" style="width:100%" onclick="showTab('match',document.querySelectorAll('.nav-tab')[2])">&#9889; New Match</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">&#128203; Pipeline</button>
+            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[7])">&#128269; Diligence</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
@@ -600,7 +596,7 @@
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
-            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Open Pipeline</button>
+            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Open Pipeline</button>
           </div>
         </div>
       </div>
@@ -628,56 +624,6 @@
         <div class="card-title">All Pipeline Deals</div>
       </div>
       <div id="pipeline-list"></div>
-    </div>
-  </div>
-
-  <!-- ═══ ANALYTICS ═══ -->
-  <div id="page-analytics" class="page">
-    <div class="section-bar">
-      <div class="section-title">Deal Analytics</div>
-      <button class="ghost-btn" onclick="refreshAnalytics()">Refresh</button>
-    </div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat">
-        <div class="stat-value" id="an-total-matched">0</div>
-        <div class="stat-label">Total Matched</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-contacted">0</div>
-        <div class="stat-label">Contacted</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-meetings">0</div>
-        <div class="stat-label">Meetings Booked</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-invested">0</div>
-        <div class="stat-label">Invested</div>
-      </div>
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Pipeline Funnel</div></div>
-        <div id="analytics-funnel"></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Status Breakdown</div></div>
-        <div id="analytics-status-chart"></div>
-      </div>
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Sector Distribution</div></div>
-        <div id="analytics-sector"></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Conversion Rates</div></div>
-        <div id="analytics-conversion"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Score Distribution (All Matches)</div></div>
-      <div id="analytics-score-dist"></div>
     </div>
   </div>
 
@@ -720,36 +666,6 @@
           <input id="extra-docs-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" onchange="handleExtraDocsUpload(event)">
           <div id="extra-docs-list" style="margin-top:8px"><div class="empty" style="padding:14px">No documents uploaded yet.</div></div>
         </div>
-      </div>
-    </div>
-  </div>
-
-    <!-- ═══ WATCHLISTS ═══ -->
-  <div id="page-watchlists" class="page">
-    <div class="section-bar">
-      <div class="section-title">Watchlists</div>
-      <button class="ghost-btn" onclick="saveCurrentToWatchlist()">Save Current Startup</button>
-    </div>
-    <div class="module-banner">
-      <strong>Firm-level watchlists and internal grouping.</strong>
-      Save startups into reusable buckets like IC Candidates, High Conviction, Needs More Diligence, or Outbound Now.
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Create / Edit Watchlist</div></div>
-        <div class="field">
-          <label>Watchlist Name</label>
-          <input id="watchlist-name" placeholder="e.g. IC Candidates">
-        </div>
-        <div class="field">
-          <label>Watchlist Notes</label>
-          <textarea id="watchlist-notes" placeholder="What qualifies a startup for this watchlist?"></textarea>
-        </div>
-        <button class="action-btn primary" onclick="createWatchlist()">Save Watchlist</button>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Saved Watchlists</div></div>
-        <div id="watchlists-list"><div class="empty">No watchlists created yet.</div></div>
       </div>
     </div>
   </div>
@@ -966,7 +882,6 @@
   </div>
 
   <!-- MODALS -->
-  <div id="tearsheet-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:760px;width:100%;max-height:90vh;overflow-y:auto;border-radius:10px"><div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px"><button class="action-btn primary" onclick="window.print()">Print</button><button class="action-btn danger" onclick="closeTearsheet()">&#x2715; Close</button></div><div id="tearsheet-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
 </div><!-- end container -->
@@ -1082,9 +997,9 @@ window.onload = async () => {
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
   await loadData();
-  refreshDocsSelectors();refreshHome();renderWatchlists();
+  refreshDocsSelectors();refreshHome();
   refreshDiligence();renderKanban();renderPipelineList();
-  renderAuditLog();refreshAnalytics();renderICVotes();
+  renderAuditLog();renderICVotes();
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
@@ -1096,7 +1011,6 @@ function showTab(name,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='analytics') refreshAnalytics();
   if(name==='pipeline'){renderKanban();renderPipelineList();}
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
@@ -1389,7 +1303,7 @@ async function loadData(){
   ['st-count','stat-startups'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=startups.length;});
   renderStartups();renderStartupMatchList();clearStartupSelection();refreshDocsSelectors();
   if(prev){const idx=startups.findIndex(s=>s.company===prev);if(idx>=0)selectStartup(idx);}
-  renderKanban();renderPipelineList();refreshHome();renderWatchlists();updateStats();showLoading('');
+  renderKanban();renderPipelineList();refreshHome();updateStats();showLoading('');
   if(invErr||stErr)showError([invErr?'Investor: '+invErr:'',stErr?'Startup: '+stErr:''].filter(Boolean).join(' | '));
   addAuditEntry('match','Data refreshed from Google Sheets');
 }
@@ -1548,16 +1462,6 @@ function renderDeckTab(payload){
   var el=document.getElementById('deck-tab-content');if(!el)return;
   el.innerHTML='<div class="grid-two"><div><div class="card insight-card"><div class="card-header"><div class="card-title">Deck Summary</div></div><div style="font-size:13px;line-height:1.8">'+escapeHtml(deck.summary||'No deck summary yet.')+'</div><div class="tag-row">'+(deck.signals||[]).map(function(s){return'<span class="tag info">'+escapeHtml(s)+'</span>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Readiness Score</div></div><div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+readiness.score+'</div><div class="mini-label">Score</div></div><div class="mini-stat"><div class="mini-value">'+readiness.verdict+'</div><div class="mini-label">Verdict</div></div></div><div class="template-help" style="margin-top:10px">'+(readiness.reasons||[]).join(' · ')+'</div></div></div><div><div class="card"><div class="card-header"><div class="card-title">Deck Breakdown</div></div><div class="detail-list"><div class="detail-row"><span class="detail-label">Market</span><span>'+escapeHtml(deck.market||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Traction</span><span>'+escapeHtml(deck.traction||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Business Model</span><span>'+escapeHtml(deck.business_model||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">PDF Uploaded</span><span>'+escapeHtml(uploadedPdfName||'None')+'</span></div></div></div><div class="card"><div class="card-header"><div class="card-title">Missing Data</div></div><div class="tag-row">'+(missing.map(function(m){return'<span class="tag warn">'+escapeHtml(m)+'</span>';}).join('')||'<span class="tag good">No missing data flags</span>')+'</div></div></div></div><div class="grid-two"><div class="card"><div class="card-header"><div class="card-title">Strengths</div></div><div class="insight-list">'+(deck.strengths||['None captured']).map(function(s){return'<div>— '+escapeHtml(s)+'</div>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Risks</div></div><div class="insight-list">'+(deck.risks||['None captured']).map(function(r){return'<div>— '+escapeHtml(r)+'</div>';}).join('')+'</div></div></div>';
 }
-// ═══ TEARSHEET ═══
-function generateTearsheet(){
-  const modal=document.getElementById('tearsheet-modal'),content=document.getElementById('tearsheet-content');
-  if(!selectedStartup){alert('Select a startup first.');return;}
-  const top=(lastMatches||[]).slice(0,5),readiness=lastPayload?.founder_readiness||computeFounderReadiness(selectedStartup,null),deck=lastPayload?.deck_insights||deriveDeckInsightsFromLocalData();
-  content.innerHTML='<div class="tearsheet"><div class="tearsheet-header"><div><div class="tearsheet-logo">LOG7 CAPITAL</div><div style="font-size:10px;color:#888;margin-top:2px">Confidential \u2014 For Internal Use Only</div></div><div style="text-align:right"><div style="font-size:11px;color:#888">Generated '+new Date().toLocaleDateString('en-IN')+'</div></div></div><div class="tearsheet-co">'+escapeHtml(selectedStartup.company)+'</div><div class="tearsheet-meta">'+escapeHtml(selectedStartup.sector||'Sector n/a')+' \u00b7 '+escapeHtml(selectedStartup.stage||'Stage n/a')+' \u00b7 '+escapeHtml(selectedStartup.location||'Location n/a')+'</div><div class="tearsheet-grid" style="margin-top:20px"><div><div class="tearsheet-section">Founder</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.founder||'\u2014')+'</div></div><div><div class="tearsheet-section">Round</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.currentRound||'\u2014')+' \u2014 '+escapeHtml(selectedStartup.roundSize||'\u2014')+'</div></div><div><div class="tearsheet-section">Valuation</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.valuation||'\u2014')+'</div></div><div><div class="tearsheet-section">ARR</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.arr||selectedStartup.prevRevenue||'\u2014')+'</div></div></div><div style="border-top:1px solid #eee;padding-top:14px;margin-top:4px"><div class="tearsheet-section">Problem Statement</div><div style="font-size:12.5px;line-height:1.7;color:#333">'+escapeHtml(selectedStartup.problem||'Not provided')+'</div></div><div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee"><div class="tearsheet-section">Deck Summary</div><div style="font-size:12.5px;line-height:1.7;color:#333">'+escapeHtml(deck.summary||'No deck summary available.')+'</div></div><div class="tearsheet-matches"><div class="tearsheet-section" style="margin-bottom:10px">Top '+(top.length||0)+' Investor Matches</div>'+(top.length?top.map((m,i)=>'<div class="tearsheet-match-row"><div style="width:20px;font-size:11px;font-weight:700;color:#888">'+(i+1)+'</div><div style="flex:1;font-size:12.5px;font-weight:500">'+escapeHtml(m.name)+'</div><div class="tearsheet-score-bar"><div class="tearsheet-score-fill" style="width:'+m.score+'%"></div></div><div style="font-size:12px;font-weight:600;width:40px;text-align:right">'+m.score+'</div><div style="font-size:10px;color:#888;width:80px;text-align:right">'+escapeHtml(m.verdict)+'</div></div>').join(''):'<div style="font-size:12px;color:#888">Run a match to see investor rankings.</div>')+'</div><div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee;display:flex;justify-content:space-between"><div style="font-size:11px;color:#888">Founder Readiness: '+readiness.score+'/100 ('+readiness.verdict+')</div><div style="font-size:11px;color:#888">Log7 Capital \u2014 Confidential</div></div></div>';
-  modal.classList.remove('hidden');modal.style.display='flex';addAuditEntry('match','Tearsheet generated',selectedStartup.company);
-}
-function closeTearsheet(){const m=document.getElementById('tearsheet-modal');m.classList.add('hidden');m.style.display='none';}
-function printTearsheet(){window.print();}
 
 // ═══ SCORE SIMULATOR ═══
 function runScoreSimulator(){
@@ -1626,17 +1530,6 @@ function renderPipelineList(){
 function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
 
 // ═══ ANALYTICS ═══
-function refreshAnalytics(){
-  const pipeline=getPipeline(),allCRMs=pipeline.map(i=>getInvestorCRM(i.startup,i.investor));
-  const contacted=allCRMs.filter(c=>c.status!=='not contacted').length,replied=allCRMs.filter(c=>['replied','meeting booked','invested'].includes(c.status)).length,meetings=allCRMs.filter(c=>c.status==='meeting booked').length,invested=allCRMs.filter(c=>c.status==='invested').length;
-  [['an-total-matched',lastMatches.length],['an-contacted',contacted],['an-meetings',meetings],['an-invested',invested]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
-  const fEl=document.getElementById('analytics-funnel');if(fEl){const total=Math.max(1,pipeline.length);fEl.innerHTML=[['In Pipeline',pipeline.length,total],['Contacted',contacted,total],['Replied',replied,total],['Meeting Booked',meetings,total],['Invested',invested,total]].map(([l,v,t])=>'<div class="funnel-bar"><div class="funnel-label">'+l+'</div><div class="funnel-track"><div class="funnel-fill" style="width:'+Math.round(v/t*100)+'%"></div></div><div class="funnel-value">'+v+'</div></div>').join('');}
-  const sEl=document.getElementById('analytics-status-chart');if(sEl){const counts={};CRM_STATUSES.forEach(s=>{counts[s]=allCRMs.filter(c=>c.status===s).length;});const maxC=Math.max(1,...Object.values(counts));sEl.innerHTML='<div class="bar-chart">'+CRM_STATUSES.map(s=>'<div class="bar-col"><div class="bar-segment" style="height:'+Math.round(counts[s]/maxC*100)+'px;opacity:'+(counts[s]>0?'1':'0.2')+'"></div><div class="bar-xlabel">'+escapeHtml(s)+'</div></div>').join('')+'</div>';}
-  const secEl=document.getElementById('analytics-sector');if(secEl){const sc={};startups.forEach(s=>{const sec=s.sector||'Unknown';sc[sec]=(sc[sec]||0)+1;});const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxS=Math.max(1,...sorted.map(([,v])=>v));secEl.innerHTML=sorted.map(([l,v])=>'<div class="funnel-bar"><div class="funnel-label">'+escapeHtml(l)+'</div><div class="funnel-track"><div class="funnel-fill" style="width:'+Math.round(v/maxS*100)+'%;background:var(--blue)"></div></div><div class="funnel-value">'+v+'</div></div>').join('')||'<div class="empty">No sector data yet.</div>';}
-  const convEl=document.getElementById('analytics-conversion');if(convEl){const pl=pipeline.length||1;convEl.innerHTML=[['Contacted rate',contacted,pl],['Reply rate',replied,Math.max(1,contacted)],['Meeting rate',meetings,Math.max(1,replied)],['Investment rate',invested,Math.max(1,meetings)]].map(([l,n,d])=>{const pct=d>0?Math.round(n/d*100):0;return'<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted)">'+l+'</span><strong style="color:'+(pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)')+'">'+pct+'%</strong></div>';}).join('');}
-  const sdEl=document.getElementById('analytics-score-dist');if(sdEl&&lastMatches.length){const buckets=Array(10).fill(0);lastMatches.forEach(m=>{buckets[Math.min(9,Math.floor((m.score||0)/10))]++;});const maxB=Math.max(1,...buckets);sdEl.innerHTML='<div class="bar-chart">'+buckets.map((v,i)=>'<div class="bar-col"><div class="bar-segment" style="height:'+Math.round(v/maxB*100)+'px;background:'+scoreColor(i*10+5)+';opacity:'+(v>0?'0.85':'0.2')+'"></div><div class="bar-xlabel">'+i*10+'-'+(i*10+9)+'</div></div>').join('')+'</div><div class="template-help" style="margin-top:10px">Score distribution across '+lastMatches.length+' investors.</div>';}
-  else if(sdEl)sdEl.innerHTML='<div class="empty">Run a match to populate this chart.</div>';
-}
 
 // ═══ CRM ═══
 function crmKey(startup,investor){return'l7_crm_'+(startup||'global')+'_'+investor;}
@@ -1730,11 +1623,6 @@ function toggleDiligenceTask(id,done){const tasks=getDiligenceTasks(),t=tasks.fi
 function removeDiligenceTask(id){saveDiligenceTasks(getDiligenceTasks().filter(t=>t.id!==id));renderDiligenceTasks();}
 
 // ═══ WATCHLISTS ═══
-function getWatchlists(){return JSON.parse(localStorage.getItem('l7_watchlists')||'[]');}
-function saveWatchlists(lists){localStorage.setItem('l7_watchlists',JSON.stringify(lists));}
-function renderWatchlists(){const el=document.getElementById('watchlists-list');if(!el)return;const lists=getWatchlists();if(!lists.length){el.innerHTML='<div class="empty">No watchlists yet.</div>';return;}el.innerHTML=lists.map(list=>'<div class="pipeline-row"><div class="avatar">'+initials(list.name)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(list.name)+' <span class="badge">'+(list.items||[]).length+' startups</span></div><div class="row-copy">'+escapeHtml(list.notes||'No notes')+'</div><div class="tag-row">'+(list.items||[]).slice(0,4).map(i=>'<span class="tag info">'+escapeHtml(i)+'</span>').join('')+'</div></div></div>').join('');}
-function createWatchlist(){const name=document.getElementById('watchlist-name')?.value.trim(),notes=document.getElementById('watchlist-notes')?.value.trim();if(!name)return showError('Enter a watchlist name.');const lists=getWatchlists(),existing=lists.find(l=>l.name.toLowerCase()===name.toLowerCase());if(existing){existing.notes=notes;}else{lists.unshift({name,notes,items:[]});}saveWatchlists(lists);document.getElementById('watchlist-name').value='';document.getElementById('watchlist-notes').value='';renderWatchlists();addAuditEntry('match','Watchlist saved',name);}
-function saveCurrentToWatchlist(){if(!selectedStartup)return showError('Select a startup first.');const lists=getWatchlists();if(!lists.length)return showError('Create a watchlist first.');lists[0].items=uniqueList([selectedStartup.company,...(lists[0].items||[])]);saveWatchlists(lists);renderWatchlists();addAuditEntry('match','Added to watchlist',selectedStartup.company+' \u2192 '+lists[0].name);}
 
 // ═══ DOCUMENT VAULT ═══
 function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('Log7DocumentVault',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('documents')){const store=db.createObjectStore('documents',{keyPath:'id',autoIncrement:true});store.createIndex('entityType','entityType',{unique:false});store.createIndex('entityName','entityName',{unique:false});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return docsDbPromise;}
