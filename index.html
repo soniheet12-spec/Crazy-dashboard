@@ -316,19 +316,29 @@
 
   @media (max-width:1200px) { .kanban-board { grid-template-columns:repeat(3,1fr); } }
   @media (max-width:1024px) { .grid-main, .grid-two, .grid-three, .insight-grid, .pipeline-grid, .stat-grid { grid-template-columns:1fr; } .hero-title { max-width:none; } }
-  @media (max-width:680px) {
-    .container { padding:18px; } nav { padding:16px 18px; }
+  @media (max-width:768px) {
+    nav { flex-wrap:wrap; padding:12px 14px; gap:8px; align-items:flex-start; }
+    .nav-tabs { order:3; width:100%; overflow-x:auto; overflow-y:hidden; flex-wrap:nowrap; gap:4px; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    .nav-tabs::-webkit-scrollbar { height:4px; }
+    .nav-tab { white-space:nowrap; flex-shrink:0; min-height:44px; }
+    .nav-right { order:2; flex-wrap:wrap; gap:6px; }
+    #global-search-wrap input { width:140px !important; }
+    .container { padding:14px; }
     .section-title { font-size:1.35rem; } .field-row { grid-template-columns:1fr; }
-    .hero-title { font-size:1.7rem; } .hero-copy { font-size:13px; }
-    .card { border-radius:8px; padding:16px; } .match-card { padding:16px; }
+    .hero-title { font-size:1.6rem; } .hero-copy { font-size:13px; }
+    .card { border-radius:8px; padding:14px; } .match-card { padding:14px; }
     .match-head { flex-direction:column; align-items:stretch; } .score { text-align:left; min-width:0; }
-    .settings-menu { right:-6px; }
-    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; }
+    .settings-menu { right:-6px; left:auto; max-width:90vw; }
+    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .inline-actions > *, .action-row > * { width:100%; }
-    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle { min-height:40px; }
+    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle, button.action-btn { min-height:44px; }
+    input, select, textarea { min-height:44px; font-size:14px; }
     .mobile-sticky-actions { display:block; }
-    .kanban-board { grid-template-columns:repeat(2,1fr); }
+    .kanban-board { grid-template-columns:1fr; gap:10px; }
     .stat-grid { grid-template-columns:repeat(2,1fr); }
+    /* All wide tables become horizontally scrollable so columns don't crush */
+    table { display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
+    #whatsapp-outreach-panel, .outreach-list { max-height:60vh; overflow-y:auto; }
   }
   @media print {
     nav, .settings-wrap, .section-bar button, .template-card, .drop-zone, #pdf-input, .filters-row, .subtabs, .action-row { display:none !important; }
@@ -355,11 +365,16 @@
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
   </div>
   <div class="nav-right">
+    <div id="global-search-wrap" style="position:relative;margin-right:10px">
+      <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
+      <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
+    </div>
         <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
     <div class="settings-wrap" id="settings-wrap">
       <button class="settings-toggle" onclick="toggleSettings()">Settings ▾</button>
       <div class="settings-menu">
+        <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
         <div class="settings-section">
           <div class="settings-label">Active User / Role</div>
           <div class="field-row" style="margin-bottom:0">
@@ -444,9 +459,12 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
           <div style="display:grid;gap:6px">
-            <button class="action-btn primary" style="width:100%" onclick="showTab('match',document.querySelectorAll('.nav-tab')[2])">&#9889; New Match</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">&#128203; Pipeline</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[7])">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('network')">&#127760; Network</button>
+            <button class="action-btn primary" style="width:100%" onclick="goToTab('match')">&#9889; Match Studio</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
@@ -607,6 +625,7 @@
   <div id="page-pipeline" class="page">
     <div class="section-bar">
       <div class="section-title">Deal Pipeline</div>
+      <button class="ghost-btn" onclick="openAddDealModal()">+ Add Deal</button>
       <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
       <button class="ghost-btn" onclick="renderPipelineList()">List View</button>
       <button class="ghost-btn" onclick="renderKanban()">Board View</button>
@@ -883,6 +902,8 @@
   </div>
 
   <!-- MODALS -->
+  <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
+  <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
 </div><!-- end container -->
@@ -1023,22 +1044,37 @@ function toggleSettings(){document.getElementById('settings-wrap').classList.tog
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
 // ═══ THEME ═══
+// ═══ TOAST ═══
+function showToast(msg, kind){
+  var c=document.getElementById('toast-container');
+  if(!c){c=document.createElement('div');c.id='toast-container';c.style.cssText='position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';document.body.appendChild(c);}
+  var bg = kind==='error' ? '#f44336' : kind==='warn' ? '#ff9800' : '#4caf50';
+  var t=document.createElement('div');
+  t.style.cssText='background:'+bg+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:auto;max-width:320px';
+  t.textContent=msg;c.appendChild(t);
+  setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},2000);
+}
+function _markSettingsSaved(label){
+  var ts=new Date().toISOString();localStorage.setItem('l7_settings_last_saved',ts);
+  var el=document.getElementById('settings-last-saved');if(el)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+  showToast('Settings saved ✓');
+}
 function applyTheme(name){
   const t=THEMES[name]||THEMES.midnight,r=document.documentElement;
   [['--bg',t.bg],['--s1',t.s1],['--s2',t.s2],['--s3',t.s3],['--border',t.border],['--border2',t.border2],['--text',t.text],['--muted',t.muted],['--accent',t.accent],['--accent-soft',t.accentSoft],['--green',t.green],['--amber',t.amber],['--red',t.red],['--blue',t.blue]].forEach(([k,v])=>r.style.setProperty(k,v));
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
-function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';}
+function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
+function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
 function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
 
 // ═══ USER PROFILE ═══
 function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));}
+function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
 function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
 
 // ═══ CAPITAL SETTINGS ═══
-function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();}
+function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();_markSettingsSaved('Capital');}
 function getCapitalSettings(){return JSON.parse(localStorage.getItem('l7_capital')||'{"deployed":0,"fund":0}');}
 function refreshCapitalDisplay(){
   const {deployed,fund}=getCapitalSettings();
@@ -1052,16 +1088,6 @@ function refreshCapitalDisplay(){
 }
 
 // ═══ AUDIT LOG ═══
-// ═══ TOAST ═══
-function showToast(msg, kind){
-  var c=document.getElementById('toast-container');
-  if(!c){c=document.createElement('div');c.id='toast-container';c.style.cssText='position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';document.body.appendChild(c);}
-  var bg = kind==='error' ? '#f44336' : kind==='warn' ? '#ff9800' : '#4caf50';
-  var t=document.createElement('div');
-  t.style.cssText='background:'+bg+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:auto;animation:fadeIn .2s';
-  t.textContent=msg;c.appendChild(t);
-  setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},2200);
-}
 function getAuditLog(){return JSON.parse(localStorage.getItem('l7_audit')||'[]');}
 function saveAuditLog(log){localStorage.setItem('l7_audit',JSON.stringify(log.slice(0,500)));}
 function addAuditEntry(type,action,entity){
@@ -1281,7 +1307,9 @@ async function fetchNewsMonitor(){
 }
 
 // ═══ DATA LOADING ═══
-function saveKey(){const k=document.getElementById('api-key').value;localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');}
+function saveKey(){const k=document.getElementById('api-key').value.trim();
+  if(k && !/^sk-[A-Za-z0-9_\-]{10,}/.test(k)){showToast('Invalid API key format','error');setKeyStatus('Invalid');return;}
+  localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');if(k)_markSettingsSaved('API key');}
 function setKeyStatus(text){const el=document.getElementById('key-status');if(el)el.textContent=text?'API key '+text:'';}
 function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.now());return u.toString();}
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
@@ -1545,16 +1573,88 @@ function renderKanban(){
   function parseCr(v){if(v==null)return 0;var s=String(v);var m=s.replace(/,/g,'').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;}
   function stageTotal(items){return items.reduce(function(acc,it){return acc+parseCr(sizeBy[String(it.startup).toLowerCase()]||0);},0);}
   function fmtCr(n){return n>0?' \u2022 \u20b9'+(n>=1?n.toFixed(n%1===0?0:1):n)+'Cr':'';}
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title">'+escapeHtml(item.investor)+'</div><div class="kanban-card-meta">'+escapeHtml(item.startup)+' \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
   const el=document.getElementById('pipeline-list');if(!el)return;const pipeline=getPipeline();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><strong>'+escapeHtml(item.investor)+'</strong></td><td>'+escapeHtml(item.startup)+'</td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
+  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
 function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+
+// ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
+function findNetEntity(type,name){
+  var key = type==='investor' ? 'l7_net_investors' : 'l7_net_startups';
+  var arr = JSON.parse(localStorage.getItem(key)||'[]');
+  var lc = String(name||'').toLowerCase();
+  return arr.find(function(r){
+    var n = (r.investorName||r.companyName||r.name||'').toLowerCase();
+    return n===lc;
+  }) || null;
+}
+function openNetEntityModal(type,name){
+  var rec = findNetEntity(type,name);
+  var modal = document.getElementById('net-entity-modal');
+  var title = document.getElementById('net-entity-title');
+  var body  = document.getElementById('net-entity-content');
+  title.textContent = (type==='investor'?'Investor: ':'Startup: ') + (name||'Unknown');
+  if(!rec){
+    body.innerHTML = '<div class="empty" style="padding:20px">No matching record in Network &gt; '+(type==='investor'?'Investors':'Startups')+'.</div>'
+      + '<div style="margin-top:12px"><button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);">Open Network Tab</button></div>';
+  } else {
+    var rows = Object.keys(rec).filter(function(k){return !k.startsWith('_')&&k!=='id'&&rec[k]!=null&&rec[k]!=='';}).map(function(k){
+      var label = k.replace(/([A-Z])/g,' $1').replace(/^./,function(c){return c.toUpperCase();});
+      return '<div class="detail-row"><span class="detail-label">'+escapeHtml(label)+'</span><span>'+escapeHtml(String(rec[k]))+'</span></div>';
+    }).join('');
+    body.innerHTML = '<div class="detail-list">'+rows+'</div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);switchNetTab(\''+(type==='investor'?'investors':'startups')+'\',document.getElementById(\'net-tab-\'+(type===\'investor\'?\'investors\':\'startups\')));">Open in Network</button>'
+      + '</div>';
+  }
+  modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeNetEntityModal(){var m=document.getElementById('net-entity-modal');m.classList.add('hidden');m.style.display='none';}
+
+// ═══ ADD DEAL MODAL ═══
+function openAddDealModal(){
+  var invs = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var sts  = JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  var body = document.getElementById('add-deal-content');
+  if(!invs.length || !sts.length){
+    body.innerHTML = '<div class="empty" style="padding:18px">'
+      + (!sts.length?'Add at least one startup in <strong>Network &gt; Startups</strong>. ':'')
+      + (!invs.length?'Add at least one investor in <strong>Network &gt; Investors</strong>.':'')
+      + '</div>';
+  } else {
+    var stOpts  = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var invOpts = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var stageOpts = PIPELINE_STAGES.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+    body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
+      + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
+      + '<div class="field-row"><div class="field"><label>Score (0-100)</label><input id="add-deal-score" type="number" min="0" max="100" value="50"></div><div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div></div>'
+      + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
+  }
+  var modal=document.getElementById('add-deal-modal');modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeAddDealModal(){var m=document.getElementById('add-deal-modal');m.classList.add('hidden');m.style.display='none';}
+function submitAddDeal(){
+  var startup  = document.getElementById('add-deal-startup').value;
+  var investor = document.getElementById('add-deal-investor').value;
+  var score    = +document.getElementById('add-deal-score').value || 0;
+  var stage    = document.getElementById('add-deal-stage').value;
+  if(!startup || !investor) return showError('Pick both a startup and an investor.');
+  var pipeline = getPipeline();
+  if(pipeline.find(function(i){return i.startup===startup&&i.investor===investor;})){
+    return showError('That deal is already in the pipeline.');
+  }
+  pipeline.unshift({startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage});
+  localStorage.setItem('l7_pipeline',JSON.stringify(pipeline.slice(0,500)));
+  addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
+  closeAddDealModal();
+  renderKanban();renderPipelineList();refreshHome();updateStats();
+}
 
 // ═══ ANALYTICS ═══
 
@@ -1674,9 +1774,36 @@ function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Pr
 async function saveDocumentRecord(record){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').add(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
 async function getAllDocuments(){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readonly');const req=tx.objectStore('documents').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});}
 async function deleteDocumentRecord(id){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
-function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;const items=typeEl.value==='startup'?startups.map(s=>s.company):investors.map(i=>i.name);nameEl.innerHTML=items.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');refreshDocsUI();}
-async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;const docs=(await getAllDocuments()).filter(d=>d.entityType===typeEl.value&&d.entityName===nameEl.value).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}listEl.innerHTML=docs.map(doc=>'<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+' | '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>').join('');}
-async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();};reader.readAsDataURL(file);}
+function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;
+  // Source entity options from Network localStorage rather than sheet-loaded globals
+  var net = typeEl.value==='startup' ? JSON.parse(localStorage.getItem('l7_net_startups')||'[]') : JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var names = net.map(function(r){return typeEl.value==='startup' ? (r.companyName||r.name||'') : (r.investorName||r.name||'');}).filter(Boolean);
+  // Fall back to sheet-loaded globals if Network is empty
+  if(!names.length){names = typeEl.value==='startup' ? (startups||[]).map(function(s){return s.company;}) : (investors||[]).map(function(i){return i.name;});}
+  nameEl.innerHTML = names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+  refreshDocsUI();refreshDocCountCache();}
+// Cache of {entityType:entityName: count} used by Network list to show doc badges
+window._docCounts = {};
+async function refreshDocCountCache(){
+  try{var docs=await getAllDocuments();var c={};docs.forEach(function(d){var k=(d.entityType||'')+':'+(d.entityName||'');c[k]=(c[k]||0)+1;});window._docCounts=c;
+    if(typeof renderNetList==='function'){renderNetList('investors');renderNetList('startups');}
+  }catch(e){}
+}
+async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;
+  var docs=(await getAllDocuments()).filter(function(d){return d.entityType===typeEl.value&&d.entityName===nameEl.value;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
+  if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}
+  listEl.innerHTML=docs.map(function(doc){
+    var entityBadge='<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+escapeQ(doc.entityType)+'\',\''+escapeQ(doc.entityName)+'\')">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+'</span>';
+    return '<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+entityBadge+' '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>';
+  }).join('');
+}
+function filterDocsByEntity(type,name){
+  var typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');
+  if(typeEl&&['startup','investor'].includes(type)){typeEl.value=type;refreshDocsSelectors();}
+  if(nameEl){var opt=Array.from(nameEl.options).find(function(o){return o.value===name;});if(!opt){var o=document.createElement('option');o.value=o.textContent=name;nameEl.appendChild(o);}nameEl.value=name;refreshDocsUI();}
+  if(typeof goToTab==='function') goToTab('docs'); else { var btn=document.querySelectorAll('.nav-tab')[9]; if(btn) showTab('docs',btn); }
+}
+async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();refreshDocCountCache();};reader.readAsDataURL(file);}
 async function downloadStoredDoc(id){const docs=await getAllDocuments(),doc=docs.find(d=>d.id===id);if(!doc)return;const a=document.createElement('a');a.href=doc.dataUrl;a.download=doc.fileName;document.body.appendChild(a);a.click();document.body.removeChild(a);}
 async function deleteStoredDoc(id){await deleteDocumentRecord(id);addAuditEntry('doc','Document deleted from vault');refreshDocsUI();}
 
@@ -2330,6 +2457,7 @@ function renderNetList(tab){
     + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
+    + ((tab==='investors'||tab==='startups')?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Docs</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Match</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
     + '<th style="padding:8px 10px"></th>'
@@ -2362,6 +2490,16 @@ function renderNetList(tab){
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
+    if(tab==='investors'||tab==='startups'){
+      var entType = tab==='investors' ? 'investor' : 'startup';
+      var entName = tab==='investors' ? (row.investorName||row.name||'') : (row.companyName||row.name||'');
+      var docCount = (window._docCounts||{})[entType+':'+entName] || 0;
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (docCount>0
+            ? '<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+entType+'\',\''+escapeQ(entName)+'\')">📁 '+docCount+'</span>'
+            : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
+    }
     if(tab==='investors'){
       var invName = row.investorName||row.name||'';
       var ms = matchScores[invName];
@@ -3069,6 +3207,91 @@ function sendWhatsApp(phone, name) {
 }
 
 document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
+
+// ═══ GLOBAL SEARCH ═══
+function goToTab(name){
+  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var idx=map[name];if(idx==null)return;
+  var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
+}
+function runGlobalSearch(q){
+  var box=document.getElementById('global-search-results');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];}}
+  var sources=[
+    {label:'Investors', tab:'network', subtab:'investors', items:load('l7_net_investors'), nameFn:function(r){return r.investorName||r.name||'';}, metaFn:function(r){return [r.fundName,r.sectorFocus,r.stageFocus].filter(Boolean).join(' · ');}},
+    {label:'Partners',  tab:'network', subtab:'partnerships', items:load('l7_net_partnerships'), nameFn:function(r){return r.partnerName||r.name||'';}, metaFn:function(r){return [r.organisation,r.role].filter(Boolean).join(' · ');}},
+    {label:'Startups',  tab:'network', subtab:'startups', items:load('l7_net_startups'), nameFn:function(r){return r.companyName||r.name||'';}, metaFn:function(r){return [r.founderName,r.sector,r.stage].filter(Boolean).join(' · ');}},
+    {label:'Pipeline',  tab:'pipeline', items:load('l7_pipeline'), nameFn:function(r){return (r.investor||'')+' ↔ '+(r.startup||'');}, metaFn:function(r){return [r.stage,r.score!=null?'Score '+r.score:''].filter(Boolean).join(' · ');}}
+  ];
+  var html='';
+  sources.forEach(function(src){
+    var hits=(src.items||[]).filter(function(r){return JSON.stringify(r).toLowerCase().indexOf(q)>=0;}).slice(0,8);
+    if(!hits.length)return;
+    html+='<div style="padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--muted);background:var(--s2);border-bottom:1px solid var(--border)">'+src.label.toUpperCase()+'</div>';
+    hits.forEach(function(r){
+      var name=src.nameFn(r)||'(unnamed)';
+      var meta=src.metaFn(r);
+      var payload=encodeURIComponent(JSON.stringify({tab:src.tab,subtab:src.subtab,name:name,kind:src.label}));
+      html+='<div onmousedown="globalSearchPick(\''+payload+'\')" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12.5px" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<div style="font-weight:600;color:var(--text)">'+escapeHtml(name)+'</div>'
+        +(meta?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escapeHtml(meta)+'</div>':'')+'</div>';
+    });
+  });
+  if(!html)html='<div style="padding:14px;color:var(--muted);font-size:12px">No matches for "'+escapeHtml(q)+'"</div>';
+  box.innerHTML=html;box.style.display='block';
+}
+function globalSearchPick(payload){
+  try{var p=JSON.parse(decodeURIComponent(payload));
+    closeGlobalSearch();
+    goToTab(p.tab);
+    if(p.tab==='network'&&p.subtab){
+      var btn=document.getElementById('net-tab-'+p.subtab);
+      if(btn&&typeof switchNetTab==='function')switchNetTab(p.subtab,btn);
+    }
+    // Try to flash-highlight matching row after render
+    setTimeout(function(){
+      var rows=document.querySelectorAll('#page-'+p.tab+' tr, #page-'+p.tab+' .kanban-card');
+      rows.forEach(function(row){
+        if(row.textContent && row.textContent.toLowerCase().indexOf(String(p.name).toLowerCase())>=0){
+          row.style.transition='background 0.4s';
+          var orig=row.style.background;row.style.background='var(--accent-soft)';
+          setTimeout(function(){row.style.background=orig;},1600);
+        }
+      });
+    },120);
+  }catch(e){}
+}
+function closeGlobalSearch(){var b=document.getElementById('global-search-results');if(b){b.style.display='none';}}
+
+// ═══ KEYBOARD SHORTCUTS ═══
+document.addEventListener('keydown', function(e){
+  var tag=(e.target&&e.target.tagName)||'';
+  var typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
+  // Ctrl/Cmd + K → focus search (works even while typing elsewhere)
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==='k'||e.key==='K')){
+    e.preventDefault();var s=document.getElementById('global-search');if(s){s.focus();s.select();}
+    return;
+  }
+  // Ctrl/Cmd + ? → shortcut help
+  if((e.ctrlKey||e.metaKey)&&(e.key==='?'||e.key==='/')){
+    e.preventDefault();alert('Keyboard shortcuts:\n\nCtrl+K — focus global search\nH — Home\nN — Network\nM — Match Studio\nP — Pipeline\nD — Diligence\nEsc — close any open modal');
+    return;
+  }
+  if(e.key==='Escape'){
+    var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','net-modal'];
+    var any=false;
+    modals.forEach(function(id){var m=document.getElementById(id);if(m&&!m.classList.contains('hidden')){m.classList.add('hidden');m.style.display='none';any=true;}});
+    closeGlobalSearch();
+    if(any){e.preventDefault();}
+    return;
+  }
+  if(typing)return;
+  var map={h:'home',n:'network',m:'match',p:'pipeline',d:'diligence'};
+  var key=String(e.key||'').toLowerCase();
+  if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
+});
 </script>
 </body>
 </html>
