@@ -316,19 +316,29 @@
 
   @media (max-width:1200px) { .kanban-board { grid-template-columns:repeat(3,1fr); } }
   @media (max-width:1024px) { .grid-main, .grid-two, .grid-three, .insight-grid, .pipeline-grid, .stat-grid { grid-template-columns:1fr; } .hero-title { max-width:none; } }
-  @media (max-width:680px) {
-    .container { padding:18px; } nav { padding:16px 18px; }
+  @media (max-width:768px) {
+    nav { flex-wrap:wrap; padding:12px 14px; gap:8px; align-items:flex-start; }
+    .nav-tabs { order:3; width:100%; overflow-x:auto; overflow-y:hidden; flex-wrap:nowrap; gap:4px; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    .nav-tabs::-webkit-scrollbar { height:4px; }
+    .nav-tab { white-space:nowrap; flex-shrink:0; min-height:44px; }
+    .nav-right { order:2; flex-wrap:wrap; gap:6px; }
+    #global-search-wrap input { width:140px !important; }
+    .container { padding:14px; }
     .section-title { font-size:1.35rem; } .field-row { grid-template-columns:1fr; }
-    .hero-title { font-size:1.7rem; } .hero-copy { font-size:13px; }
-    .card { border-radius:8px; padding:16px; } .match-card { padding:16px; }
+    .hero-title { font-size:1.6rem; } .hero-copy { font-size:13px; }
+    .card { border-radius:8px; padding:14px; } .match-card { padding:14px; }
     .match-head { flex-direction:column; align-items:stretch; } .score { text-align:left; min-width:0; }
-    .settings-menu { right:-6px; }
-    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; }
+    .settings-menu { right:-6px; left:auto; max-width:90vw; }
+    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .inline-actions > *, .action-row > * { width:100%; }
-    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle { min-height:40px; }
+    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle, button.action-btn { min-height:44px; }
+    input, select, textarea { min-height:44px; font-size:14px; }
     .mobile-sticky-actions { display:block; }
-    .kanban-board { grid-template-columns:repeat(2,1fr); }
+    .kanban-board { grid-template-columns:1fr; gap:10px; }
     .stat-grid { grid-template-columns:repeat(2,1fr); }
+    /* All wide tables become horizontally scrollable so columns don't crush */
+    table { display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
+    #whatsapp-outreach-panel, .outreach-list { max-height:60vh; overflow-y:auto; }
   }
   @media print {
     nav, .settings-wrap, .section-bar button, .template-card, .drop-zone, #pdf-input, .filters-row, .subtabs, .action-row { display:none !important; }
@@ -360,6 +370,7 @@
     <div class="settings-wrap" id="settings-wrap">
       <button class="settings-toggle" onclick="toggleSettings()">Settings ▾</button>
       <div class="settings-menu">
+        <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
         <div class="settings-section">
           <div class="settings-label">Active User / Role</div>
           <div class="field-row" style="margin-bottom:0">
@@ -1022,22 +1033,37 @@ function toggleSettings(){document.getElementById('settings-wrap').classList.tog
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
 // ═══ THEME ═══
+// ═══ TOAST ═══
+function showToast(msg, kind){
+  var c=document.getElementById('toast-container');
+  if(!c){c=document.createElement('div');c.id='toast-container';c.style.cssText='position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';document.body.appendChild(c);}
+  var bg = kind==='error' ? '#f44336' : kind==='warn' ? '#ff9800' : '#4caf50';
+  var t=document.createElement('div');
+  t.style.cssText='background:'+bg+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:auto;max-width:320px';
+  t.textContent=msg;c.appendChild(t);
+  setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},2000);
+}
+function _markSettingsSaved(label){
+  var ts=new Date().toISOString();localStorage.setItem('l7_settings_last_saved',ts);
+  var el=document.getElementById('settings-last-saved');if(el)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+  showToast('Settings saved ✓');
+}
 function applyTheme(name){
   const t=THEMES[name]||THEMES.midnight,r=document.documentElement;
   [['--bg',t.bg],['--s1',t.s1],['--s2',t.s2],['--s3',t.s3],['--border',t.border],['--border2',t.border2],['--text',t.text],['--muted',t.muted],['--accent',t.accent],['--accent-soft',t.accentSoft],['--green',t.green],['--amber',t.amber],['--red',t.red],['--blue',t.blue]].forEach(([k,v])=>r.style.setProperty(k,v));
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
-function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';}
+function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
+function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
 function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
 
 // ═══ USER PROFILE ═══
 function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));}
+function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
 function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
 
 // ═══ CAPITAL SETTINGS ═══
-function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();}
+function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();_markSettingsSaved('Capital');}
 function getCapitalSettings(){return JSON.parse(localStorage.getItem('l7_capital')||'{"deployed":0,"fund":0}');}
 function refreshCapitalDisplay(){
   const {deployed,fund}=getCapitalSettings();
@@ -1270,7 +1296,9 @@ async function fetchNewsMonitor(){
 }
 
 // ═══ DATA LOADING ═══
-function saveKey(){const k=document.getElementById('api-key').value;localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');}
+function saveKey(){const k=document.getElementById('api-key').value.trim();
+  if(k && !/^sk-[A-Za-z0-9_\-]{10,}/.test(k)){showToast('Invalid API key format','error');setKeyStatus('Invalid');return;}
+  localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');if(k)_markSettingsSaved('API key');}
 function setKeyStatus(text){const el=document.getElementById('key-status');if(el)el.textContent=text?'API key '+text:'';}
 function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.now());return u.toString();}
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
@@ -1629,9 +1657,36 @@ function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Pr
 async function saveDocumentRecord(record){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').add(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
 async function getAllDocuments(){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readonly');const req=tx.objectStore('documents').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});}
 async function deleteDocumentRecord(id){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
-function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;const items=typeEl.value==='startup'?startups.map(s=>s.company):investors.map(i=>i.name);nameEl.innerHTML=items.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');refreshDocsUI();}
-async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;const docs=(await getAllDocuments()).filter(d=>d.entityType===typeEl.value&&d.entityName===nameEl.value).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}listEl.innerHTML=docs.map(doc=>'<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+' | '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>').join('');}
-async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();};reader.readAsDataURL(file);}
+function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;
+  // Source entity options from Network localStorage rather than sheet-loaded globals
+  var net = typeEl.value==='startup' ? JSON.parse(localStorage.getItem('l7_net_startups')||'[]') : JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var names = net.map(function(r){return typeEl.value==='startup' ? (r.companyName||r.name||'') : (r.investorName||r.name||'');}).filter(Boolean);
+  // Fall back to sheet-loaded globals if Network is empty
+  if(!names.length){names = typeEl.value==='startup' ? (startups||[]).map(function(s){return s.company;}) : (investors||[]).map(function(i){return i.name;});}
+  nameEl.innerHTML = names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+  refreshDocsUI();refreshDocCountCache();}
+// Cache of {entityType:entityName: count} used by Network list to show doc badges
+window._docCounts = {};
+async function refreshDocCountCache(){
+  try{var docs=await getAllDocuments();var c={};docs.forEach(function(d){var k=(d.entityType||'')+':'+(d.entityName||'');c[k]=(c[k]||0)+1;});window._docCounts=c;
+    if(typeof renderNetList==='function'){renderNetList('investors');renderNetList('startups');}
+  }catch(e){}
+}
+async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;
+  var docs=(await getAllDocuments()).filter(function(d){return d.entityType===typeEl.value&&d.entityName===nameEl.value;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
+  if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}
+  listEl.innerHTML=docs.map(function(doc){
+    var entityBadge='<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+escapeQ(doc.entityType)+'\',\''+escapeQ(doc.entityName)+'\')">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+'</span>';
+    return '<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+entityBadge+' '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>';
+  }).join('');
+}
+function filterDocsByEntity(type,name){
+  var typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');
+  if(typeEl&&['startup','investor'].includes(type)){typeEl.value=type;refreshDocsSelectors();}
+  if(nameEl){var opt=Array.from(nameEl.options).find(function(o){return o.value===name;});if(!opt){var o=document.createElement('option');o.value=o.textContent=name;nameEl.appendChild(o);}nameEl.value=name;refreshDocsUI();}
+  if(typeof goToTab==='function') goToTab('docs'); else { var btn=document.querySelectorAll('.nav-tab')[9]; if(btn) showTab('docs',btn); }
+}
+async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();refreshDocCountCache();};reader.readAsDataURL(file);}
 async function downloadStoredDoc(id){const docs=await getAllDocuments(),doc=docs.find(d=>d.id===id);if(!doc)return;const a=document.createElement('a');a.href=doc.dataUrl;a.download=doc.fileName;document.body.appendChild(a);a.click();document.body.removeChild(a);}
 async function deleteStoredDoc(id){await deleteDocumentRecord(id);addAuditEntry('doc','Document deleted from vault');refreshDocsUI();}
 
@@ -2285,6 +2340,7 @@ function renderNetList(tab){
     + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
+    + ((tab==='investors'||tab==='startups')?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Docs</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Match</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
     + '<th style="padding:8px 10px"></th>'
@@ -2317,6 +2373,16 @@ function renderNetList(tab){
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
+    if(tab==='investors'||tab==='startups'){
+      var entType = tab==='investors' ? 'investor' : 'startup';
+      var entName = tab==='investors' ? (row.investorName||row.name||'') : (row.companyName||row.name||'');
+      var docCount = (window._docCounts||{})[entType+':'+entName] || 0;
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (docCount>0
+            ? '<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+entType+'\',\''+escapeQ(entName)+'\')">📁 '+docCount+'</span>'
+            : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
+    }
     if(tab==='investors'){
       var invName = row.investorName||row.name||'';
       var ms = matchScores[invName];
