@@ -1101,7 +1101,7 @@ function showTab(name,btn){
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
   if(name==='network') renderNetworkTab();
-  if(name==='home') refreshNetFollowups();
+  if(name==='home'){refreshHome();}
   if(name==='match') renderBulkOutreachPanel();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
@@ -1162,10 +1162,17 @@ function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>
 function refreshHome(){
   const dateEl=document.getElementById('home-date');if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const pipeline=getPipeline(),today=new Date().toISOString().slice(0,10);
-  const due=pipeline.filter(i=>{const c=getInvestorCRM(i.startup,i.investor);return c.followUp&&c.followUp<=today;});
-  const hot=pipeline.filter(i=>['meeting booked','invested','replied'].includes(getInvestorCRM(i.startup,i.investor).status));
+  // Read counts from Network localStorage keys
+  const netStartups=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  const netInvestors=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  const netPartners=JSON.parse(localStorage.getItem('l7_net_partnerships')||'[]');
+  // Follow-ups due: check all three network collections
+  const due=[...netStartups,...netInvestors,...netPartners].filter(r=>r.followUpDate&&r.followUpDate===today);
+  // Hot deals: pipeline where stage==="Hot", or tags include "hot", or score>=80
+  const hot=pipeline.filter(i=>{const crm=getInvestorCRM(i.startup,i.investor);return i.stage==='Hot'||(crm.tags||[]).map(t=>String(t).toLowerCase()).includes('hot')||(i.score>=80);});
+  // Contacted: pipeline where CRM status !== "not contacted"
   const contacted=pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted');
-  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startups.length],['home-stat-investors',investors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
+  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',netStartups.length],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const notifEl=document.getElementById('home-notifications');
   if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
   const prEl=document.getElementById('home-priority-list');
