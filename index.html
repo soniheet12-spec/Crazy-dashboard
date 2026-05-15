@@ -563,7 +563,7 @@
             <button class="action-btn secondary" onclick="exportPipelineCsv()">Export Pipeline CSV</button>
           </div>
         </div>
-        <div id="match-results"><div class="empty">Select a startup, upload a pitch deck if available, and run a match.</div></div>
+        <div id="match-results" style="display:none"></div>
 
         <!-- ═══ WHATSAPP OUTREACH PANEL ═══ -->
         <div id="whatsapp-outreach-panel" style="margin-top:20px;padding:16px;border:1px solid #444;border-radius:8px;">
@@ -1101,7 +1101,7 @@ function showTab(name,btn){
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
   if(name==='network') renderNetworkTab();
-  if(name==='home') refreshNetFollowups();
+  if(name==='home'){refreshHome();}
   if(name==='match') renderBulkOutreachPanel();
 }
 function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
@@ -1162,10 +1162,17 @@ function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>
 function refreshHome(){
   const dateEl=document.getElementById('home-date');if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const pipeline=getPipeline(),today=new Date().toISOString().slice(0,10);
-  const due=pipeline.filter(i=>{const c=getInvestorCRM(i.startup,i.investor);return c.followUp&&c.followUp<=today;});
-  const hot=pipeline.filter(i=>['meeting booked','invested','replied'].includes(getInvestorCRM(i.startup,i.investor).status));
+  // Read counts from Network localStorage keys
+  const netStartups=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  const netInvestors=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  const netPartners=JSON.parse(localStorage.getItem('l7_net_partnerships')||'[]');
+  // Follow-ups due: check all three network collections
+  const due=[...netStartups,...netInvestors,...netPartners].filter(r=>r.followUpDate&&r.followUpDate===today);
+  // Hot deals: pipeline where stage==="Hot", or tags include "hot", or score>=80
+  const hot=pipeline.filter(i=>{const crm=getInvestorCRM(i.startup,i.investor);return i.stage==='Hot'||(crm.tags||[]).map(t=>String(t).toLowerCase()).includes('hot')||(i.score>=80);});
+  // Contacted: pipeline where CRM status !== "not contacted"
   const contacted=pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted');
-  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startups.length],['home-stat-investors',investors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
+  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',netStartups.length],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const notifEl=document.getElementById('home-notifications');
   if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
   const prEl=document.getElementById('home-priority-list');
@@ -1418,6 +1425,9 @@ function clearStartupSelection(){
 }
 function selectStartup(index){
   selectedStartup=startups[index];pdfText='';uploadedPdfName='';deckInsightsCache=null;
+  // Clear previous match scores when startup changes
+  localStorage.removeItem('l7_match_scores');window._lastMatchScores={};
+  var mr=document.getElementById('match-results');if(mr)mr.style.display='none';
   const pn=document.getElementById('pdf-name');if(pn)pn.textContent='';
   document.querySelectorAll('.startup-option').forEach((e,i)=>e.classList.toggle('selected',i===index));
   const readiness=computeFounderReadiness(selectedStartup,null);
@@ -1448,10 +1458,9 @@ async function processPdf(file){
 async function runMatch(){
   if(!selectedStartup)return showError('Select a startup first.');
   var netInvs=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-  if(!netInvs.length){document.getElementById('match-results').innerHTML='<div class="empty">No investors in Network tab — add investors first.</div>';return;}
+  if(!netInvs.length){showError('No investors in Network tab — add investors first.');return;}
   showError('');
-  var btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching...';
-  document.getElementById('match-results').innerHTML='<div class="loading-box">Matching against '+netInvs.length+' investors from your network...</div>';
+  var btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching '+netInvs.length+'...';
   var apiKey=localStorage.getItem('l7_key');
   if(!apiKey){btn.disabled=false;btn.textContent='Run Match';return showError('Add a Claude API key in Settings first.');}
   try{
@@ -1471,11 +1480,18 @@ async function runMatch(){
     results.sort(function(a,b){return b.score-a.score;});
     lastMatches=results.map(function(r){return{name:r.inv.investorName||r.inv.name||'',score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
     lastPayload={matches:lastMatches};
+    // Save scores to localStorage keyed by investor name
+    var scoreMap={};results.forEach(function(r){var n=r.inv.investorName||r.inv.name||'';scoreMap[n]={score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
+    localStorage.setItem('l7_match_scores',JSON.stringify(scoreMap));
     window._lastMatchScores={};lastMatches.forEach(function(m){window._lastMatchScores[m.name]=m.score;});
-    renderMatches(results);
+    // Refresh Network investors tab and outreach panel to show badges
+    renderNetList('investors');
+    renderBulkOutreachPanel();
     updateStats();
+    // Show brief confirmation
+    var mr=document.getElementById('match-results');if(mr){mr.style.display='block';mr.innerHTML='<div style="padding:12px 0;color:var(--muted);font-size:13px">✓ Match complete — scores shown on investor rows in Network tab and Outreach panel.</div>';}
     addAuditEntry('match','Network AI match — '+results.length+' investors ranked',selectedStartup.company);
-  }catch(err){showError('Matching failed: '+err.message);document.getElementById('match-results').innerHTML='';}
+  }catch(err){showError('Matching failed: '+err.message);}
   btn.disabled=false;btn.textContent='Run Match';
 }
 
@@ -2373,6 +2389,7 @@ function renderNetList(tab){
   var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
+  var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
@@ -2380,6 +2397,7 @@ function renderNetList(tab){
     + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
+    + (tab==='investors'?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Match</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
     + '<th style="padding:8px 10px"></th>'
     + '</tr></thead><tbody>';
@@ -2411,6 +2429,16 @@ function renderNetList(tab){
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
+    if(tab==='investors'){
+      var invName = row.investorName||row.name||'';
+      var ms = matchScores[invName];
+      var msColor = ms!=null ? (ms>=70?'#4caf50':ms>=40?'#ff9800':'#f44336') : '';
+      var msData = ms!=null ? matchScores[invName] : null;
+      var msTip = msData ? escapeHtml((msData.verdict||'')+(msData.reasons&&msData.reasons.length?'\nWhy: '+msData.reasons.slice(0,2).join('; '):'')+(msData.concerns&&msData.concerns.length?'\nConcerns: '+msData.concerns.slice(0,2).join('; '):'')) : '';
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (ms!=null ? '<span title="'+msTip+'" style="display:inline-block;padding:2px 8px;border-radius:10px;background:'+msColor+';color:#fff;font-size:11px;font-weight:700;cursor:help">'+ms+'/100</span>' : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
+    }
     if(tab==='investors'){
       var badge = row._fromSheet
         ? (row._localOverride
@@ -2954,7 +2982,9 @@ function renderBulkOutreachPanel() {
   if (partners.length)  console.log('First partner record:',  partners[0]);
 
   // Sort investors by match score descending if scores are available
-  const scores = window._lastMatchScores || {};
+  var matchScoreMap = JSON.parse(localStorage.getItem('l7_match_scores') || '{}');
+  const scores = {};
+  Object.keys(matchScoreMap).forEach(k => { scores[k] = matchScoreMap[k].score != null ? matchScoreMap[k].score : matchScoreMap[k]; });
   investors = investors.slice().sort((a, b) => {
     const nm = n => n.investorName || n.name || '';
     return (scores[nm(b)] || 0) - (scores[nm(a)] || 0);
@@ -2997,8 +3027,11 @@ function renderBulkOutreachPanel() {
       var safe  = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       var isDue = row.followUpDate && row.followUpDate <= today;
       var matchScore = scores[name];
+      var matchData = matchScoreMap[name];
+      var scoreTip = matchData ? (matchData.verdict||'')+(matchData.reasons&&matchData.reasons.length?'\nWhy: '+matchData.reasons.slice(0,2).join('; '):'')+(matchData.concerns&&matchData.concerns.length?'\nConcerns: '+matchData.concerns.slice(0,2).join('; '):'') : '';
+      var scoreColor = matchScore>=70?'#4caf50':matchScore>=40?'#ff9800':'#f44336';
       var scoreBadge = matchScore != null
-        ? ' <span style="font-size:10px;padding:1px 6px;border-radius:10px;background:' + (matchScore>=75?'var(--green)':matchScore>=50?'var(--amber)':'var(--red)') + ';color:#fff;font-weight:700;vertical-align:middle">' + matchScore + '</span>'
+        ? ' <span title="'+escapeHtml(scoreTip)+'" style="font-size:10px;padding:1px 6px;border-radius:10px;background:'+scoreColor+';color:#fff;font-weight:700;vertical-align:middle;cursor:help">' + matchScore + '/100</span>'
         : '';
 
       html += '<tr style="border-bottom:1px solid var(--border)"'
