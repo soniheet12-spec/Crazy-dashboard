@@ -355,6 +355,10 @@
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
   </div>
   <div class="nav-right">
+    <div id="global-search-wrap" style="position:relative;margin-right:10px">
+      <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
+      <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
+    </div>
         <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
     <div class="settings-wrap" id="settings-wrap">
@@ -444,9 +448,12 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
           <div style="display:grid;gap:6px">
-            <button class="action-btn primary" style="width:100%" onclick="showTab('match',document.querySelectorAll('.nav-tab')[2])">&#9889; New Match</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">&#128203; Pipeline</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[7])">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('network')">&#127760; Network</button>
+            <button class="action-btn primary" style="width:100%" onclick="goToTab('match')">&#9889; Match Studio</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
@@ -3023,6 +3030,91 @@ function sendWhatsApp(phone, name) {
 }
 
 document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
+
+// ═══ GLOBAL SEARCH ═══
+function goToTab(name){
+  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var idx=map[name];if(idx==null)return;
+  var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
+}
+function runGlobalSearch(q){
+  var box=document.getElementById('global-search-results');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];}}
+  var sources=[
+    {label:'Investors', tab:'network', subtab:'investors', items:load('l7_net_investors'), nameFn:function(r){return r.investorName||r.name||'';}, metaFn:function(r){return [r.fundName,r.sectorFocus,r.stageFocus].filter(Boolean).join(' · ');}},
+    {label:'Partners',  tab:'network', subtab:'partnerships', items:load('l7_net_partnerships'), nameFn:function(r){return r.partnerName||r.name||'';}, metaFn:function(r){return [r.organisation,r.role].filter(Boolean).join(' · ');}},
+    {label:'Startups',  tab:'network', subtab:'startups', items:load('l7_net_startups'), nameFn:function(r){return r.companyName||r.name||'';}, metaFn:function(r){return [r.founderName,r.sector,r.stage].filter(Boolean).join(' · ');}},
+    {label:'Pipeline',  tab:'pipeline', items:load('l7_pipeline'), nameFn:function(r){return (r.investor||'')+' ↔ '+(r.startup||'');}, metaFn:function(r){return [r.stage,r.score!=null?'Score '+r.score:''].filter(Boolean).join(' · ');}}
+  ];
+  var html='';
+  sources.forEach(function(src){
+    var hits=(src.items||[]).filter(function(r){return JSON.stringify(r).toLowerCase().indexOf(q)>=0;}).slice(0,8);
+    if(!hits.length)return;
+    html+='<div style="padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--muted);background:var(--s2);border-bottom:1px solid var(--border)">'+src.label.toUpperCase()+'</div>';
+    hits.forEach(function(r){
+      var name=src.nameFn(r)||'(unnamed)';
+      var meta=src.metaFn(r);
+      var payload=encodeURIComponent(JSON.stringify({tab:src.tab,subtab:src.subtab,name:name,kind:src.label}));
+      html+='<div onmousedown="globalSearchPick(\''+payload+'\')" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12.5px" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<div style="font-weight:600;color:var(--text)">'+escapeHtml(name)+'</div>'
+        +(meta?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escapeHtml(meta)+'</div>':'')+'</div>';
+    });
+  });
+  if(!html)html='<div style="padding:14px;color:var(--muted);font-size:12px">No matches for "'+escapeHtml(q)+'"</div>';
+  box.innerHTML=html;box.style.display='block';
+}
+function globalSearchPick(payload){
+  try{var p=JSON.parse(decodeURIComponent(payload));
+    closeGlobalSearch();
+    goToTab(p.tab);
+    if(p.tab==='network'&&p.subtab){
+      var btn=document.getElementById('net-tab-'+p.subtab);
+      if(btn&&typeof switchNetTab==='function')switchNetTab(p.subtab,btn);
+    }
+    // Try to flash-highlight matching row after render
+    setTimeout(function(){
+      var rows=document.querySelectorAll('#page-'+p.tab+' tr, #page-'+p.tab+' .kanban-card');
+      rows.forEach(function(row){
+        if(row.textContent && row.textContent.toLowerCase().indexOf(String(p.name).toLowerCase())>=0){
+          row.style.transition='background 0.4s';
+          var orig=row.style.background;row.style.background='var(--accent-soft)';
+          setTimeout(function(){row.style.background=orig;},1600);
+        }
+      });
+    },120);
+  }catch(e){}
+}
+function closeGlobalSearch(){var b=document.getElementById('global-search-results');if(b){b.style.display='none';}}
+
+// ═══ KEYBOARD SHORTCUTS ═══
+document.addEventListener('keydown', function(e){
+  var tag=(e.target&&e.target.tagName)||'';
+  var typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
+  // Ctrl/Cmd + K → focus search (works even while typing elsewhere)
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==='k'||e.key==='K')){
+    e.preventDefault();var s=document.getElementById('global-search');if(s){s.focus();s.select();}
+    return;
+  }
+  // Ctrl/Cmd + ? → shortcut help
+  if((e.ctrlKey||e.metaKey)&&(e.key==='?'||e.key==='/')){
+    e.preventDefault();alert('Keyboard shortcuts:\n\nCtrl+K — focus global search\nH — Home\nN — Network\nM — Match Studio\nP — Pipeline\nD — Diligence\nEsc — close any open modal');
+    return;
+  }
+  if(e.key==='Escape'){
+    var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','net-modal'];
+    var any=false;
+    modals.forEach(function(id){var m=document.getElementById(id);if(m&&!m.classList.contains('hidden')){m.classList.add('hidden');m.style.display='none';any=true;}});
+    closeGlobalSearch();
+    if(any){e.preventDefault();}
+    return;
+  }
+  if(typing)return;
+  var map={h:'home',n:'network',m:'match',p:'pipeline',d:'diligence'};
+  var key=String(e.key||'').toLowerCase();
+  if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
+});
 </script>
 </body>
 </html>
