@@ -997,7 +997,7 @@ function sendWhatsApp(phone, name) {
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbyDvK8t4E9_5ZMLv0WfYrmtomcOBFKNxOdBqj5VbzvGxa1AdohX1aWIQDFeMVN32S0s/exec';
-const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0/gviz/tq?tqx=out:json&sheet=Sheet1';
+const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0/gviz/tq?tqx=out:json';
 const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -1341,10 +1341,12 @@ function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.n
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
 async function fetchGvizSheet(url){
   var res=await fetch(url+'&_ts='+Date.now(),{cache:'no-store'});
-  if(!res.ok) throw new Error('Request failed ('+res.status+')');
+  if(!res.ok) throw new Error('HTTP '+res.status);
   var text=await res.text();
-  var json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,''));
-  // Return raw rows as arrays indexed by column position (0=A, 1=B, ...)
+  var json;
+  try { json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,'')); }
+  catch(e){ throw new Error('Parse error — sheet may not be public. Raw: '+text.slice(0,120)); }
+  if(json.status==='error') throw new Error('Sheet error: '+(json.errors||[]).map(function(e){return e.detailed_message||e.message||'';}).join('; '));
   var rows=(json.table&&json.table.rows||[]).map(function(r){
     return (r.c||[]).map(function(cell){ return cell?(cell.v==null?'':String(cell.v)):''; });
   });
@@ -2768,8 +2770,9 @@ async function netFetchInvestors(){
       +' &bull; Last synced: '+now;
 
   } catch(err) {
+    console.error('[netFetchInvestors] fetch failed:', err);
     var cachedTime = localStorage.getItem('l7_net_inv_sync')||'—';
-    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">Sheet unreachable — cached data (last: '+cachedTime+')</span>';
+    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">Sheet unreachable — '+escapeHtml(err.message)+' (last: '+cachedTime+')</span>';
   }
 
   _netInvFetching = false;
