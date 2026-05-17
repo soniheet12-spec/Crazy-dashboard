@@ -472,8 +472,10 @@ function initTokenClient(){
       _toast('Google Drive connected ✓');
       renderPanel('backup-panel-container');
       startAuto();
-      // Initialize Sheets DB after auth
-      if(window.SheetsDB) window.SheetsDB.fetchAll().then(function(ok){
+      // Initialize Sheets DB after auth — migrate first, then fetch+render
+      if(window.SheetsDB) window.SheetsDB.migrateFromLocalStorage().then(function(){
+        return window.SheetsDB.fetchAll();
+      }).then(function(ok){
         if(!ok) return;
         renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
         window.SheetsDB.startPolling();
@@ -817,6 +819,88 @@ window.SheetsDB = (function(){
     } catch(e){ console.warn('[SheetsDB] logActivity:', e.message); }
   }
 
+  // ── One-time migration from localStorage ─────────────────────────────
+  var MIGRATION_KEY = 'l7_migration_done';
+
+  // Flatten pipeline: handles both flat array and {stage:[...]} object shapes
+  function flattenPipeline(raw){
+    if(Array.isArray(raw)) return raw;
+    var out = [];
+    if(raw && typeof raw === 'object'){
+      Object.entries(raw).forEach(function(kv){
+        var stage = kv[0], items = kv[1];
+        if(Array.isArray(items)) items.forEach(function(item){
+          out.push(Object.assign({}, item, { stage: item.stage || stage }));
+        });
+      });
+    }
+    return out;
+  }
+
+  async function migrateFromLocalStorage(){
+    if(localStorage.getItem(MIGRATION_KEY) === 'true') return;
+    if(!isAuthenticated()) return;
+
+    var lsMapping = [
+      { lsKey:'l7_net_investors',    tab:'investors',    idFn:function(r){ return (r.investorName||'').toLowerCase(); } },
+      { lsKey:'l7_net_startups',     tab:'startups',     idFn:function(r){ return (r.companyName||r.name||'').toLowerCase(); } },
+      { lsKey:'l7_net_partnerships', tab:'partnerships', idFn:function(r){ return (r.partnerName||r.name||'').toLowerCase(); } },
+      { lsKey:'l7_pipeline',         tab:'pipeline',     idFn:function(r){ return ((r.startup||'')+'_'+(r.investor||'')).toLowerCase(); } },
+    ];
+
+    // Check whether any key has data worth migrating
+    var hasData = lsMapping.some(function(m){
+      var raw = localStorage.getItem(m.lsKey);
+      if(!raw) return false;
+      try {
+        var d = JSON.parse(raw);
+        return Array.isArray(d) ? d.length > 0 : (d && typeof d === 'object' && Object.keys(d).length > 0);
+      } catch(e){ return false; }
+    });
+    if(!hasData){ localStorage.setItem(MIGRATION_KEY,'true'); return; }
+
+    _toast('Migrating your local data to Google Sheets…');
+
+    try {
+      // Ensure tabs exist before migration
+      if(!_initialized){ await ensureTabs(); _initialized=true; }
+
+      for(var i=0; i<lsMapping.length; i++){
+        var m = lsMapping[i];
+        var raw = localStorage.getItem(m.lsKey);
+        if(!raw) continue;
+        var local;
+        try { local = JSON.parse(raw); } catch(e){ continue; }
+
+        // Flatten pipeline if needed
+        if(m.tab === 'pipeline') local = flattenPipeline(local);
+        if(!Array.isArray(local) || !local.length) continue;
+
+        // Fetch existing Sheets rows to avoid duplicates
+        var existing = [];
+        try {
+          var fetched = await fetchTab(m.tab);
+          existing = fetched.map(_tabMap[m.tab].toObj);
+        } catch(e){ existing = []; }
+
+        var existingIds = new Set(existing.map(m.idFn));
+        var toAdd = local.filter(function(r){ return !existingIds.has(m.idFn(r)); });
+
+        if(toAdd.length > 0){
+          var merged = existing.concat(toAdd);
+          await pushTab(m.tab, merged);
+        }
+      }
+
+      // Clear migrated keys
+      lsMapping.forEach(function(m){ localStorage.removeItem(m.lsKey); });
+      localStorage.setItem(MIGRATION_KEY, 'true');
+      _toast('Migration complete! All data now synced to Google Sheets.');
+    } catch(e){
+      _toast('Migration failed: '+e.message+' — your local data is safe.', 'error');
+    }
+  }
+
   return {
     get cache(){ return _cache; },
     get lastSync(){ return _lastSync; },
@@ -831,6 +915,7 @@ window.SheetsDB = (function(){
     logActivity: logActivity,
     startPolling: startPolling,
     updateSyncEl: updateSyncEl,
+    migrateFromLocalStorage: migrateFromLocalStorage,
   };
 })();
 </script>
@@ -1575,9 +1660,11 @@ window.onload = async () => {
   if(key) setKeyStatus('Saved');
   netStartPolling();
   if(window.Log7Backup) Log7Backup.init();
-  // If already authenticated from a previous session, fetch Sheets data immediately
+  // If already authenticated from a previous session, migrate then fetch
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.fetchAll(true).then(function(ok){
+    SheetsDB.migrateFromLocalStorage().then(function(){
+      return SheetsDB.fetchAll(true);
+    }).then(function(ok){
       if(!ok) return;
       renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
       SheetsDB.startPolling();
