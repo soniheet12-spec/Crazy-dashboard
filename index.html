@@ -1611,14 +1611,14 @@ function netLoad(tab){
     return SheetsDB.cache[tab] || [];
   }
   // localStorage fallback when not connected to Sheets
+  var manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
   if(tab === 'investors'){
-    var manual = netLoad('investors');
     var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
     var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
     var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
     return manual.concat(sheetOnly);
   }
-  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+  return manual;
 }
 function netSave(tab, data){
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
