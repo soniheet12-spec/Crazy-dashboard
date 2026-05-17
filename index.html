@@ -1162,17 +1162,22 @@ function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>
 function refreshHome(){
   const dateEl=document.getElementById('home-date');if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const pipeline=getPipeline(),today=new Date().toISOString().slice(0,10);
-  // Read counts from Network localStorage keys
+  // Startups: in-memory array loaded from Google Sheets (Match Studio), fallback to Network tab startups
   const netStartups=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
-  const netInvestors=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  const startupCount=(typeof startups!=='undefined'&&startups.length)?startups.length:netStartups.length;
+  // Investors: merge manual Network entries + Google Sheet cache rows via netLoad
+  const netInvestors=netLoad('investors');
   const netPartners=JSON.parse(localStorage.getItem('l7_net_partnerships')||'[]');
-  // Follow-ups due: check all three network collections
-  const due=[...netStartups,...netInvestors,...netPartners].filter(r=>r.followUpDate&&r.followUpDate===today);
-  // Hot deals: pipeline where stage==="Hot", or tags include "hot", or score>=80
-  const hot=pipeline.filter(i=>{const crm=getInvestorCRM(i.startup,i.investor);return i.stage==='Hot'||(crm.tags||[]).map(t=>String(t).toLowerCase()).includes('hot')||(i.score>=80);});
-  // Contacted: pipeline where CRM status !== "not contacted"
-  const contacted=pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted');
-  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',netStartups.length],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contacted.length]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
+  // Follow-ups due: overdue (<=today) across all three network collections
+  const due=[...netStartups,...netInvestors,...netPartners].filter(r=>r.followUpDate&&r.followUpDate<=today);
+  // Hot deals: pipeline where stage==="Hot" or CRM tags include "hot" (not score — score is match quality not deal heat)
+  const hot=pipeline.filter(i=>{const crm=getInvestorCRM(i.startup,i.investor);return i.stage==='Hot'||(crm.tags||[]).map(t=>String(t).toLowerCase()).includes('hot');});
+  // Contacted: count network investors/startups/partners that have been reached out to
+  const contactedInv=netInvestors.filter(r=>r.status&&r.status!=='Cold'&&r.status!=='Passed'&&r.status!=='');
+  const contactedSt=netStartups.filter(r=>r.status&&r.status!=='Referred'&&r.status!=='');
+  const contactedPa=netPartners.filter(r=>r.status&&r.status==='Active');
+  const contactedCount=contactedInv.length+contactedSt.length+contactedPa.length||pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted').length;
+  [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startupCount],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contactedCount]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const notifEl=document.getElementById('home-notifications');
   if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
   const prEl=document.getElementById('home-priority-list');
@@ -2308,8 +2313,24 @@ const NET_KEYS = {
   startups:     'l7_net_startups',
 };
 
-function netLoad(tab){ return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]'); }
-function netSave(tab,data){ localStorage.setItem(NET_KEYS[tab], JSON.stringify(data)); }
+function netLoad(tab){
+  if(tab==='investors'){
+    var manual=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+    var sheet=JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var manualNames=new Set(manual.map(function(r){return(r.investorName||'').toLowerCase();}));
+    var sheetOnly=sheet.filter(function(r){return!manualNames.has((r.investorName||'').toLowerCase());});
+    return manual.concat(sheetOnly);
+  }
+  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+}
+function netSave(tab,data){
+  if(tab==='investors'){
+    var manualOnly=data.filter(function(r){return!r._fromSheet;});
+    localStorage.setItem('l7_net_investors',JSON.stringify(manualOnly));
+    return;
+  }
+  localStorage.setItem(NET_KEYS[tab],JSON.stringify(data));
+}
 function netNextId(arr){ return arr.length ? Math.max(...arr.map(r=>r.id||0))+1 : 1; }
 
 function switchNetTab(tab, btn){
