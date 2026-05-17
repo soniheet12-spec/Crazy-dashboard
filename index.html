@@ -473,13 +473,18 @@ function initTokenClient(){
       _toast('Google Drive connected ✓');
       renderPanel('backup-panel-container');
       startAuto();
-      // Initialize Sheets DB after auth — migrate first, then fetch+render
-      if(window.SheetsDB) window.SheetsDB.migrateFromLocalStorage().then(function(){
+      // Initialize Sheets DB after auth — ensure tabs exist first, then migrate and fetch
+      if(window.SheetsDB) window.SheetsDB.ensureSheetTabsExist().then(function(){
+        return window.SheetsDB.migrateFromLocalStorage();
+      }).then(function(){
         return window.SheetsDB.fetchAll();
       }).then(function(ok){
         if(!ok) return;
         renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
         window.SheetsDB.startPolling();
+      }).catch(function(e){
+        console.error('[SheetsDB] ensureSheetTabsExist error:', e);
+        _toast('Failed to initialize Sheets tabs: '+e.message, 'error');
       });
     }
   });
@@ -729,11 +734,30 @@ window.SheetsDB = (function(){
   }
 
   async function ensureTabs(){
-    var existing = await fetchMeta();
-    var existSet = new Set(existing);
-    for(var tab in COLUMNS){
-      if(!existSet.has(tab)) await createTab(tab, COLUMNS[tab]);
+    await ensureSheetTabsExist();
+  }
+
+  async function ensureSheetTabsExist(){
+    var data = await apiCall('GET', '?fields=sheets.properties');
+    var existingSet = new Set((data.sheets||[]).map(function(s){ return s.properties.title; }));
+    (data.sheets||[]).forEach(function(s){ _sheetIds[s.properties.title] = s.properties.sheetId; });
+
+    var needed = Object.keys(COLUMNS);
+    var toCreate = needed.filter(function(n){ return !existingSet.has(n); });
+
+    if(toCreate.length > 0){
+      console.log('[SheetsDB] Creating missing tabs:', toCreate);
+      await apiCall('POST', ':batchUpdate', {
+        requests: toCreate.map(function(title){ return { addSheet:{ properties:{ title:title } } }; })
+      });
+      await fetchMeta();
+      for(var i=0; i<toCreate.length; i++){
+        var tab = toCreate[i];
+        await apiCall('PUT', '/values/'+encodeURIComponent(tab+'!A1')+'?valueInputOption=USER_ENTERED', { values:[COLUMNS[tab]] });
+      }
     }
+
+    _initialized = true;
   }
 
   async function fetchTab(tab){
@@ -771,6 +795,7 @@ window.SheetsDB = (function(){
 
   // Push full tab contents (clear data rows then rewrite)
   async function pushTab(tab, rows){
+    if(!_initialized) await ensureSheetTabsExist();
     var cols = COLUMNS[tab];
     var fromObj = _tabMap[tab].fromObj;
     var values = [cols].concat(rows.map(function(r){ return fromObj(r); }));
@@ -992,10 +1017,12 @@ window.SheetsDB = (function(){
     isAuthenticated: isAuthenticated,
     fetchAll: fetchAll,
     fetchTabInto: async function(tab){
+      if(!_initialized) await ensureSheetTabsExist();
       var rows = await fetchTab(tab);
       _cache[tab] = rows.map(_tabMap[tab].toObj);
       return _cache[tab];
     },
+    ensureSheetTabsExist: ensureSheetTabsExist,
     pushTab: pushTab,
     logActivity: logActivity,
     startPolling: startPolling,
