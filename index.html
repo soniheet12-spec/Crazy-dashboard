@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log7 Capital</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
     /* ── Pearl (White & Purple) default ── */
@@ -316,19 +317,29 @@
 
   @media (max-width:1200px) { .kanban-board { grid-template-columns:repeat(3,1fr); } }
   @media (max-width:1024px) { .grid-main, .grid-two, .grid-three, .insight-grid, .pipeline-grid, .stat-grid { grid-template-columns:1fr; } .hero-title { max-width:none; } }
-  @media (max-width:680px) {
-    .container { padding:18px; } nav { padding:16px 18px; }
+  @media (max-width:768px) {
+    nav { flex-wrap:wrap; padding:12px 14px; gap:8px; align-items:flex-start; }
+    .nav-tabs { order:3; width:100%; overflow-x:auto; overflow-y:hidden; flex-wrap:nowrap; gap:4px; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    .nav-tabs::-webkit-scrollbar { height:4px; }
+    .nav-tab { white-space:nowrap; flex-shrink:0; min-height:44px; }
+    .nav-right { order:2; flex-wrap:wrap; gap:6px; }
+    #global-search-wrap input { width:140px !important; }
+    .container { padding:14px; }
     .section-title { font-size:1.35rem; } .field-row { grid-template-columns:1fr; }
-    .hero-title { font-size:1.7rem; } .hero-copy { font-size:13px; }
-    .card { border-radius:8px; padding:16px; } .match-card { padding:16px; }
+    .hero-title { font-size:1.6rem; } .hero-copy { font-size:13px; }
+    .card { border-radius:8px; padding:14px; } .match-card { padding:14px; }
     .match-head { flex-direction:column; align-items:stretch; } .score { text-align:left; min-width:0; }
-    .settings-menu { right:-6px; }
-    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; }
+    .settings-menu { right:-6px; left:auto; max-width:90vw; }
+    .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .inline-actions > *, .action-row > * { width:100%; }
-    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle { min-height:40px; }
+    .mini-btn, .ghost-btn, .pill-btn, .action-btn, .nav-tab, .subtab, .settings-toggle, button.action-btn { min-height:44px; }
+    input, select, textarea { min-height:44px; font-size:14px; }
     .mobile-sticky-actions { display:block; }
-    .kanban-board { grid-template-columns:repeat(2,1fr); }
+    .kanban-board { grid-template-columns:1fr; gap:10px; }
     .stat-grid { grid-template-columns:repeat(2,1fr); }
+    /* All wide tables become horizontally scrollable so columns don't crush */
+    table { display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
+    #whatsapp-outreach-panel, .outreach-list { max-height:60vh; overflow-y:auto; }
   }
   @media print {
     nav, .settings-wrap, .section-bar button, .template-card, .drop-zone, #pdf-input, .filters-row, .subtabs, .action-row { display:none !important; }
@@ -338,31 +349,332 @@
   }
 @keyframes netLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.4)}}
 </style>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// LOG7 BACKUP SYSTEM — inlined
+// ═══════════════════════════════════════════════════════════════
+(function(){
+var GOOGLE_CLIENT_ID = '918188740743-36sgbscqcjpr3lftb4b81jq6uts60qgl.apps.googleusercontent.com';
+var DRIVE_FOLDER_ID  = '1rwJ3Gx992uo5Ol41-ry2oIvBwHWe4J5A';
+var TOKEN_KEY        = 'log7_gapi_token';
+var SETTINGS_KEY     = 'log7_backup_settings';
+var HISTORY_KEY      = 'log7_backup_history';
+var BACKUP_PREFIX    = 'log7_backup_';
+var MAX_HISTORY      = 20;
+
+// ── Snapshot ──────────────────────────────────────────────────
+function collectSnapshot(){
+  var snap={version:'1.0',timestamp:new Date().toISOString(),source:window.location.hostname,data:{},meta:{totalKeys:0,sizeBytes:0}};
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k&&k.startsWith('l7_'))snap.data[k]=localStorage.getItem(k);
+  }
+  var str=JSON.stringify(snap.data);
+  snap.meta.totalKeys=Object.keys(snap.data).length;
+  snap.meta.sizeBytes=new Blob([str]).size;
+  return snap;
+}
+
+// ── Token ─────────────────────────────────────────────────────
+function getToken(){return sessionStorage.getItem(TOKEN_KEY)||null;}
+
+// ── Drive upload ──────────────────────────────────────────────
+async function uploadToDrive(snap){
+  var token=getToken();
+  if(!token)throw new Error('Not connected to Google Drive. Click "Connect Google Drive" first.');
+  var filename=BACKUP_PREFIX+snap.timestamp.replace(/[:.]/g,'-')+'.json';
+  var body=JSON.stringify(snap,null,2);
+  var boundary='l7bk';
+  var meta={name:filename,parents:[DRIVE_FOLDER_ID],mimeType:'application/json',
+    description:'Log7 backup — '+snap.meta.totalKeys+' keys, '+fmtBytes(snap.meta.sizeBytes)};
+  var mp=['--'+boundary,'Content-Type: application/json; charset=UTF-8','',JSON.stringify(meta),
+    '--'+boundary,'Content-Type: application/json','',body,'--'+boundary+'--'].join('\r\n');
+  var r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
+    body:mp});
+  if(!r.ok){
+    if(r.status===401){sessionStorage.removeItem(TOKEN_KEY);throw new Error('Session expired. Reconnect Google Drive.');}
+    var e=await r.json();throw new Error((e&&e.error&&e.error.message)||'Upload failed: '+r.status);
+  }
+  return await r.json();
+}
+
+// ── List backups ──────────────────────────────────────────────
+async function listBackups(){
+  var token=getToken();if(!token)return[];
+  var q=encodeURIComponent("'"+DRIVE_FOLDER_ID+"' in parents and name contains '"+BACKUP_PREFIX+"' and trashed=false");
+  var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime+desc&pageSize=30&fields=files(id,name,createdTime,description,size)',
+    {headers:{Authorization:'Bearer '+token}});
+  if(!r.ok){if(r.status===401)sessionStorage.removeItem(TOKEN_KEY);return[];}
+  var d=await r.json();return d.files||[];
+}
+
+// ── Restore ───────────────────────────────────────────────────
+async function restoreFromDrive(fileId,filename){
+  var token=getToken();if(!token)throw new Error('Not connected to Google Drive.');
+  var r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
+    {headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error('Download failed: '+r.status);
+  var snap=await r.json();
+  if(!snap||!snap.data)throw new Error('Invalid backup format.');
+  localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(collectSnapshot()));
+  var n=0;
+  Object.keys(snap.data).forEach(function(k){localStorage.setItem(k,snap.data[k]);n++;});
+  addHistory({action:'restore',filename:filename,fileId:fileId,timestamp:new Date().toISOString(),keysRestored:n,fromTimestamp:snap.timestamp});
+  return{restored:n,fromTimestamp:snap.timestamp};
+}
+
+// ── History / Settings ────────────────────────────────────────
+function getHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return[];}}
+function addHistory(e){var h=getHistory();h.unshift(e);localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,MAX_HISTORY)));}
+function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};}}
+function saveSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
+
+// ── Auto-backup ───────────────────────────────────────────────
+var _timer=null;
+function startAuto(){
+  stopAuto();
+  var s=getSettings();var h=s.intervalHours||6;
+  _timer=setInterval(async function(){try{await doBackup('auto');}catch(e){console.warn('[Backup] auto failed:',e.message);}},h*3600000);
+}
+function stopAuto(){if(_timer){clearInterval(_timer);_timer=null;}}
+
+// ── Main backup trigger ───────────────────────────────────────
+async function doBackup(src){
+  var snap=collectSnapshot();
+  var file=await uploadToDrive(snap);
+  addHistory({action:'backup',source:src||'manual',filename:file.name,fileId:file.id,timestamp:snap.timestamp,keys:snap.meta.totalKeys,sizeBytes:snap.meta.sizeBytes});
+  var s=getSettings();s.lastBackupAt=snap.timestamp;s.lastBackupFile=file.name;saveSettings(s);
+  return{file:file,snapshot:snap};
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB';}
+function fmtAgo(iso){
+  if(!iso)return'Never';
+  var d=Date.now()-new Date(iso).getTime();var m=Math.floor(d/60000);
+  if(m<1)return'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);
+  if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── OAuth ─────────────────────────────────────────────────────
+var _tc=null;
+function initTokenClient(){
+  if(_tc||!window.google||!window.google.accounts)return;
+  _tc=window.google.accounts.oauth2.initTokenClient({
+    client_id:GOOGLE_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/drive.file',
+    callback:function(resp){
+      if(resp.error){_toast('Sign-in failed: '+resp.error,'error');return;}
+      sessionStorage.setItem(TOKEN_KEY,resp.access_token);
+      _toast('Google Drive connected ✓');
+      renderPanel('backup-panel-container');
+      startAuto();
+    }
+  });
+}
+function connectDrive(){
+  initTokenClient();
+  if(!_tc){
+    // GIS not loaded yet — retry once
+    setTimeout(function(){initTokenClient();if(_tc)_tc.requestAccessToken({prompt:'consent'});else _toast('Google Identity Services not ready. Try again.','error');},600);
+    return;
+  }
+  _tc.requestAccessToken({prompt:'consent'});
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function _toast(msg,kind){
+  if(typeof window.showToast==='function'){window.showToast(msg,kind==='error'?'error':undefined);return;}
+  var t=document.createElement('div');t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;background:'+(kind==='error'?'#f44336':'#4caf50')+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  document.body.appendChild(t);setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},3000);
+}
+
+// ── Render panel ──────────────────────────────────────────────
+function renderPanel(containerId){
+  var el=document.getElementById(containerId);if(!el)return;
+  var s=getSettings(),hist=getHistory(),snap=collectSnapshot(),connected=!!getToken();
+  var rows=hist.slice(0,10).map(function(h){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:14px;width:20px;text-align:center">'+(h.action==='restore'?'&#8681;':h.source==='auto'?'&#8635;':'&#8679;')+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      +esc(h.action==='restore'?'Restored: '+(h.fromTimestamp?new Date(h.fromTimestamp).toLocaleString('en-IN'):h.filename):(h.filename||'Backup'))+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(h.source==='auto'?'Auto':'Manual')+' &middot; '+(h.keys||h.keysRestored||'?')+' keys'+(h.sizeBytes?' &middot; '+fmtBytes(h.sizeBytes):'')+'</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);white-space:nowrap">'+fmtAgo(h.timestamp)+'</div>'
+      +'</div>';
+  }).join('');
+
+  el.innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:16px">'
+
+    // Header
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--text)">&#128190; Data Backup</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:2px">All dashboard data backed up to Google Drive</div></div>'
+    +'<div style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;white-space:nowrap;'
+    +(s.lastBackupAt?'background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)':'background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)')+'">'+
+    (s.lastBackupAt?'&#9679; Last: '+fmtAgo(s.lastBackupAt):'&#9888; Never backed up')+'</div>'
+    +'</div>'
+
+    // Connect row
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px">'
+    +(connected
+      ?'<div style="flex:1;font-size:13px;font-weight:600;color:var(--green)">&#10003; Google Drive connected</div>'
+       +'<button onclick="sessionStorage.removeItem(\''+TOKEN_KEY+'\');stopAutoBackup();window.Log7Backup.renderPanel(\'backup-panel-container\');_backupToast(\'Disconnected.\')" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif">Disconnect</button>'
+      :'<button onclick="window.Log7Backup._connect()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Poppins\',sans-serif">&#128279; Connect Google Drive</button>')
+    +'</div>'
+
+    // Action buttons
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button onclick="window.Log7Backup._backupNow(this)" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8679; Back Up Now</button>'
+    +'<button onclick="window.Log7Backup._restore()" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8681; Restore</button>'
+    +'<a href="https://drive.google.com/drive/folders/'+DRIVE_FOLDER_ID+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--s2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:12px;text-decoration:none;font-family:\'Poppins\',sans-serif">&#128193; Open Drive</a>'
+    +'</div>'
+
+    // Auto-backup
+    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'
+    +'<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px">Auto-backup interval</div>'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<select onchange="window.Log7Backup._setInterval(this.value)" style="background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">'
+    +'<option value="2"'  +((s.intervalHours||6)==2 ?' selected':'')+'>Every 2 hours</option>'
+    +'<option value="6"'  +((s.intervalHours||6)==6 ?' selected':'')+'>Every 6 hours</option>'
+    +'<option value="12"' +((s.intervalHours||6)==12?' selected':'')+'>Every 12 hours</option>'
+    +'<option value="24"' +((s.intervalHours||6)==24?' selected':'')+'>Every 24 hours</option>'
+    +'</select>'
+    +'<span style="font-size:12px;color:var(--muted)">Active every '+(s.intervalHours||6)+'h</span>'
+    +'</div></div>'
+
+    // History
+    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+    +'<div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted)">'
+    +'<span>Backup History</span><span>'+hist.length+' entries</span></div>'
+    +'<div style="max-height:220px;overflow-y:auto">'
+    +(rows||'<div style="padding:20px 14px;text-align:center;color:var(--muted);font-size:13px">No backups yet</div>')
+    +'</div></div>'
+
+    // Stats
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    +['<div>'+snap.meta.totalKeys+'</div><div>Keys in storage</div>',
+      '<div>'+fmtBytes(snap.meta.sizeBytes)+'</div><div>Current size</div>',
+      '<div>'+hist.filter(function(h){return h.action==='backup';}).length+'</div><div>Total backups</div>']
+    .map(function(s){return '<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">'+s.replace('<div>','<div style="font-size:18px;font-weight:700;color:var(--accent)">').replace('<div>','<div style="font-size:11px;color:var(--muted);margin-top:3px">')+'</div>';}).join('')
+    +'</div>'
+
+    +'</div>'
+
+    // Restore modal
+    +'<div id="l7-restore-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px">'
+    +'<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;padding:24px;display:flex;flex-direction:column;gap:16px;max-height:90vh">'
+    +'<div style="font-size:15px;font-weight:700;color:var(--text)">&#8681; Restore from Backup</div>'
+    +'<div style="font-size:13px;color:var(--muted);line-height:1.6">Choose a backup. Current data is saved as emergency snapshot first.</div>'
+    +'<div id="l7-restore-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"><div style="padding:20px;text-align:center;color:var(--muted)">Loading…</div></div>'
+    +'<div style="display:flex;justify-content:flex-end"><button onclick="document.getElementById(\'l7-restore-modal\').style.display=\'none\'" style="background:var(--s2);color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">Cancel</button></div>'
+    +'</div></div>';
+}
+
+// ── Public action handlers ─────────────────────────────────────
+window._backupToast = _toast; // allow disconnect button inline
+window.stopAutoBackup = stopAuto;
+
+window.Log7Backup={
+  init:function(){
+    // Try to init token client now; if GIS not yet ready, wait
+    if(window.google&&window.google.accounts){initTokenClient();}
+    else{
+      var tries=0;
+      var iv=setInterval(function(){
+        tries++;
+        if(window.google&&window.google.accounts){initTokenClient();clearInterval(iv);}
+        else if(tries>20){clearInterval(iv);}
+      },300);
+    }
+    if(getToken())startAuto();
+    console.log('[Log7 Backup] Inlined backup system ready.');
+  },
+  renderPanel:renderPanel,
+  _connect:connectDrive,
+  _backupNow:async function(btn){
+    var orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='&#8987; Backing up…';
+    try{
+      var r=await doBackup('manual');
+      btn.innerHTML='&#10003; Done!';
+      _toast('Backed up '+r.snapshot.meta.totalKeys+' keys → '+r.file.name);
+      setTimeout(function(){btn.disabled=false;btn.innerHTML=orig;renderPanel('backup-panel-container');},2000);
+    }catch(e){btn.disabled=false;btn.innerHTML=orig;_toast('Backup failed: '+e.message,'error');}
+  },
+  _restore:async function(){
+    var modal=document.getElementById('l7-restore-modal');
+    if(!modal)return;
+    modal.style.display='flex';
+    var listEl=document.getElementById('l7-restore-list');
+    try{
+      var files=await listBackups();
+      if(!files.length){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">No backups found in Drive folder.</div>';return;}
+      listEl.innerHTML=files.map(function(f){
+        return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name.replace(BACKUP_PREFIX,''))+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(f.description||'')+'</div>'
+          +'</div>'
+          +'<button onclick="window.Log7Backup._doRestore(\''+f.id+'\',\''+esc(f.name)+'\',this)" style="background:var(--s2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif;flex-shrink:0">Restore</button>'
+          +'</div>';
+      }).join('');
+    }catch(e){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--red)">Error: '+esc(e.message)+'</div>';}
+  },
+  _doRestore:async function(fileId,filename,btn){
+    if(!confirm('Restore from "'+filename+'"?\n\nYour current data will be saved as an emergency snapshot.'))return;
+    btn.disabled=true;btn.textContent='Restoring…';
+    try{
+      var r=await restoreFromDrive(fileId,filename);
+      document.getElementById('l7-restore-modal').style.display='none';
+      _toast('Restored '+r.restored+' keys. Reloading…');
+      setTimeout(function(){location.reload();},1800);
+    }catch(e){btn.disabled=false;btn.textContent='Restore';_toast('Restore failed: '+e.message,'error');}
+  },
+  _setInterval:function(val){
+    var s=getSettings();s.intervalHours=parseInt(val,10);saveSettings(s);stopAuto();startAuto();
+    _toast('Auto-backup set to every '+val+' hours');
+  },
+  backup:doBackup,
+  collectSnapshot:collectSnapshot,
+  getHistory:getLocalHistory,
+};
+function getLocalHistory(){return getHistory();}
+})();
+</script>
 </head>
 <body>
 <nav>
   <div class="logo">Log7 Capital</div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showTab('home',this)">Home</button>
+    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
     <button class="nav-tab" onclick="showTab('match',this)">Match Studio</button>
     <button class="nav-tab" onclick="showTab('pipeline',this)">Pipeline</button>
-    <button class="nav-tab" onclick="showTab('analytics',this)">Analytics</button>
     <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
     <button class="nav-tab" onclick="showTab('deck',this)">Deck Insights</button>
-    <button class="nav-tab" onclick="showTab('watchlists',this)">Watchlists</button>
     <button class="nav-tab" onclick="showTab('memo',this)">IC Memo</button>
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
-    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
+    <button class="nav-tab" onclick="showTab('backup',this)">&#128190; Backup</button>
   </div>
   <div class="nav-right">
-    <button class="pill-btn" onclick="generateTearsheet()">Tearsheet</button>
+    <div id="global-search-wrap" style="position:relative;margin-right:10px">
+      <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
+      <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
+    </div>
         <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
     <div class="settings-wrap" id="settings-wrap">
       <button class="settings-toggle" onclick="toggleSettings()">Settings ▾</button>
       <div class="settings-menu">
+        <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
         <div class="settings-section">
           <div class="settings-label">Active User / Role</div>
           <div class="field-row" style="margin-bottom:0">
@@ -412,6 +724,14 @@
           <div class="settings-label">Fund Size (&#8377; Cr)</div>
           <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
         </div>
+        <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
+          <div class="settings-label">&#128190; Google Drive Backup</div>
+          <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
+            <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -435,7 +755,7 @@
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start">
       <div>
         <div class="card" style="margin-bottom:14px">
-          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Full Board &#8599;</button></div></div>
+          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Full Board &#8599;</button></div></div>
           <div id="home-pipeline-snapshot"><div class="empty" style="padding:18px">No pipeline deals yet.</div></div>
         </div>
         <div class="card">
@@ -447,10 +767,12 @@
         <div class="card" style="margin-bottom:14px">
           <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
           <div style="display:grid;gap:6px">
-            <button class="action-btn primary" style="width:100%" onclick="showTab('match',document.querySelectorAll('.nav-tab')[1])">&#9889; New Match</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">&#128203; Pipeline</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('analytics',document.querySelectorAll('.nav-tab')[3])">&#128202; Analytics</button>
-            <button class="action-btn secondary" style="width:100%" onclick="showTab('diligence',document.querySelectorAll('.nav-tab')[9])">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('network')">&#127760; Network</button>
+            <button class="action-btn primary" style="width:100%" onclick="goToTab('match')">&#9889; Match Studio</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
+            <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
           </div>
         </div>
         <div class="card" style="margin-bottom:14px">
@@ -600,7 +922,7 @@
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
-            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[2])">Open Pipeline</button>
+            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Open Pipeline</button>
           </div>
         </div>
       </div>
@@ -611,6 +933,7 @@
   <div id="page-pipeline" class="page">
     <div class="section-bar">
       <div class="section-title">Deal Pipeline</div>
+      <button class="ghost-btn" onclick="openAddDealModal()">+ Add Deal</button>
       <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
       <button class="ghost-btn" onclick="renderPipelineList()">List View</button>
       <button class="ghost-btn" onclick="renderKanban()">Board View</button>
@@ -628,56 +951,6 @@
         <div class="card-title">All Pipeline Deals</div>
       </div>
       <div id="pipeline-list"></div>
-    </div>
-  </div>
-
-  <!-- ═══ ANALYTICS ═══ -->
-  <div id="page-analytics" class="page">
-    <div class="section-bar">
-      <div class="section-title">Deal Analytics</div>
-      <button class="ghost-btn" onclick="refreshAnalytics()">Refresh</button>
-    </div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat">
-        <div class="stat-value" id="an-total-matched">0</div>
-        <div class="stat-label">Total Matched</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-contacted">0</div>
-        <div class="stat-label">Contacted</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-meetings">0</div>
-        <div class="stat-label">Meetings Booked</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="an-invested">0</div>
-        <div class="stat-label">Invested</div>
-      </div>
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Pipeline Funnel</div></div>
-        <div id="analytics-funnel"></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Status Breakdown</div></div>
-        <div id="analytics-status-chart"></div>
-      </div>
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Sector Distribution</div></div>
-        <div id="analytics-sector"></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Conversion Rates</div></div>
-        <div id="analytics-conversion"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Score Distribution (All Matches)</div></div>
-      <div id="analytics-score-dist"></div>
     </div>
   </div>
 
@@ -720,36 +993,6 @@
           <input id="extra-docs-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" onchange="handleExtraDocsUpload(event)">
           <div id="extra-docs-list" style="margin-top:8px"><div class="empty" style="padding:14px">No documents uploaded yet.</div></div>
         </div>
-      </div>
-    </div>
-  </div>
-
-    <!-- ═══ WATCHLISTS ═══ -->
-  <div id="page-watchlists" class="page">
-    <div class="section-bar">
-      <div class="section-title">Watchlists</div>
-      <button class="ghost-btn" onclick="saveCurrentToWatchlist()">Save Current Startup</button>
-    </div>
-    <div class="module-banner">
-      <strong>Firm-level watchlists and internal grouping.</strong>
-      Save startups into reusable buckets like IC Candidates, High Conviction, Needs More Diligence, or Outbound Now.
-    </div>
-    <div class="grid-two">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Create / Edit Watchlist</div></div>
-        <div class="field">
-          <label>Watchlist Name</label>
-          <input id="watchlist-name" placeholder="e.g. IC Candidates">
-        </div>
-        <div class="field">
-          <label>Watchlist Notes</label>
-          <textarea id="watchlist-notes" placeholder="What qualifies a startup for this watchlist?"></textarea>
-        </div>
-        <button class="action-btn primary" onclick="createWatchlist()">Save Watchlist</button>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Saved Watchlists</div></div>
-        <div id="watchlists-list"><div class="empty">No watchlists created yet.</div></div>
       </div>
     </div>
   </div>
@@ -797,6 +1040,7 @@
       <strong>Structured diligence tracker.</strong>
       Track legal, finance, product, market, team, and customer validation across multiple sections. Assign owners and record notes per item.
     </div>
+    <div id="diligence-ic-ready" style="margin-bottom:12px"></div>
     <div class="grid-two">
       <div>
         <div class="card">
@@ -966,12 +1210,54 @@
   </div>
 
   <!-- MODALS -->
-  <div id="tearsheet-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:760px;width:100%;max-height:90vh;overflow-y:auto;border-radius:10px"><div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px"><button class="action-btn primary" onclick="window.print()">Print</button><button class="action-btn danger" onclick="closeTearsheet()">&#x2715; Close</button></div><div id="tearsheet-content"></div></div></div>
+  <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
+  <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
+  <!-- ═══ BACKUP ═══ -->
+  <div id="page-backup" class="page">
+    <div class="section-bar">
+      <div class="section-title">Data Backup</div>
+      <button class="ghost-btn" onclick="Log7Backup.renderPanel('backup-panel-container')">&#8635; Refresh</button>
+    </div>
+    <div class="module-banner">
+      <strong>Google Drive backup.</strong>
+      Backs up all dashboard localStorage data to your Google Drive folder. Restore any previous snapshot with one click.
+    </div>
+    <div class="card" style="max-width:640px">
+      <div id="backup-panel-container"></div>
+    </div>
+  </div>
+
 </div><!-- end container -->
 
 <script>
+const NET_KEYS = {
+  partnerships: 'l7_net_partnerships',
+  investors:    'l7_net_investors',
+  startups:     'l7_net_startups',
+};
+
+function netLoad(tab){
+  if(tab === 'investors'){
+    var manual = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
+    var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
+    return manual.concat(sheetOnly);
+  }
+  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+}
+function netSave(tab,data){
+  if(tab === 'investors'){
+    var manualOnly = data.filter(function(r){ return !r._fromSheet; });
+    localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
+    return;
+  }
+  localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
+}
+
+
 function renderBulkOutreachPanel() {
   var investors = JSON.parse(localStorage.getItem('l7_net_investors') || '[]');
   var partners  = JSON.parse(localStorage.getItem('l7_net_partnerships') || '[]');
@@ -1034,7 +1320,7 @@ function sendWhatsApp(phone, name) {
 //  CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
 const INVESTOR_URL = 'https://script.google.com/macros/s/AKfycbyDvK8t4E9_5ZMLv0WfYrmtomcOBFKNxOdBqj5VbzvGxa1AdohX1aWIQDFeMVN32S0s/exec';
-const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0/gviz/tq?tqx=out:json&sheet=Sheet1';
+const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0/gviz/tq?tqx=out:json';
 const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -1082,12 +1368,13 @@ window.onload = async () => {
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
   await loadData();
-  refreshDocsSelectors();refreshHome();renderWatchlists();
+  refreshDocsSelectors();refreshHome();
   refreshDiligence();renderKanban();renderPipelineList();
-  renderAuditLog();refreshAnalytics();renderICVotes();
+  renderAuditLog();renderICVotes();
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
+  if(window.Log7Backup) Log7Backup.init();
 };
 
 // ═══ NAV ═══
@@ -1096,34 +1383,92 @@ function showTab(name,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='analytics') refreshAnalytics();
   if(name==='pipeline'){renderKanban();renderPipelineList();}
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
   if(name==='network') renderNetworkTab();
   if(name==='home'){refreshHome();}
   if(name==='match') renderBulkOutreachPanel();
+  if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
-function toggleSettings(){document.getElementById('settings-wrap').classList.toggle('open');}
+function toggleSettings(){
+  document.getElementById('settings-wrap').classList.toggle('open');
+  _refreshSettingsBackupStatus();
+}
+function _refreshSettingsBackupStatus(){
+  var statusEl=document.getElementById('settings-backup-status');
+  var connectBtn=document.getElementById('settings-backup-connect-btn');
+  var nowBtn=document.getElementById('settings-backup-now-btn');
+  if(!statusEl) return;
+  var connected=!!sessionStorage.getItem('log7_gapi_token');
+  var s={};try{s=JSON.parse(localStorage.getItem('log7_backup_settings')||'{}');}catch(e){}
+  if(connected){
+    statusEl.style.color='var(--green)';
+    statusEl.textContent='&#10003; Connected'+(s.lastBackupAt?' · Last: '+_fmtAgoShort(s.lastBackupAt):'');
+    if(connectBtn){connectBtn.textContent='Disconnect';connectBtn.onclick=function(){sessionStorage.removeItem('log7_gapi_token');_refreshSettingsBackupStatus();};}
+    if(nowBtn) nowBtn.style.opacity='1';
+  } else {
+    statusEl.style.color='var(--muted)';
+    statusEl.textContent='Not connected';
+    if(connectBtn){connectBtn.textContent='Connect Drive';connectBtn.onclick=window._settingsBackupConnect;}
+    if(nowBtn) nowBtn.style.opacity='.4';
+  }
+}
+function _fmtAgoShort(iso){
+  var d=Date.now()-new Date(iso).getTime(),m=Math.floor(d/60000);
+  if(m<1)return'just now';if(m<60)return m+'m ago';
+  var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
+}
+window._settingsBackupConnect=function(){
+  if(!window.Log7Backup){showToast('Backup system not ready','error');return;}
+  window.Log7Backup._connect();
+  // Refresh status after short delay to pick up token
+  setTimeout(_refreshSettingsBackupStatus,2000);
+};
+window._settingsBackupNow=async function(btn){
+  if(!sessionStorage.getItem('log7_gapi_token')){showToast('Connect Google Drive first','error');return;}
+  var orig=btn.textContent;btn.disabled=true;btn.textContent='Backing up…';
+  try{
+    var r=await window.Log7Backup.backup('manual');
+    showToast('Backed up '+r.snapshot.meta.totalKeys+' keys ✓');
+    _refreshSettingsBackupStatus();
+  }catch(e){showToast('Backup failed: '+e.message,'error');}
+  btn.disabled=false;btn.textContent=orig;
+};
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
 // ═══ THEME ═══
+// ═══ TOAST ═══
+function showToast(msg, kind){
+  var c=document.getElementById('toast-container');
+  if(!c){c=document.createElement('div');c.id='toast-container';c.style.cssText='position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none';document.body.appendChild(c);}
+  var bg = kind==='error' ? '#f44336' : kind==='warn' ? '#ff9800' : '#4caf50';
+  var t=document.createElement('div');
+  t.style.cssText='background:'+bg+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:auto;max-width:320px';
+  t.textContent=msg;c.appendChild(t);
+  setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},2000);
+}
+function _markSettingsSaved(label){
+  var ts=new Date().toISOString();localStorage.setItem('l7_settings_last_saved',ts);
+  var el=document.getElementById('settings-last-saved');if(el)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+  showToast('Settings saved ✓');
+}
 function applyTheme(name){
   const t=THEMES[name]||THEMES.midnight,r=document.documentElement;
   [['--bg',t.bg],['--s1',t.s1],['--s2',t.s2],['--s3',t.s3],['--border',t.border],['--border2',t.border2],['--text',t.text],['--muted',t.muted],['--accent',t.accent],['--accent-soft',t.accentSoft],['--green',t.green],['--amber',t.amber],['--red',t.red],['--blue',t.blue]].forEach(([k,v])=>r.style.setProperty(k,v));
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
-function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';}
+function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
+function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
 function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
 
 // ═══ USER PROFILE ═══
 function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));}
+function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
 function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
 
 // ═══ CAPITAL SETTINGS ═══
-function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();}
+function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();_markSettingsSaved('Capital');}
 function getCapitalSettings(){return JSON.parse(localStorage.getItem('l7_capital')||'{"deployed":0,"fund":0}');}
 function refreshCapitalDisplay(){
   const {deployed,fund}=getCapitalSettings();
@@ -1361,16 +1706,20 @@ async function fetchNewsMonitor(){
 }
 
 // ═══ DATA LOADING ═══
-function saveKey(){const k=document.getElementById('api-key').value;localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');}
+function saveKey(){const k=document.getElementById('api-key').value.trim();
+  if(k && !/^sk-[A-Za-z0-9_\-]{10,}/.test(k)){showToast('Invalid API key format','error');setKeyStatus('Invalid');return;}
+  localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');if(k)_markSettingsSaved('API key');}
 function setKeyStatus(text){const el=document.getElementById('key-status');if(el)el.textContent=text?'API key '+text:'';}
 function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.now());return u.toString();}
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
 async function fetchGvizSheet(url){
   var res=await fetch(url+'&_ts='+Date.now(),{cache:'no-store'});
-  if(!res.ok) throw new Error('Request failed ('+res.status+')');
+  if(!res.ok) throw new Error('HTTP '+res.status);
   var text=await res.text();
-  var json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,''));
-  // Return raw rows as arrays indexed by column position (0=A, 1=B, ...)
+  var json;
+  try { json=JSON.parse(text.replace(/^[^\{]+/,'').replace(/\);\s*$/,'')); }
+  catch(e){ throw new Error('Parse error — sheet may not be public. Raw: '+text.slice(0,120)); }
+  if(json.status==='error') throw new Error('Sheet error: '+(json.errors||[]).map(function(e){return e.detailed_message||e.message||'';}).join('; '));
   var rows=(json.table&&json.table.rows||[]).map(function(r){
     return (r.c||[]).map(function(cell){ return cell?(cell.v==null?'':String(cell.v)):''; });
   });
@@ -1394,7 +1743,7 @@ async function loadData(){
   ['st-count','stat-startups'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=startups.length;});
   renderStartups();renderStartupMatchList();clearStartupSelection();refreshDocsSelectors();
   if(prev){const idx=startups.findIndex(s=>s.company===prev);if(idx>=0)selectStartup(idx);}
-  renderKanban();renderPipelineList();refreshHome();renderWatchlists();updateStats();showLoading('');
+  renderKanban();renderPipelineList();refreshHome();updateStats();showLoading('');
   if(invErr||stErr)showError([invErr?'Investor: '+invErr:'',stErr?'Startup: '+stErr:''].filter(Boolean).join(' | '));
   addAuditEntry('match','Data refreshed from Google Sheets');
 }
@@ -1553,16 +1902,6 @@ function renderDeckTab(payload){
   var el=document.getElementById('deck-tab-content');if(!el)return;
   el.innerHTML='<div class="grid-two"><div><div class="card insight-card"><div class="card-header"><div class="card-title">Deck Summary</div></div><div style="font-size:13px;line-height:1.8">'+escapeHtml(deck.summary||'No deck summary yet.')+'</div><div class="tag-row">'+(deck.signals||[]).map(function(s){return'<span class="tag info">'+escapeHtml(s)+'</span>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Readiness Score</div></div><div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+readiness.score+'</div><div class="mini-label">Score</div></div><div class="mini-stat"><div class="mini-value">'+readiness.verdict+'</div><div class="mini-label">Verdict</div></div></div><div class="template-help" style="margin-top:10px">'+(readiness.reasons||[]).join(' · ')+'</div></div></div><div><div class="card"><div class="card-header"><div class="card-title">Deck Breakdown</div></div><div class="detail-list"><div class="detail-row"><span class="detail-label">Market</span><span>'+escapeHtml(deck.market||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Traction</span><span>'+escapeHtml(deck.traction||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">Business Model</span><span>'+escapeHtml(deck.business_model||'Not captured')+'</span></div><div class="detail-row"><span class="detail-label">PDF Uploaded</span><span>'+escapeHtml(uploadedPdfName||'None')+'</span></div></div></div><div class="card"><div class="card-header"><div class="card-title">Missing Data</div></div><div class="tag-row">'+(missing.map(function(m){return'<span class="tag warn">'+escapeHtml(m)+'</span>';}).join('')||'<span class="tag good">No missing data flags</span>')+'</div></div></div></div><div class="grid-two"><div class="card"><div class="card-header"><div class="card-title">Strengths</div></div><div class="insight-list">'+(deck.strengths||['None captured']).map(function(s){return'<div>— '+escapeHtml(s)+'</div>';}).join('')+'</div></div><div class="card"><div class="card-header"><div class="card-title">Risks</div></div><div class="insight-list">'+(deck.risks||['None captured']).map(function(r){return'<div>— '+escapeHtml(r)+'</div>';}).join('')+'</div></div></div>';
 }
-// ═══ TEARSHEET ═══
-function generateTearsheet(){
-  const modal=document.getElementById('tearsheet-modal'),content=document.getElementById('tearsheet-content');
-  if(!selectedStartup){alert('Select a startup first.');return;}
-  const top=(lastMatches||[]).slice(0,5),readiness=lastPayload?.founder_readiness||computeFounderReadiness(selectedStartup,null),deck=lastPayload?.deck_insights||deriveDeckInsightsFromLocalData();
-  content.innerHTML='<div class="tearsheet"><div class="tearsheet-header"><div><div class="tearsheet-logo">LOG7 CAPITAL</div><div style="font-size:10px;color:#888;margin-top:2px">Confidential \u2014 For Internal Use Only</div></div><div style="text-align:right"><div style="font-size:11px;color:#888">Generated '+new Date().toLocaleDateString('en-IN')+'</div></div></div><div class="tearsheet-co">'+escapeHtml(selectedStartup.company)+'</div><div class="tearsheet-meta">'+escapeHtml(selectedStartup.sector||'Sector n/a')+' \u00b7 '+escapeHtml(selectedStartup.stage||'Stage n/a')+' \u00b7 '+escapeHtml(selectedStartup.location||'Location n/a')+'</div><div class="tearsheet-grid" style="margin-top:20px"><div><div class="tearsheet-section">Founder</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.founder||'\u2014')+'</div></div><div><div class="tearsheet-section">Round</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.currentRound||'\u2014')+' \u2014 '+escapeHtml(selectedStartup.roundSize||'\u2014')+'</div></div><div><div class="tearsheet-section">Valuation</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.valuation||'\u2014')+'</div></div><div><div class="tearsheet-section">ARR</div><div class="tearsheet-val">'+escapeHtml(selectedStartup.arr||selectedStartup.prevRevenue||'\u2014')+'</div></div></div><div style="border-top:1px solid #eee;padding-top:14px;margin-top:4px"><div class="tearsheet-section">Problem Statement</div><div style="font-size:12.5px;line-height:1.7;color:#333">'+escapeHtml(selectedStartup.problem||'Not provided')+'</div></div><div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee"><div class="tearsheet-section">Deck Summary</div><div style="font-size:12.5px;line-height:1.7;color:#333">'+escapeHtml(deck.summary||'No deck summary available.')+'</div></div><div class="tearsheet-matches"><div class="tearsheet-section" style="margin-bottom:10px">Top '+(top.length||0)+' Investor Matches</div>'+(top.length?top.map((m,i)=>'<div class="tearsheet-match-row"><div style="width:20px;font-size:11px;font-weight:700;color:#888">'+(i+1)+'</div><div style="flex:1;font-size:12.5px;font-weight:500">'+escapeHtml(m.name)+'</div><div class="tearsheet-score-bar"><div class="tearsheet-score-fill" style="width:'+m.score+'%"></div></div><div style="font-size:12px;font-weight:600;width:40px;text-align:right">'+m.score+'</div><div style="font-size:10px;color:#888;width:80px;text-align:right">'+escapeHtml(m.verdict)+'</div></div>').join(''):'<div style="font-size:12px;color:#888">Run a match to see investor rankings.</div>')+'</div><div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee;display:flex;justify-content:space-between"><div style="font-size:11px;color:#888">Founder Readiness: '+readiness.score+'/100 ('+readiness.verdict+')</div><div style="font-size:11px;color:#888">Log7 Capital \u2014 Confidential</div></div></div>';
-  modal.classList.remove('hidden');modal.style.display='flex';addAuditEntry('match','Tearsheet generated',selectedStartup.company);
-}
-function closeTearsheet(){const m=document.getElementById('tearsheet-modal');m.classList.add('hidden');m.style.display='none';}
-function printTearsheet(){window.print();}
 
 // ═══ SCORE SIMULATOR ═══
 function runScoreSimulator(){
@@ -1611,7 +1950,17 @@ function saveMatchToPipeline(name){
   renderKanban();renderPipelineList();refreshHome();updateStats();
 }
 function movePipelineStage(startup,investor,stage){
-  const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
+  const pipeline=getPipeline(),item=pipeline.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;
+  const prev=item.stage;item.stage=stage;localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
+  // Auto-create diligence checklist when stage moves to IC Review (treated as "IC Ready")
+  if(stage==='IC Review' && prev!=='IC Review'){
+    var dKey='l7_diligence_'+startup;
+    if(!localStorage.getItem(dKey)){
+      localStorage.setItem(dKey,JSON.stringify({}));
+      addAuditEntry('diligence','Diligence checklist created (IC Ready trigger)',startup);
+      showToast('Diligence checklist created for '+startup);
+    }
+  }
   renderKanban();renderPipelineList();updateStats();refreshHome();
 }
 function removePipelineItem(startup,investor){let pipeline=getPipeline();pipeline=pipeline.filter(i=>!(i.startup===startup&&i.investor===investor));localStorage.setItem('l7_pipeline',JSON.stringify(pipeline));addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);renderKanban();renderPipelineList();updateStats();refreshHome();}
@@ -1619,29 +1968,96 @@ function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+'</span><span class="badge">'+byStage[stage].length+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title">'+escapeHtml(item.investor)+'</div><div class="kanban-card-meta">'+escapeHtml(item.startup)+' \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  // Build startup\u2192roundSize lookup from Network startups for \u20b9 totals
+  var netSt=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  var sizeBy={};netSt.forEach(function(s){var n=s.companyName||s.name||'';if(n)sizeBy[n.toLowerCase()]=s.roundSize||s.roundSizeCr||s.fundraise||'';});
+  function parseCr(v){if(v==null)return 0;var s=String(v);var m=s.replace(/,/g,'').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;}
+  function stageTotal(items){return items.reduce(function(acc,it){return acc+parseCr(sizeBy[String(it.startup).toLowerCase()]||0);},0);}
+  function fmtCr(n){return n>0?' \u2022 \u20b9'+(n>=1?n.toFixed(n%1===0?0:1):n)+'Cr':'';}
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
   const el=document.getElementById('pipeline-list');if(!el)return;const pipeline=getPipeline();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><strong>'+escapeHtml(item.investor)+'</strong></td><td>'+escapeHtml(item.startup)+'</td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
+  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
-function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;localStorage.setItem('l7_pipeline',JSON.stringify([]));localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+
+// ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
+function findNetEntity(type,name){
+  var key = type==='investor' ? 'l7_net_investors' : 'l7_net_startups';
+  var arr = JSON.parse(localStorage.getItem(key)||'[]');
+  var lc = String(name||'').toLowerCase();
+  return arr.find(function(r){
+    var n = (r.investorName||r.companyName||r.name||'').toLowerCase();
+    return n===lc;
+  }) || null;
+}
+function openNetEntityModal(type,name){
+  var rec = findNetEntity(type,name);
+  var modal = document.getElementById('net-entity-modal');
+  var title = document.getElementById('net-entity-title');
+  var body  = document.getElementById('net-entity-content');
+  title.textContent = (type==='investor'?'Investor: ':'Startup: ') + (name||'Unknown');
+  if(!rec){
+    body.innerHTML = '<div class="empty" style="padding:20px">No matching record in Network &gt; '+(type==='investor'?'Investors':'Startups')+'.</div>'
+      + '<div style="margin-top:12px"><button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);">Open Network Tab</button></div>';
+  } else {
+    var rows = Object.keys(rec).filter(function(k){return !k.startsWith('_')&&k!=='id'&&rec[k]!=null&&rec[k]!=='';}).map(function(k){
+      var label = k.replace(/([A-Z])/g,' $1').replace(/^./,function(c){return c.toUpperCase();});
+      return '<div class="detail-row"><span class="detail-label">'+escapeHtml(label)+'</span><span>'+escapeHtml(String(rec[k]))+'</span></div>';
+    }).join('');
+    body.innerHTML = '<div class="detail-list">'+rows+'</div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);switchNetTab(\''+(type==='investor'?'investors':'startups')+'\',document.getElementById(\'net-tab-\'+(type===\'investor\'?\'investors\':\'startups\')));">Open in Network</button>'
+      + '</div>';
+  }
+  modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeNetEntityModal(){var m=document.getElementById('net-entity-modal');m.classList.add('hidden');m.style.display='none';}
+
+// ═══ ADD DEAL MODAL ═══
+function openAddDealModal(){
+  var invs = JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var sts  = JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+  var body = document.getElementById('add-deal-content');
+  if(!invs.length || !sts.length){
+    body.innerHTML = '<div class="empty" style="padding:18px">'
+      + (!sts.length?'Add at least one startup in <strong>Network &gt; Startups</strong>. ':'')
+      + (!invs.length?'Add at least one investor in <strong>Network &gt; Investors</strong>.':'')
+      + '</div>';
+  } else {
+    var stOpts  = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var invOpts = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var stageOpts = PIPELINE_STAGES.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+    body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
+      + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
+      + '<div class="field-row"><div class="field"><label>Score (0-100)</label><input id="add-deal-score" type="number" min="0" max="100" value="50"></div><div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div></div>'
+      + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
+  }
+  var modal=document.getElementById('add-deal-modal');modal.classList.remove('hidden');modal.style.display='flex';
+}
+function closeAddDealModal(){var m=document.getElementById('add-deal-modal');m.classList.add('hidden');m.style.display='none';}
+function submitAddDeal(){
+  var startup  = document.getElementById('add-deal-startup').value;
+  var investor = document.getElementById('add-deal-investor').value;
+  var score    = +document.getElementById('add-deal-score').value || 0;
+  var stage    = document.getElementById('add-deal-stage').value;
+  if(!startup || !investor) return showError('Pick both a startup and an investor.');
+  var pipeline = getPipeline();
+  if(pipeline.find(function(i){return i.startup===startup&&i.investor===investor;})){
+    return showError('That deal is already in the pipeline.');
+  }
+  pipeline.unshift({startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage});
+  localStorage.setItem('l7_pipeline',JSON.stringify(pipeline.slice(0,500)));
+  addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
+  closeAddDealModal();
+  renderKanban();renderPipelineList();refreshHome();updateStats();
+}
 
 // ═══ ANALYTICS ═══
-function refreshAnalytics(){
-  const pipeline=getPipeline(),allCRMs=pipeline.map(i=>getInvestorCRM(i.startup,i.investor));
-  const contacted=allCRMs.filter(c=>c.status!=='not contacted').length,replied=allCRMs.filter(c=>['replied','meeting booked','invested'].includes(c.status)).length,meetings=allCRMs.filter(c=>c.status==='meeting booked').length,invested=allCRMs.filter(c=>c.status==='invested').length;
-  [['an-total-matched',lastMatches.length],['an-contacted',contacted],['an-meetings',meetings],['an-invested',invested]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
-  const fEl=document.getElementById('analytics-funnel');if(fEl){const total=Math.max(1,pipeline.length);fEl.innerHTML=[['In Pipeline',pipeline.length,total],['Contacted',contacted,total],['Replied',replied,total],['Meeting Booked',meetings,total],['Invested',invested,total]].map(([l,v,t])=>'<div class="funnel-bar"><div class="funnel-label">'+l+'</div><div class="funnel-track"><div class="funnel-fill" style="width:'+Math.round(v/t*100)+'%"></div></div><div class="funnel-value">'+v+'</div></div>').join('');}
-  const sEl=document.getElementById('analytics-status-chart');if(sEl){const counts={};CRM_STATUSES.forEach(s=>{counts[s]=allCRMs.filter(c=>c.status===s).length;});const maxC=Math.max(1,...Object.values(counts));sEl.innerHTML='<div class="bar-chart">'+CRM_STATUSES.map(s=>'<div class="bar-col"><div class="bar-segment" style="height:'+Math.round(counts[s]/maxC*100)+'px;opacity:'+(counts[s]>0?'1':'0.2')+'"></div><div class="bar-xlabel">'+escapeHtml(s)+'</div></div>').join('')+'</div>';}
-  const secEl=document.getElementById('analytics-sector');if(secEl){const sc={};startups.forEach(s=>{const sec=s.sector||'Unknown';sc[sec]=(sc[sec]||0)+1;});const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxS=Math.max(1,...sorted.map(([,v])=>v));secEl.innerHTML=sorted.map(([l,v])=>'<div class="funnel-bar"><div class="funnel-label">'+escapeHtml(l)+'</div><div class="funnel-track"><div class="funnel-fill" style="width:'+Math.round(v/maxS*100)+'%;background:var(--blue)"></div></div><div class="funnel-value">'+v+'</div></div>').join('')||'<div class="empty">No sector data yet.</div>';}
-  const convEl=document.getElementById('analytics-conversion');if(convEl){const pl=pipeline.length||1;convEl.innerHTML=[['Contacted rate',contacted,pl],['Reply rate',replied,Math.max(1,contacted)],['Meeting rate',meetings,Math.max(1,replied)],['Investment rate',invested,Math.max(1,meetings)]].map(([l,n,d])=>{const pct=d>0?Math.round(n/d*100):0;return'<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted)">'+l+'</span><strong style="color:'+(pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)')+'">'+pct+'%</strong></div>';}).join('');}
-  const sdEl=document.getElementById('analytics-score-dist');if(sdEl&&lastMatches.length){const buckets=Array(10).fill(0);lastMatches.forEach(m=>{buckets[Math.min(9,Math.floor((m.score||0)/10))]++;});const maxB=Math.max(1,...buckets);sdEl.innerHTML='<div class="bar-chart">'+buckets.map((v,i)=>'<div class="bar-col"><div class="bar-segment" style="height:'+Math.round(v/maxB*100)+'px;background:'+scoreColor(i*10+5)+';opacity:'+(v>0?'0.85':'0.2')+'"></div><div class="bar-xlabel">'+i*10+'-'+(i*10+9)+'</div></div>').join('')+'</div><div class="template-help" style="margin-top:10px">Score distribution across '+lastMatches.length+' investors.</div>';}
-  else if(sdEl)sdEl.innerHTML='<div class="empty">Run a match to populate this chart.</div>';
-}
 
 // ═══ CRM ═══
 function crmKey(startup,investor){return'l7_crm_'+(startup||'global')+'_'+investor;}
@@ -1669,8 +2085,17 @@ function saveTemplates(){localStorage.setItem('l7_email_subject_template',docume
 // ═══ IC MEMO ═══
 function generateICMemo(){
   const el=document.getElementById('memo-content'),badge=document.getElementById('memo-badge');if(!el)return;
-  if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to generate the IC memo.</div>';return;}
-  const payload=lastPayload||{matches:[],deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};const topMatches=(payload.matches||[]).slice(0,5);
+  if(!selectedStartup){
+    // Auto-pick the first Network startup if no Match Studio selection yet
+    var netStartups=JSON.parse(localStorage.getItem('l7_net_startups')||'[]');
+    if(netStartups.length){selectedStartup={company:netStartups[0].companyName||netStartups[0].name||'',founder:netStartups[0].founderName||'',sector:netStartups[0].sector||'',stage:netStartups[0].stage||'',currentRound:netStartups[0].currentRound||'',roundSize:netStartups[0].roundSize||'',valuation:netStartups[0].valuation||'',arr:netStartups[0].arr||'',prevRevenue:netStartups[0].prevRevenue||'',website:netStartups[0].website||'',email:netStartups[0].founderEmail||'',problem:netStartups[0].problem||netStartups[0].notes||'',pitchDeckUrl:netStartups[0].pitchDeckUrl||''};}
+    else {el.innerHTML='<div class="empty">Add a startup in Network &gt; Startups or select one in Match Studio.</div>';return;}
+  }
+  // Build payload from lastPayload if a match has run, else from l7_match_scores
+  var matchScores=JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
+  var scoredMatches=Object.keys(matchScores).map(function(name){var d=matchScores[name];return{name:name,score:d.score||0,verdict:d.verdict||'',reasons:d.reasons||[],concerns:d.concerns||[]};}).sort(function(a,b){return b.score-a.score;});
+  const payload=(lastPayload&&lastPayload.matches&&lastPayload.matches.length)?lastPayload:{matches:scoredMatches,deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};
+  const topMatches=(payload.matches||[]).slice(0,3);
   const readiness=payload.founder_readiness||computeFounderReadiness(selectedStartup,payload.deck_insights);
   const missing=payload.missing_data||getMissingDataAlerts(selectedStartup);
   const objections=uniqueList(topMatches.flatMap(m=>m.objections||predictObjections(m)));
@@ -1700,6 +2125,15 @@ function diligenceKey(){return'l7_diligence_'+(selectedStartup?.company||'global
 function getDiligenceState(){return JSON.parse(localStorage.getItem(diligenceKey())||'{}');}
 function saveDiligenceState(state){localStorage.setItem(diligenceKey(),JSON.stringify(state));}
 function refreshDiligence(){
+  // IC Ready badge banner
+  var icEl=document.getElementById('diligence-ic-ready');
+  if(icEl){
+    var pipeline=getPipeline();
+    var icReady=[...new Set(pipeline.filter(function(i){return i.stage==='IC Review';}).map(function(i){return i.startup;}))];
+    icEl.innerHTML=icReady.length
+      ? '<div style="padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px;font-size:12.5px"><strong style="color:var(--amber)">IC Ready:</strong> '+icReady.map(function(s){return '<span class="badge" style="background:var(--amber);color:#fff;border-color:transparent;margin-left:6px;cursor:pointer" onclick="(function(){var idx=startups.findIndex(function(x){return x.company===\''+escapeQ(s)+'\';});if(idx>=0)selectStartup(idx);})()">'+escapeHtml(s)+'</span>';}).join(' ')+'</div>'
+      : '';
+  }
   const el=document.getElementById('diligence-checklist'),sumEl=document.getElementById('diligence-summary'),badge=document.getElementById('diligence-progress-badge');if(!el)return;
   if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to begin diligence tracking.</div>';if(sumEl)sumEl.innerHTML='<div class="empty">Select a startup first.</div>';return;}
   const state=getDiligenceState(),sections={};
@@ -1735,20 +2169,42 @@ function toggleDiligenceTask(id,done){const tasks=getDiligenceTasks(),t=tasks.fi
 function removeDiligenceTask(id){saveDiligenceTasks(getDiligenceTasks().filter(t=>t.id!==id));renderDiligenceTasks();}
 
 // ═══ WATCHLISTS ═══
-function getWatchlists(){return JSON.parse(localStorage.getItem('l7_watchlists')||'[]');}
-function saveWatchlists(lists){localStorage.setItem('l7_watchlists',JSON.stringify(lists));}
-function renderWatchlists(){const el=document.getElementById('watchlists-list');if(!el)return;const lists=getWatchlists();if(!lists.length){el.innerHTML='<div class="empty">No watchlists yet.</div>';return;}el.innerHTML=lists.map(list=>'<div class="pipeline-row"><div class="avatar">'+initials(list.name)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(list.name)+' <span class="badge">'+(list.items||[]).length+' startups</span></div><div class="row-copy">'+escapeHtml(list.notes||'No notes')+'</div><div class="tag-row">'+(list.items||[]).slice(0,4).map(i=>'<span class="tag info">'+escapeHtml(i)+'</span>').join('')+'</div></div></div>').join('');}
-function createWatchlist(){const name=document.getElementById('watchlist-name')?.value.trim(),notes=document.getElementById('watchlist-notes')?.value.trim();if(!name)return showError('Enter a watchlist name.');const lists=getWatchlists(),existing=lists.find(l=>l.name.toLowerCase()===name.toLowerCase());if(existing){existing.notes=notes;}else{lists.unshift({name,notes,items:[]});}saveWatchlists(lists);document.getElementById('watchlist-name').value='';document.getElementById('watchlist-notes').value='';renderWatchlists();addAuditEntry('match','Watchlist saved',name);}
-function saveCurrentToWatchlist(){if(!selectedStartup)return showError('Select a startup first.');const lists=getWatchlists();if(!lists.length)return showError('Create a watchlist first.');lists[0].items=uniqueList([selectedStartup.company,...(lists[0].items||[])]);saveWatchlists(lists);renderWatchlists();addAuditEntry('match','Added to watchlist',selectedStartup.company+' \u2192 '+lists[0].name);}
 
 // ═══ DOCUMENT VAULT ═══
 function initDocsDb(){if(docsDbPromise)return docsDbPromise;docsDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('Log7DocumentVault',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('documents')){const store=db.createObjectStore('documents',{keyPath:'id',autoIncrement:true});store.createIndex('entityType','entityType',{unique:false});store.createIndex('entityName','entityName',{unique:false});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return docsDbPromise;}
 async function saveDocumentRecord(record){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').add(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
 async function getAllDocuments(){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readonly');const req=tx.objectStore('documents').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});}
 async function deleteDocumentRecord(id){const db=await initDocsDb();return new Promise((resolve,reject)=>{const tx=db.transaction('documents','readwrite');tx.objectStore('documents').delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
-function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;const items=typeEl.value==='startup'?startups.map(s=>s.company):investors.map(i=>i.name);nameEl.innerHTML=items.map(n=>'<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>').join('');refreshDocsUI();}
-async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;const docs=(await getAllDocuments()).filter(d=>d.entityType===typeEl.value&&d.entityName===nameEl.value).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}listEl.innerHTML=docs.map(doc=>'<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+' | '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>').join('');}
-async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();};reader.readAsDataURL(file);}
+function refreshDocsSelectors(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');if(!typeEl||!nameEl)return;
+  // Source entity options from Network localStorage rather than sheet-loaded globals
+  var net = typeEl.value==='startup' ? JSON.parse(localStorage.getItem('l7_net_startups')||'[]') : JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
+  var names = net.map(function(r){return typeEl.value==='startup' ? (r.companyName||r.name||'') : (r.investorName||r.name||'');}).filter(Boolean);
+  // Fall back to sheet-loaded globals if Network is empty
+  if(!names.length){names = typeEl.value==='startup' ? (startups||[]).map(function(s){return s.company;}) : (investors||[]).map(function(i){return i.name;});}
+  nameEl.innerHTML = names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+  refreshDocsUI();refreshDocCountCache();}
+// Cache of {entityType:entityName: count} used by Network list to show doc badges
+window._docCounts = {};
+async function refreshDocCountCache(){
+  try{var docs=await getAllDocuments();var c={};docs.forEach(function(d){var k=(d.entityType||'')+':'+(d.entityName||'');c[k]=(c[k]||0)+1;});window._docCounts=c;
+    if(typeof renderNetList==='function'){renderNetList('investors');renderNetList('startups');}
+  }catch(e){}
+}
+async function refreshDocsUI(){const typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name'),listEl=document.getElementById('docs-list');if(!typeEl||!nameEl||!listEl)return;
+  var docs=(await getAllDocuments()).filter(function(d){return d.entityType===typeEl.value&&d.entityName===nameEl.value;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
+  if(!docs.length){listEl.innerHTML='<div class="empty">No documents stored for this entity yet.</div>';return;}
+  listEl.innerHTML=docs.map(function(doc){
+    var entityBadge='<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+escapeQ(doc.entityType)+'\',\''+escapeQ(doc.entityName)+'\')">'+escapeHtml(doc.entityType)+': '+escapeHtml(doc.entityName)+'</span>';
+    return '<div class="pipeline-row"><div class="avatar">'+doc.category.slice(0,2).toUpperCase()+'</div><div class="row-main"><div class="row-title">'+escapeHtml(doc.fileName)+' <span class="badge">'+escapeHtml(doc.category)+'</span></div><div class="row-meta">'+entityBadge+' '+formatDate(doc.createdAt)+' | '+(doc.sizeKb||0)+' KB</div>'+(doc.notes?'<div class="row-copy">'+escapeHtml(doc.notes)+'</div>':'')+'<div class="action-row"><button class="action-btn primary" onclick="downloadStoredDoc('+doc.id+')">Download</button><button class="action-btn danger" onclick="deleteStoredDoc('+doc.id+')">Delete</button></div></div></div>';
+  }).join('');
+}
+function filterDocsByEntity(type,name){
+  var typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');
+  if(typeEl&&['startup','investor'].includes(type)){typeEl.value=type;refreshDocsSelectors();}
+  if(nameEl){var opt=Array.from(nameEl.options).find(function(o){return o.value===name;});if(!opt){var o=document.createElement('option');o.value=o.textContent=name;nameEl.appendChild(o);}nameEl.value=name;refreshDocsUI();}
+  if(typeof goToTab==='function') goToTab('docs'); else { var btn=document.querySelectorAll('.nav-tab')[9]; if(btn) showTab('docs',btn); }
+}
+async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();refreshDocCountCache();};reader.readAsDataURL(file);}
 async function downloadStoredDoc(id){const docs=await getAllDocuments(),doc=docs.find(d=>d.id===id);if(!doc)return;const a=document.createElement('a');a.href=doc.dataUrl;a.download=doc.fileName;document.body.appendChild(a);a.click();document.body.removeChild(a);}
 async function deleteStoredDoc(id){await deleteDocumentRecord(id);addAuditEntry('doc','Document deleted from vault');refreshDocsUI();}
 
@@ -2307,30 +2763,6 @@ async function analyseExtraDoc(id){var apiKey=localStorage.getItem('l7_key');if(
 let _netActiveTab = 'partnerships';
 let _netEditId = null;
 
-const NET_KEYS = {
-  partnerships: 'l7_net_partnerships',
-  investors:    'l7_net_investors',
-  startups:     'l7_net_startups',
-};
-
-function netLoad(tab){
-  if(tab==='investors'){
-    var manual=JSON.parse(localStorage.getItem('l7_net_investors')||'[]');
-    var sheet=JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-    var manualNames=new Set(manual.map(function(r){return(r.investorName||'').toLowerCase();}));
-    var sheetOnly=sheet.filter(function(r){return!manualNames.has((r.investorName||'').toLowerCase());});
-    return manual.concat(sheetOnly);
-  }
-  return JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
-}
-function netSave(tab,data){
-  if(tab==='investors'){
-    var manualOnly=data.filter(function(r){return!r._fromSheet;});
-    localStorage.setItem('l7_net_investors',JSON.stringify(manualOnly));
-    return;
-  }
-  localStorage.setItem(NET_KEYS[tab],JSON.stringify(data));
-}
 function netNextId(arr){ return arr.length ? Math.max(...arr.map(r=>r.id||0))+1 : 1; }
 
 function switchNetTab(tab, btn){
@@ -2418,6 +2850,7 @@ function renderNetList(tab){
     + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
+    + ((tab==='investors'||tab==='startups')?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Docs</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Match</th>':'')
     + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
     + '<th style="padding:8px 10px"></th>'
@@ -2450,6 +2883,16 @@ function renderNetList(tab){
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
+    if(tab==='investors'||tab==='startups'){
+      var entType = tab==='investors' ? 'investor' : 'startup';
+      var entName = tab==='investors' ? (row.investorName||row.name||'') : (row.companyName||row.name||'');
+      var docCount = (window._docCounts||{})[entType+':'+entName] || 0;
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (docCount>0
+            ? '<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+entType+'\',\''+escapeQ(entName)+'\')">📁 '+docCount+'</span>'
+            : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
+    }
     if(tab==='investors'){
       var invName = row.investorName||row.name||'';
       var ms = matchScores[invName];
@@ -2687,7 +3130,7 @@ async function netFetchInvestors(){
       }
     });
 
-    netSave('investors', manual.concat(sheetEntries));
+    localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetEntries));
     renderNetList('investors');
 
     var now = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -2700,8 +3143,9 @@ async function netFetchInvestors(){
       +' &bull; Last synced: '+now;
 
   } catch(err) {
+    console.error('[netFetchInvestors] fetch failed:', err);
     var cachedTime = localStorage.getItem('l7_net_inv_sync')||'—';
-    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">Sheet unreachable — cached data (last: '+cachedTime+')</span>';
+    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">Sheet unreachable — '+escapeHtml(err.message)+' (last: '+cachedTime+')</span>';
   }
 
   _netInvFetching = false;
@@ -2715,13 +3159,13 @@ function netStartPolling(){
 
 function netResetToSheet(id){
   if(!confirm('Reset this entry to the sheet values? Your local edits will be lost.')) return;
-  var rows = netLoad('investors');
-  var idx = rows.findIndex(function(r){ return r.id===id; });
+  var sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+  var idx = sheetCache.findIndex(function(r){ return r.id===id; });
   if(idx===-1) return;
-  var row = rows[idx];
+  var row = sheetCache[idx];
   var sd = row._sheetData;
   if(!sd) return;
-  rows[idx] = {
+  sheetCache[idx] = {
     id:           row.id,
     _sheetKey:    row._sheetKey,
     investorName: sd.investorName,
@@ -2739,7 +3183,7 @@ function netResetToSheet(id){
     _fromSheet:   true,
     _sheetData:   sd,
   };
-  netSave('investors', rows);
+  localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetCache));
   renderNetList('investors');
   syncFollowupsToServer();
 }
@@ -3153,9 +3597,95 @@ function sendWhatsApp(phone, name) {
   if (!phone) { alert('No number for ' + name); return; }
   var msg = waFillTemplate(waGetTemplate(), name);
   window.open('https://wa.me/' + phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(msg), '_blank');
+  if (typeof addAuditEntry === 'function') addAuditEntry('outreach','WhatsApp sent',name+' ('+phone+')');
 }
 
 document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
+
+// ═══ GLOBAL SEARCH ═══
+function goToTab(name){
+  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var idx=map[name];if(idx==null)return;
+  var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
+}
+function runGlobalSearch(q){
+  var box=document.getElementById('global-search-results');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];}}
+  var sources=[
+    {label:'Investors', tab:'network', subtab:'investors', items:load('l7_net_investors'), nameFn:function(r){return r.investorName||r.name||'';}, metaFn:function(r){return [r.fundName,r.sectorFocus,r.stageFocus].filter(Boolean).join(' · ');}},
+    {label:'Partners',  tab:'network', subtab:'partnerships', items:load('l7_net_partnerships'), nameFn:function(r){return r.partnerName||r.name||'';}, metaFn:function(r){return [r.organisation,r.role].filter(Boolean).join(' · ');}},
+    {label:'Startups',  tab:'network', subtab:'startups', items:load('l7_net_startups'), nameFn:function(r){return r.companyName||r.name||'';}, metaFn:function(r){return [r.founderName,r.sector,r.stage].filter(Boolean).join(' · ');}},
+    {label:'Pipeline',  tab:'pipeline', items:load('l7_pipeline'), nameFn:function(r){return (r.investor||'')+' ↔ '+(r.startup||'');}, metaFn:function(r){return [r.stage,r.score!=null?'Score '+r.score:''].filter(Boolean).join(' · ');}}
+  ];
+  var html='';
+  sources.forEach(function(src){
+    var hits=(src.items||[]).filter(function(r){return JSON.stringify(r).toLowerCase().indexOf(q)>=0;}).slice(0,8);
+    if(!hits.length)return;
+    html+='<div style="padding:6px 10px;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--muted);background:var(--s2);border-bottom:1px solid var(--border)">'+src.label.toUpperCase()+'</div>';
+    hits.forEach(function(r){
+      var name=src.nameFn(r)||'(unnamed)';
+      var meta=src.metaFn(r);
+      var payload=encodeURIComponent(JSON.stringify({tab:src.tab,subtab:src.subtab,name:name,kind:src.label}));
+      html+='<div onmousedown="globalSearchPick(\''+payload+'\')" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12.5px" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<div style="font-weight:600;color:var(--text)">'+escapeHtml(name)+'</div>'
+        +(meta?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escapeHtml(meta)+'</div>':'')+'</div>';
+    });
+  });
+  if(!html)html='<div style="padding:14px;color:var(--muted);font-size:12px">No matches for "'+escapeHtml(q)+'"</div>';
+  box.innerHTML=html;box.style.display='block';
+}
+function globalSearchPick(payload){
+  try{var p=JSON.parse(decodeURIComponent(payload));
+    closeGlobalSearch();
+    goToTab(p.tab);
+    if(p.tab==='network'&&p.subtab){
+      var btn=document.getElementById('net-tab-'+p.subtab);
+      if(btn&&typeof switchNetTab==='function')switchNetTab(p.subtab,btn);
+    }
+    // Try to flash-highlight matching row after render
+    setTimeout(function(){
+      var rows=document.querySelectorAll('#page-'+p.tab+' tr, #page-'+p.tab+' .kanban-card');
+      rows.forEach(function(row){
+        if(row.textContent && row.textContent.toLowerCase().indexOf(String(p.name).toLowerCase())>=0){
+          row.style.transition='background 0.4s';
+          var orig=row.style.background;row.style.background='var(--accent-soft)';
+          setTimeout(function(){row.style.background=orig;},1600);
+        }
+      });
+    },120);
+  }catch(e){}
+}
+function closeGlobalSearch(){var b=document.getElementById('global-search-results');if(b){b.style.display='none';}}
+
+// ═══ KEYBOARD SHORTCUTS ═══
+document.addEventListener('keydown', function(e){
+  var tag=(e.target&&e.target.tagName)||'';
+  var typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
+  // Ctrl/Cmd + K → focus search (works even while typing elsewhere)
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==='k'||e.key==='K')){
+    e.preventDefault();var s=document.getElementById('global-search');if(s){s.focus();s.select();}
+    return;
+  }
+  // Ctrl/Cmd + ? → shortcut help
+  if((e.ctrlKey||e.metaKey)&&(e.key==='?'||e.key==='/')){
+    e.preventDefault();alert('Keyboard shortcuts:\n\nCtrl+K — focus global search\nH — Home\nN — Network\nM — Match Studio\nP — Pipeline\nD — Diligence\nEsc — close any open modal');
+    return;
+  }
+  if(e.key==='Escape'){
+    var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','net-modal'];
+    var any=false;
+    modals.forEach(function(id){var m=document.getElementById(id);if(m&&!m.classList.contains('hidden')){m.classList.add('hidden');m.style.display='none';any=true;}});
+    closeGlobalSearch();
+    if(any){e.preventDefault();}
+    return;
+  }
+  if(typing)return;
+  var map={h:'home',n:'network',m:'match',p:'pipeline',d:'diligence'};
+  var key=String(e.key||'').toLowerCase();
+  if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
+});
 </script>
 </body>
 </html>
