@@ -683,21 +683,32 @@ window.SheetsDB = (function(){
     else console.warn('[SheetsDB]', msg);
   }
 
-  function updateSyncEl(){
+  function updateSyncEl(offline){
     var el = document.getElementById('home-sync-status');
     if(!el) return;
+    if(offline){ el.innerHTML = '<span style="color:var(--amber)">⚠ Offline — changes saved locally</span>'; return; }
     if(!_lastSync){ el.textContent = ''; return; }
-    el.textContent = 'Synced ' + _lastSync.toLocaleTimeString();
+    el.innerHTML = '<span style="color:var(--green)">● Synced</span> <span style="color:var(--muted)">' + _lastSync.toLocaleTimeString() + '</span>';
   }
 
   async function apiCall(method, path, body){
     var token = getToken();
-    if(!token) throw new Error('Not authenticated');
+    if(!token){
+      console.error('[SheetsDB] apiCall: no token in sessionStorage — user must reconnect Google');
+      throw new Error('Not authenticated — please reconnect Google Drive');
+    }
     var opts = { method: method, headers: { 'Authorization': 'Bearer '+token, 'Content-Type': 'application/json' } };
     if(body) opts.body = JSON.stringify(body);
-    var resp = await fetch(API_BASE + path, opts);
+    var url = API_BASE + path;
+    console.log('[SheetsDB]', method, path.split('?')[0]);
+    var resp = await fetch(url, opts);
     if(!resp.ok){
       var txt = await resp.text();
+      console.error('[SheetsDB] API error', resp.status, path, txt);
+      if(resp.status === 401){
+        sessionStorage.removeItem(TOKEN_KEY);
+        _toast('Google session expired — please reconnect Drive in Settings', 'error');
+      }
       throw new Error('Sheets API '+resp.status+': '+txt.slice(0,300));
     }
     return resp.json();
@@ -767,8 +778,9 @@ window.SheetsDB = (function(){
       if(rows.length) await apiCall('PUT', '/values/'+encodeURIComponent(tab+'!A1')+'?valueInputOption=USER_ENTERED', { values:values });
       _cache[tab] = rows;
       _lastSync = new Date();
-      updateSyncEl();
+      updateSyncEl(false);
     } catch(e) {
+      updateSyncEl(true);
       _toast('Failed to save '+tab+': '+e.message, 'error');
       throw e;
     }
@@ -785,9 +797,10 @@ window.SheetsDB = (function(){
       var results = await Promise.all(tabs.map(fetchTab));
       tabs.forEach(function(t,i){ _cache[t] = results[i].map(_tabMap[t].toObj); });
       _lastSync = new Date();
-      updateSyncEl();
+      updateSyncEl(false);
       return true;
     } catch(e) {
+      updateSyncEl(true);
       if(!silent) _toast('Sheets sync failed: '+e.message, 'error');
       else console.warn('[SheetsDB] sync failed:', e.message);
       return false;
@@ -807,7 +820,7 @@ window.SheetsDB = (function(){
         else if(id==='page-network') renderNetworkTab();
         else if(id==='page-pipeline'){ renderKanban(); renderPipelineList(); }
       });
-    }, 30000);
+    }, 60000);
   }
 
   async function logActivity(action, entity, detail){
@@ -837,68 +850,139 @@ window.SheetsDB = (function(){
     return out;
   }
 
-  async function migrateFromLocalStorage(){
-    if(localStorage.getItem(MIGRATION_KEY) === 'true') return;
-    if(!isAuthenticated()) return;
+  // Mapping: each entry lists all localStorage key aliases to check
+  var _lsMapping = [
+    { lsKeys:['l7_net_investors','log7_investors'],    tab:'investors',    idFn:function(r){ return (r.investorName||r.name||'').toLowerCase(); } },
+    { lsKeys:['l7_net_startups','log7_startups'],      tab:'startups',     idFn:function(r){ return (r.companyName||r.name||'').toLowerCase(); } },
+    { lsKeys:['l7_net_partnerships','log7_partnerships'], tab:'partnerships', idFn:function(r){ return (r.partnerName||r.name||'').toLowerCase(); } },
+    { lsKeys:['l7_pipeline','log7_pipeline'],          tab:'pipeline',     idFn:function(r){ return ((r.startup||r.dealName||'')+'_'+(r.investor||r.investorName||'')).toLowerCase(); } },
+  ];
 
-    var lsMapping = [
-      { lsKey:'l7_net_investors',    tab:'investors',    idFn:function(r){ return (r.investorName||'').toLowerCase(); } },
-      { lsKey:'l7_net_startups',     tab:'startups',     idFn:function(r){ return (r.companyName||r.name||'').toLowerCase(); } },
-      { lsKey:'l7_net_partnerships', tab:'partnerships', idFn:function(r){ return (r.partnerName||r.name||'').toLowerCase(); } },
-      { lsKey:'l7_pipeline',         tab:'pipeline',     idFn:function(r){ return ((r.startup||'')+'_'+(r.investor||'')).toLowerCase(); } },
-    ];
-
-    // Check whether any key has data worth migrating
-    var hasData = lsMapping.some(function(m){
-      var raw = localStorage.getItem(m.lsKey);
-      if(!raw) return false;
+  // Read data from the first key in the list that has content
+  function readLsData(keys, isPipeline){
+    for(var i=0; i<keys.length; i++){
+      var raw = localStorage.getItem(keys[i]);
+      if(!raw) continue;
       try {
         var d = JSON.parse(raw);
-        return Array.isArray(d) ? d.length > 0 : (d && typeof d === 'object' && Object.keys(d).length > 0);
-      } catch(e){ return false; }
-    });
+        if(isPipeline) d = flattenPipeline(d);
+        if(Array.isArray(d) && d.length > 0) return { data:d, key:keys[i] };
+      } catch(e){}
+    }
+    return null;
+  }
+
+  async function runMigration(onProgress){
+    if(!isAuthenticated()) throw new Error('Not authenticated');
+    if(!_initialized){ await ensureTabs(); _initialized=true; }
+
+    var migratedKeys = [];
+    var totalMigrated = 0;
+
+    for(var i=0; i<_lsMapping.length; i++){
+      var m = _lsMapping[i];
+      var found = readLsData(m.lsKeys, m.tab==='pipeline');
+      if(!found) continue;
+
+      var local = found.data;
+      if(onProgress) onProgress('Migrating '+m.tab+'… ('+local.length+' entries)');
+
+      // Fetch existing Sheets rows to deduplicate
+      var existing = [];
+      try { var fetched = await fetchTab(m.tab); existing = fetched.map(_tabMap[m.tab].toObj); } catch(e){ existing=[]; }
+
+      var existingIds = new Set(existing.map(m.idFn));
+      var toAdd = local.filter(function(r){ return !existingIds.has(m.idFn(r)); });
+      console.log('[SheetsDB] migration', m.tab, '— existing:', existing.length, 'local:', local.length, 'new:', toAdd.length);
+
+      if(toAdd.length > 0){
+        await pushTab(m.tab, existing.concat(toAdd));
+        totalMigrated += toAdd.length;
+      }
+      migratedKeys.push(found.key);
+    }
+
+    return { migratedKeys: migratedKeys, totalMigrated: totalMigrated };
+  }
+
+  async function migrateFromLocalStorage(){
+    if(localStorage.getItem(MIGRATION_KEY) === 'true' || localStorage.getItem('log7_migration_done') === 'true') return;
+    if(!isAuthenticated()) return;
+
+    var hasData = _lsMapping.some(function(m){ return readLsData(m.lsKeys, m.tab==='pipeline') !== null; });
     if(!hasData){ localStorage.setItem(MIGRATION_KEY,'true'); return; }
 
     _toast('Migrating your local data to Google Sheets…');
-
     try {
-      // Ensure tabs exist before migration
-      if(!_initialized){ await ensureTabs(); _initialized=true; }
-
-      for(var i=0; i<lsMapping.length; i++){
-        var m = lsMapping[i];
-        var raw = localStorage.getItem(m.lsKey);
-        if(!raw) continue;
-        var local;
-        try { local = JSON.parse(raw); } catch(e){ continue; }
-
-        // Flatten pipeline if needed
-        if(m.tab === 'pipeline') local = flattenPipeline(local);
-        if(!Array.isArray(local) || !local.length) continue;
-
-        // Fetch existing Sheets rows to avoid duplicates
-        var existing = [];
-        try {
-          var fetched = await fetchTab(m.tab);
-          existing = fetched.map(_tabMap[m.tab].toObj);
-        } catch(e){ existing = []; }
-
-        var existingIds = new Set(existing.map(m.idFn));
-        var toAdd = local.filter(function(r){ return !existingIds.has(m.idFn(r)); });
-
-        if(toAdd.length > 0){
-          var merged = existing.concat(toAdd);
-          await pushTab(m.tab, merged);
-        }
-      }
-
-      // Clear migrated keys
-      lsMapping.forEach(function(m){ localStorage.removeItem(m.lsKey); });
+      var result = await runMigration(function(msg){ console.log('[SheetsDB]', msg); });
+      result.migratedKeys.forEach(function(k){ localStorage.removeItem(k); });
       localStorage.setItem(MIGRATION_KEY, 'true');
-      _toast('Migration complete! All data now synced to Google Sheets.');
+      localStorage.setItem('log7_migration_done', 'true');
+      _toast('Migration complete! '+(result.totalMigrated||'All')+' entries synced to Google Sheets.');
     } catch(e){
+      console.error('[SheetsDB] migration error:', e);
       _toast('Migration failed: '+e.message+' — your local data is safe.', 'error');
     }
+  }
+
+  // Manual migration triggered by the Settings button
+  async function manualMigrate(statusElId){
+    var statusEl = document.getElementById(statusElId);
+    function setStatus(msg, color){ if(statusEl){ statusEl.textContent=msg; statusEl.style.color=color||'var(--muted)'; } }
+
+    if(!isAuthenticated()){
+      _toast('Connect Google Drive first (click Connect Drive)', 'error');
+      setStatus('Not connected to Google', 'var(--red)');
+      return;
+    }
+
+    // Reset migration flag so we can re-run
+    localStorage.removeItem(MIGRATION_KEY);
+
+    setStatus('Connecting to Sheets…', 'var(--muted)');
+    try {
+      if(!_initialized){ await ensureTabs(); _initialized=true; }
+
+      var hasData = _lsMapping.some(function(m){ return readLsData(m.lsKeys, m.tab==='pipeline') !== null; });
+      if(!hasData){
+        setStatus('No local data found to migrate.', 'var(--muted)');
+        localStorage.setItem(MIGRATION_KEY,'true');
+        return;
+      }
+
+      var result = await runMigration(function(msg){ setStatus(msg, 'var(--muted)'); });
+
+      if(result.totalMigrated === 0){
+        setStatus('All entries already exist in Sheets — nothing new to migrate.', 'var(--green)');
+        localStorage.setItem(MIGRATION_KEY, 'true');
+        return;
+      }
+
+      setStatus('✓ Migrated '+result.totalMigrated+' entries. Click "Clear Local Data" to remove duplicates.', 'var(--green)');
+      localStorage.setItem(MIGRATION_KEY, 'true');
+      // Show the clear button
+      var clearBtn = document.getElementById('migrate-clear-btn');
+      if(clearBtn){ clearBtn.style.display='inline-block'; clearBtn._migratedKeys = result.migratedKeys; }
+      _toast('Migration complete! '+result.totalMigrated+' entries synced.');
+    } catch(e){
+      console.error('[SheetsDB] manualMigrate error:', e);
+      setStatus('Failed: '+e.message, 'var(--red)');
+      _toast('Migration failed: '+e.message, 'error');
+    }
+  }
+
+  function clearMigratedData(btnEl){
+    var keys = btnEl._migratedKeys || [];
+    if(!keys.length){
+      // Clear all known keys
+      _lsMapping.forEach(function(m){ m.lsKeys.forEach(function(k){ localStorage.removeItem(k); }); });
+    } else {
+      keys.forEach(function(k){ localStorage.removeItem(k); });
+    }
+    var statusEl = document.getElementById('migrate-status');
+    if(statusEl) statusEl.textContent = 'Local data cleared.';
+    btnEl.style.display = 'none';
+    _toast('Local data cleared — Sheets is now the only source.');
   }
 
   return {
@@ -916,6 +1000,8 @@ window.SheetsDB = (function(){
     startPolling: startPolling,
     updateSyncEl: updateSyncEl,
     migrateFromLocalStorage: migrateFromLocalStorage,
+    manualMigrate: manualMigrate,
+    clearMigratedData: clearMigratedData,
   };
 })();
 </script>
@@ -997,11 +1083,19 @@ window.SheetsDB = (function(){
           <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
         </div>
         <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
-          <div class="settings-label">&#128190; Google Drive Backup</div>
+          <div class="settings-label">&#128190; Google Drive Backup &amp; Sheets Sync</div>
           <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
             <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
+          </div>
+        </div>
+        <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
+          <div class="settings-label">&#128257; Migrate Local Data → Sheets</div>
+          <div id="migrate-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Copies all localStorage entries to Google Sheets.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button onclick="window.SheetsDB&&SheetsDB.manualMigrate('migrate-status')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128257; Migrate Local Data → Sheets</button>
+            <button id="migrate-clear-btn" onclick="window.SheetsDB&&SheetsDB.clearMigratedData(this)" style="display:none;background:var(--red);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128465; Clear Local Data</button>
           </div>
         </div>
       </div>
