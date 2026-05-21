@@ -671,7 +671,7 @@ window.SheetsDB = (function(){
   var TOKEN_KEY = 'log7_gapi_token';
 
   var COLUMNS = {
-    investors:    ['_id','InvestorName','FundName','StageFocus','CheckSize','Geography','SectorFocus','ContactPhone','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
+    investors:    ['_id','InvestorName','FundName','StageFocus','CheckSize','Geography','SectorFocus','ContactPhone','ContactEmail','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     startups:     ['_id','Name','Contact','Phone','Email','Sector','Stage','Status','ReferredBy','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     partnerships: ['_id','Name','Type','ContactName','ContactEmail','ContactPhone','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     pipeline:     ['_id','Startup','Investor','Score','Verdict','Stage','Hot','SavedAt','CRMStatus','CRMNotes','CRMTags','CRMWarmIntro','CRMFollowUp'],
@@ -778,13 +778,13 @@ window.SheetsDB = (function(){
   }
 
   // ── Row mappers: sheet row → app object ──────────────────────────────
-  function toInvestor(r){ return { id:r._id||'', _rowIndex:r._rowIndex, investorName:r.InvestorName||'', fundName:r.FundName||'', stageFocus:r.StageFocus||'', checkSize:r.CheckSize||'', geography:r.Geography||'', sectorFocus:r.SectorFocus||'', contactPhone:r.ContactPhone||'', status:r.Status||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
+  function toInvestor(r){ return { id:r._id||'', _rowIndex:r._rowIndex, investorName:r.InvestorName||'', fundName:r.FundName||'', stageFocus:r.StageFocus||'', checkSize:r.CheckSize||'', geography:r.Geography||'', sectorFocus:r.SectorFocus||'', contactPhone:r.ContactPhone||'', contactEmail:r.ContactEmail||'', status:r.Status||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
   function toStartup(r){ return { id:r._id||'', _rowIndex:r._rowIndex, companyName:r.Name||'', founderName:r.Contact||'', founderPhone:r.Phone||'', founderEmail:r.Email||'', sector:r.Sector||'', stage:r.Stage||'', status:r.Status||'', referredBy:r.ReferredBy||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
   function toPartnership(r){ return { id:r._id||'', _rowIndex:r._rowIndex, partnerName:r.Name||'', type:r.Type||'', contactName:r.ContactName||'', contactEmail:r.ContactEmail||'', contactPhone:r.ContactPhone||'', status:r.Status||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
   function toPipeline(r){ return { id:r._id||'', _rowIndex:r._rowIndex, startup:r.Startup||'', investor:r.Investor||'', score:parseInt(r.Score)||0, verdict:r.Verdict||'', stage:r.Stage||'Sourcing', hot:r.Hot==='true', savedAt:r.SavedAt||'', _crm:{ status:r.CRMStatus||'not contacted', notes:r.CRMNotes||'', tags:r.CRMTags?r.CRMTags.split('|').map(function(t){return t.trim();}).filter(Boolean):[], warmIntro:r.CRMWarmIntro||'', followUp:r.CRMFollowUp||'' } }; }
 
   // ── Row mappers: app object → sheet row array ─────────────────────────
-  function fromInvestor(o,id){ return [id||o.id||('inv_'+Date.now()),o.investorName||'',o.fundName||'',o.stageFocus||'',o.checkSize||'',o.geography||'',o.sectorFocus||'',o.contactPhone||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
+  function fromInvestor(o,id){ return [id||o.id||('inv_'+Date.now()),o.investorName||'',o.fundName||'',o.stageFocus||'',o.checkSize||'',o.geography||'',o.sectorFocus||'',o.contactPhone||'',o.contactEmail||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
   function fromStartup(o,id){ return [id||o.id||('st_'+Date.now()),o.companyName||'',o.founderName||'',o.founderPhone||'',o.founderEmail||'',o.sector||'',o.stage||'',o.status||'',o.referredBy||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
   function fromPartnership(o,id){ return [id||o.id||('pa_'+Date.now()),o.partnerName||'',o.type||'',o.contactName||'',o.contactEmail||'',o.contactPhone||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
   function fromPipeline(o,id){ var crm=o._crm||{}; return [id||o.id||('pl_'+Date.now()),o.startup||'',o.investor||'',String(o.score||0),o.verdict||'',o.stage||'Sourcing',String(o.hot||false),o.savedAt||new Date().toISOString(),crm.status||'not contacted',crm.notes||'',(crm.tags||[]).join('|'),crm.warmIntro||'',crm.followUp||'']; }
@@ -3356,6 +3356,7 @@ function netFields(tab){
     {key:'geography',    label:'Geography',        type:'text'},
     {key:'sectorFocus',  label:'Sector Focus',     type:'text'},
     {key:'contactPhone', label:'Contact Number',   type:'tel'},
+    {key:'contactEmail', label:'Contact Email',    type:'email'},
     {key:'status',       label:'Status',           type:'select', opts:['Active','Warm','Cold','Passed']},
     {key:'notes',        label:'Notes',            type:'textarea'},
     {key:'followUpDate', label:'Follow-up Date',   type:'date'},
@@ -3601,7 +3602,7 @@ function exportNetCsv(){
   if(!rows.length){ showError('No entries to export.'); return; }
   var colMap = {
     partnerships: ['partnerName','type','contactName','contactEmail','contactPhone','status','notes','followUpDate','dateAdded'],
-    investors:    ['investorName','fundName','stageFocus','checkSize','geography','sectorFocus','contactPhone','status','notes','followUpDate','dateAdded'],
+    investors:    ['investorName','fundName','stageFocus','checkSize','geography','sectorFocus','contactPhone','contactEmail','status','notes','followUpDate','dateAdded'],
     startups:     ['companyName','founderName','founderEmail','founderPhone','sector','stage','status','referredBy','notes','followUpDate','dateAdded'],
   };
   exportRowsAsCsv('log7-network-'+tab+'.csv', rows.map(function(r){
