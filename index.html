@@ -1712,7 +1712,15 @@ const NET_KEYS = {
 
 function netLoad(tab){
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    return SheetsDB.cache[tab] || [];
+    var sheetsData = SheetsDB.cache[tab] || [];
+    if(tab === 'investors'){
+      // Merge SheetsDB-managed investors with Linked Sheets cache (_fromSheet entries)
+      var sheet = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+      var manualNames = new Set(sheetsData.map(function(r){ return (r.investorName||'').toLowerCase(); }));
+      var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
+      return sheetsData.concat(sheetOnly);
+    }
+    return sheetsData;
   }
   // localStorage fallback when not connected to Sheets
   var manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
