@@ -473,6 +473,9 @@ function initTokenClient(){
       _toast('Google Drive connected ✓');
       renderPanel('backup-panel-container');
       startAuto();
+      // Show loading state while syncing from Sheets
+      var _syncEl=document.getElementById('home-sync-status');
+      if(_syncEl)_syncEl.innerHTML='<span style="color:var(--muted)">⟳ Loading from Sheets…</span>';
       // Initialize Sheets DB after auth — ensure tabs exist first, then migrate and fetch
       if(window.SheetsDB) window.SheetsDB.ensureSheetTabsExist().then(function(){
         return window.SheetsDB.migrateFromLocalStorage();
@@ -480,7 +483,10 @@ function initTokenClient(){
         return window.SheetsDB.fetchAll();
       }).then(function(ok){
         if(!ok) return;
+        // Re-init settings/templates/profile from Sheets data now that cache is populated
+        loadPreferences(); loadUserProfile(); loadTemplates(); refreshCapitalDisplay();
         renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+        renderAuditLog();
         window.SheetsDB.startPolling();
       }).catch(function(e){
         console.error('[SheetsDB] ensureSheetTabsExist error:', e);
@@ -673,6 +679,13 @@ window.SheetsDB = (function(){
     partnerships: ['_id','Name','Type','ContactName','ContactEmail','ContactPhone','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     pipeline:     ['_id','Startup','Investor','Score','Verdict','Stage','Hot','SavedAt','CRMStatus','CRMNotes','CRMTags','CRMWarmIntro','CRMFollowUp'],
     ActivityLog:  ['Timestamp','Action','Entity','Detail'],
+    Settings:       ['Key','Value'],
+    ICVotes:        ['Company','Voter','Vote','Comment'],
+    Diligence:      ['Company','ItemId','Checked'],
+    DiligenceNotes: ['Company','Notes'],
+    DiligenceTasks: ['Company','TaskId','Label','Assignee','Due','Done'],
+    AuditLog:       ['Id','Timestamp','Type','Action','Entity','User','Role'],
+    MatchScores:    ['InvestorName','Score','Verdict','Reasons','Concerns','SavedAt'],
   };
 
   var _cache = { investors:[], startups:[], partnerships:[], pipeline:[] };
@@ -680,6 +693,12 @@ window.SheetsDB = (function(){
   var _lastSync = null;
   var _pollInterval = null;
   var _initialized = false;
+
+  // Extended cache for settings, IC votes, diligence, audit, match scores
+  var _extCache = {
+    settings: null, icvotes: null, diligence: null,
+    diligenceNotes: null, diligenceTasks: null, auditLog: null, matchScores: null,
+  };
 
   function getToken(){ return sessionStorage.getItem(TOKEN_KEY); }
   function isAuthenticated(){ return !!getToken(); }
@@ -822,6 +841,7 @@ window.SheetsDB = (function(){
       var tabs = ['investors','startups','partnerships','pipeline'];
       var results = await Promise.all(tabs.map(fetchTab));
       tabs.forEach(function(t,i){ _cache[t] = results[i].map(_tabMap[t].toObj); });
+      await _fetchAllExt(true);
       _lastSync = new Date();
       updateSyncEl(false);
       return true;
@@ -949,6 +969,8 @@ window.SheetsDB = (function(){
       console.error('[SheetsDB] migration error:', e);
       _toast('Migration failed: '+e.message+' — your local data is safe.', 'error');
     }
+    // Also migrate settings/votes/diligence/audit data
+    await _migrateExtFromLocalStorage();
   }
 
   // Manual migration triggered by the Settings button
@@ -1011,6 +1033,305 @@ window.SheetsDB = (function(){
     _toast('Local data cleared — Sheets is now the only source.');
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // EXTENDED SHEETS: Settings, ICVotes, Diligence, AuditLog, MatchScores
+  // ══════════════════════════════════════════════════════════════════════
+
+  // Generic: fetch any simple tab into an array of row objects
+  async function _fetchRawTab(tabName){
+    var cols = COLUMNS[tabName];
+    var colLetter = String.fromCharCode(64 + Math.min(cols.length, 26));
+    var data = await apiCall('GET', '/values/'+encodeURIComponent(tabName+'!A:'+colLetter));
+    var rows = data.values || [];
+    if(rows.length < 2) return [];
+    var header = rows[0];
+    return rows.slice(1).map(function(row){
+      var obj = {};
+      header.forEach(function(col, j){ obj[col] = row[j] || ''; });
+      return obj;
+    }).filter(function(r){ return Object.values(r).some(function(v){ return String(v||'').trim(); }); });
+  }
+
+  // Generic: push any simple tab (clear data rows then rewrite)
+  async function _pushRawTab(tabName, rows){
+    var cols = COLUMNS[tabName];
+    var values = [cols].concat(rows);
+    await apiCall('POST', '/values/'+encodeURIComponent(tabName+'!A2:Z')+':clear', {});
+    if(rows.length) await apiCall('PUT', '/values/'+encodeURIComponent(tabName+'!A1')+'?valueInputOption=USER_ENTERED', { values:values });
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────
+  async function _fetchSettings(){
+    var rows = await _fetchRawTab('Settings');
+    _extCache.settings = {};
+    rows.forEach(function(r){ if(r.Key) _extCache.settings[r.Key] = r.Value; });
+  }
+  function _pushSettings(){
+    if(!isAuthenticated() || !_extCache.settings) return;
+    var rows = Object.entries(_extCache.settings).map(function(kv){ return [kv[0], kv[1]]; });
+    _pushRawTab('Settings', rows).catch(function(e){ console.warn('[SheetsDB] Settings push:', e.message); });
+  }
+  function getSetting(key){ return (_extCache.settings || {})[key] || null; }
+  function setSetting(key, value){
+    if(!_extCache.settings) _extCache.settings = {};
+    _extCache.settings[key] = value;
+    _pushSettings();
+  }
+
+  // ── ICVotes ───────────────────────────────────────────────────────────
+  async function _fetchICVotes(){
+    var rows = await _fetchRawTab('ICVotes');
+    _extCache.icvotes = {};
+    rows.forEach(function(r){
+      if(!r.Company || !r.Voter) return;
+      if(!_extCache.icvotes[r.Company]) _extCache.icvotes[r.Company] = {};
+      _extCache.icvotes[r.Company][r.Voter] = { vote:r.Vote||'', comment:r.Comment||'' };
+    });
+  }
+  function _pushICVotes(){
+    if(!isAuthenticated() || !_extCache.icvotes) return;
+    var rows = [];
+    Object.entries(_extCache.icvotes).forEach(function(ce){
+      Object.entries(ce[1]||{}).forEach(function(ve){
+        rows.push([ce[0], ve[0], (ve[1]||{}).vote||'', (ve[1]||{}).comment||'']);
+      });
+    });
+    _pushRawTab('ICVotes', rows).catch(function(e){ console.warn('[SheetsDB] ICVotes push:', e.message); });
+  }
+  function getICVotesCached(company){ return ((_extCache.icvotes||{})[company]) || {}; }
+  function setICVotesCached(company, votes){
+    if(!_extCache.icvotes) _extCache.icvotes = {};
+    _extCache.icvotes[company] = votes;
+    _pushICVotes();
+  }
+
+  // ── Diligence state ───────────────────────────────────────────────────
+  async function _fetchDiligence(){
+    var rows = await _fetchRawTab('Diligence');
+    _extCache.diligence = {};
+    rows.forEach(function(r){
+      if(!r.Company || !r.ItemId) return;
+      if(!_extCache.diligence[r.Company]) _extCache.diligence[r.Company] = {};
+      _extCache.diligence[r.Company][r.ItemId] = r.Checked === 'true';
+    });
+  }
+  function _pushDiligence(){
+    if(!isAuthenticated() || !_extCache.diligence) return;
+    var rows = [];
+    Object.entries(_extCache.diligence).forEach(function(ce){
+      Object.entries(ce[1]||{}).forEach(function(ie){
+        rows.push([ce[0], ie[0], String(ie[1])]);
+      });
+    });
+    _pushRawTab('Diligence', rows).catch(function(e){ console.warn('[SheetsDB] Diligence push:', e.message); });
+  }
+  function getDiligenceCached(company){ return ((_extCache.diligence||{})[company]) || {}; }
+  function setDiligenceCached(company, state){
+    if(!_extCache.diligence) _extCache.diligence = {};
+    _extCache.diligence[company] = state;
+    _pushDiligence();
+  }
+
+  // ── Diligence notes ───────────────────────────────────────────────────
+  async function _fetchDiligenceNotes(){
+    var rows = await _fetchRawTab('DiligenceNotes');
+    _extCache.diligenceNotes = {};
+    rows.forEach(function(r){ if(r.Company) _extCache.diligenceNotes[r.Company] = r.Notes||''; });
+  }
+  function _pushDiligenceNotes(){
+    if(!isAuthenticated() || !_extCache.diligenceNotes) return;
+    var rows = Object.entries(_extCache.diligenceNotes).map(function(kv){ return [kv[0], kv[1]]; });
+    _pushRawTab('DiligenceNotes', rows).catch(function(e){ console.warn('[SheetsDB] DiligenceNotes push:', e.message); });
+  }
+  function getDiligenceNotesCached(company){ return ((_extCache.diligenceNotes||{})[company]) || ''; }
+  function setDiligenceNotesCached(company, notes){
+    if(!_extCache.diligenceNotes) _extCache.diligenceNotes = {};
+    _extCache.diligenceNotes[company] = notes;
+    _pushDiligenceNotes();
+  }
+
+  // ── Diligence tasks ───────────────────────────────────────────────────
+  async function _fetchDiligenceTasks(){
+    var rows = await _fetchRawTab('DiligenceTasks');
+    _extCache.diligenceTasks = {};
+    rows.forEach(function(r){
+      if(!r.Company) return;
+      if(!_extCache.diligenceTasks[r.Company]) _extCache.diligenceTasks[r.Company] = [];
+      _extCache.diligenceTasks[r.Company].push({
+        id: parseInt(r.TaskId)||Date.now(),
+        label: r.Label||'', assignee: r.Assignee||'', due: r.Due||'', done: r.Done==='true'
+      });
+    });
+  }
+  function _pushDiligenceTasks(){
+    if(!isAuthenticated() || !_extCache.diligenceTasks) return;
+    var rows = [];
+    Object.entries(_extCache.diligenceTasks).forEach(function(ce){
+      (ce[1]||[]).forEach(function(t){
+        rows.push([ce[0], String(t.id), t.label||'', t.assignee||'', t.due||'', String(t.done||false)]);
+      });
+    });
+    _pushRawTab('DiligenceTasks', rows).catch(function(e){ console.warn('[SheetsDB] DiligenceTasks push:', e.message); });
+  }
+  function getDiligenceTasksCached(company){ return ((_extCache.diligenceTasks||{})[company]) || []; }
+  function setDiligenceTasksCached(company, tasks){
+    if(!_extCache.diligenceTasks) _extCache.diligenceTasks = {};
+    _extCache.diligenceTasks[company] = tasks;
+    _pushDiligenceTasks();
+  }
+
+  // ── AuditLog ──────────────────────────────────────────────────────────
+  async function _fetchAuditLog(){
+    var rows = await _fetchRawTab('AuditLog');
+    _extCache.auditLog = rows.map(function(r){
+      return { id:r.Id||Date.now(), ts:r.Timestamp||'', type:r.Type||'', action:r.Action||'', entity:r.Entity||'', user:r.User||'', role:r.Role||'' };
+    }).sort(function(a,b){ return (b.ts||'').localeCompare(a.ts||''); });
+  }
+  async function _appendAuditEntry(entry){
+    if(!isAuthenticated()) return;
+    if(!_extCache.auditLog) _extCache.auditLog = [];
+    _extCache.auditLog.unshift(entry);
+    if(_extCache.auditLog.length > 500) _extCache.auditLog = _extCache.auditLog.slice(0,500);
+    try {
+      await apiCall('POST', '/values/'+encodeURIComponent('AuditLog!A:G')+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS', {
+        values:[[String(entry.id||''), entry.ts||'', entry.type||'', entry.action||'', entry.entity||'', entry.user||'', entry.role||'']]
+      });
+    } catch(e){ console.warn('[SheetsDB] appendAuditEntry:', e.message); }
+  }
+  async function _clearAuditLogSheet(){
+    if(!isAuthenticated()) return;
+    _extCache.auditLog = [];
+    try { await apiCall('POST', '/values/'+encodeURIComponent('AuditLog!A2:G')+':clear', {}); }
+    catch(e){ console.warn('[SheetsDB] clearAuditLog:', e.message); }
+  }
+  function getAuditLogCached(){ return _extCache.auditLog; }
+
+  // ── MatchScores ───────────────────────────────────────────────────────
+  async function _fetchMatchScores(){
+    var rows = await _fetchRawTab('MatchScores');
+    _extCache.matchScores = {};
+    rows.forEach(function(r){
+      if(!r.InvestorName) return;
+      var reasons = [], concerns = [];
+      try{ reasons = JSON.parse(r.Reasons||'[]'); }catch(e){}
+      try{ concerns = JSON.parse(r.Concerns||'[]'); }catch(e){}
+      _extCache.matchScores[r.InvestorName] = { score:parseInt(r.Score)||0, verdict:r.Verdict||'', reasons:reasons, concerns:concerns };
+    });
+  }
+  function _pushMatchScores(){
+    if(!isAuthenticated() || !_extCache.matchScores) return;
+    var rows = Object.entries(_extCache.matchScores).map(function(kv){
+      var d = kv[1];
+      return [kv[0], String(d.score||0), d.verdict||'', JSON.stringify(d.reasons||[]), JSON.stringify(d.concerns||[]), new Date().toISOString()];
+    });
+    _pushRawTab('MatchScores', rows).catch(function(e){ console.warn('[SheetsDB] MatchScores push:', e.message); });
+  }
+  function getMatchScoresCached(){ return _extCache.matchScores || {}; }
+  function setMatchScoresCached(scoreMap){
+    _extCache.matchScores = scoreMap;
+    _pushMatchScores();
+  }
+
+  // ── Fetch all extended tabs ───────────────────────────────────────────
+  async function _fetchAllExt(silent){
+    if(!isAuthenticated()) return false;
+    try {
+      await Promise.all([
+        _fetchSettings(), _fetchICVotes(), _fetchDiligence(),
+        _fetchDiligenceNotes(), _fetchDiligenceTasks(),
+        _fetchAuditLog(), _fetchMatchScores(),
+      ]);
+      return true;
+    } catch(e){
+      if(!silent) console.warn('[SheetsDB] fetchAllExt failed:', e.message);
+      return false;
+    }
+  }
+
+  // ── One-time migration: extended data from localStorage → Sheets ──────
+  var EXT_MIGRATION_KEY = 'l7_ext_migration_done';
+  async function _migrateExtFromLocalStorage(){
+    if(localStorage.getItem(EXT_MIGRATION_KEY) === 'true') return;
+    if(!isAuthenticated()) return;
+    try {
+      // Settings key-value map
+      if(!_extCache.settings) _extCache.settings = {};
+      var settingsMap = {
+        'theme': localStorage.getItem('l7_theme'),
+        'matching_mode': localStorage.getItem('l7_matching_mode'),
+        'user': localStorage.getItem('l7_user'),
+        'capital': localStorage.getItem('l7_capital'),
+        'ic_voters': localStorage.getItem('l7_ic_voters'),
+        'email_subject_template': localStorage.getItem('l7_email_subject_template'),
+        'email_template': localStorage.getItem('l7_email_template'),
+        'whatsapp_template': localStorage.getItem('l7_whatsapp_template'),
+        'outreach_template': localStorage.getItem('l7_outreach_template'),
+      };
+      Object.entries(settingsMap).forEach(function(kv){ if(kv[1] && !_extCache.settings[kv[0]]) _extCache.settings[kv[0]] = kv[1]; });
+      _pushSettings();
+
+      // IC votes (l7_icvotes_<company>)
+      if(!_extCache.icvotes) _extCache.icvotes = {};
+      for(var i=0; i<localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.startsWith('l7_icvotes_')){
+          var company = k.slice('l7_icvotes_'.length);
+          if(!_extCache.icvotes[company]){
+            try{ _extCache.icvotes[company] = JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){}
+          }
+        }
+      }
+      _pushICVotes();
+
+      // Diligence state + notes + tasks
+      if(!_extCache.diligence) _extCache.diligence = {};
+      if(!_extCache.diligenceNotes) _extCache.diligenceNotes = {};
+      if(!_extCache.diligenceTasks) _extCache.diligenceTasks = {};
+      for(var j=0; j<localStorage.length; j++){
+        var lk = localStorage.key(j);
+        if(!lk) continue;
+        if(lk.startsWith('l7_diligence_') && !lk.endsWith('_notes')){
+          var cname = lk.slice('l7_diligence_'.length);
+          if(!_extCache.diligence[cname]){
+            try{ _extCache.diligence[cname] = JSON.parse(localStorage.getItem(lk)||'{}'); }catch(e){}
+          }
+          var notesVal = localStorage.getItem(lk+'_notes');
+          if(notesVal && !_extCache.diligenceNotes[cname]) _extCache.diligenceNotes[cname] = notesVal;
+        }
+        if(lk.startsWith('l7_dtasks_')){
+          var dc = lk.slice('l7_dtasks_'.length);
+          if(!_extCache.diligenceTasks[dc]){
+            try{ _extCache.diligenceTasks[dc] = JSON.parse(localStorage.getItem(lk)||'[]'); }catch(e){}
+          }
+        }
+      }
+      _pushDiligence(); _pushDiligenceNotes(); _pushDiligenceTasks();
+
+      // Audit log
+      if(!_extCache.auditLog || !_extCache.auditLog.length){
+        var localAudit = [];
+        try{ localAudit = JSON.parse(localStorage.getItem('l7_audit')||'[]'); }catch(e){}
+        if(localAudit.length){
+          _extCache.auditLog = localAudit;
+          var auditRows = localAudit.map(function(e){
+            return [String(e.id||''), e.ts||'', e.type||'', e.action||'', e.entity||'', e.user||'', e.role||''];
+          });
+          _pushRawTab('AuditLog', auditRows).catch(function(e){ console.warn('[SheetsDB] AuditLog migrate:', e.message); });
+        }
+      }
+
+      // Match scores
+      if(!_extCache.matchScores || !Object.keys(_extCache.matchScores).length){
+        try{
+          var localScores = JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
+          if(Object.keys(localScores).length){ _extCache.matchScores = localScores; _pushMatchScores(); }
+        }catch(e){}
+      }
+
+      localStorage.setItem(EXT_MIGRATION_KEY, 'true');
+    } catch(e){ console.warn('[SheetsDB] _migrateExtFromLocalStorage:', e.message); }
+  }
+
   return {
     get cache(){ return _cache; },
     get lastSync(){ return _lastSync; },
@@ -1030,6 +1351,22 @@ window.SheetsDB = (function(){
     migrateFromLocalStorage: migrateFromLocalStorage,
     manualMigrate: manualMigrate,
     clearMigratedData: clearMigratedData,
+    // Extended API
+    getSetting: getSetting,
+    setSetting: setSetting,
+    getICVotes: getICVotesCached,
+    setICVotes: setICVotesCached,
+    getDiligence: getDiligenceCached,
+    setDiligence: setDiligenceCached,
+    getDiligenceNotes: getDiligenceNotesCached,
+    setDiligenceNotes: setDiligenceNotesCached,
+    getDiligenceTasks: getDiligenceTasksCached,
+    setDiligenceTasks: setDiligenceTasksCached,
+    getAuditLog: getAuditLogCached,
+    appendAuditEntry: _appendAuditEntry,
+    clearAuditLogSheet: _clearAuditLogSheet,
+    getMatchScores: getMatchScoresCached,
+    setMatchScores: setMatchScoresCached,
   };
 })();
 </script>
@@ -1886,18 +2223,58 @@ function applyTheme(name){
   [['--bg',t.bg],['--s1',t.s1],['--s2',t.s2],['--s3',t.s3],['--border',t.border],['--border2',t.border2],['--text',t.text],['--muted',t.muted],['--accent',t.accent],['--accent-soft',t.accentSoft],['--green',t.green],['--amber',t.amber],['--red',t.red],['--blue',t.blue]].forEach(([k,v])=>r.style.setProperty(k,v));
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
-function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
-function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
+function setTheme(name){
+  localStorage.setItem('l7_theme',name);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('theme',name);
+  applyTheme(name);_markSettingsSaved('Theme');
+}
+function loadPreferences(){
+  var db=window.SheetsDB&&SheetsDB.isAuthenticated();
+  var theme=(db&&SheetsDB.getSetting('theme'))||localStorage.getItem('l7_theme')||'midnight';
+  applyTheme(theme);
+  var mode=(db&&SheetsDB.getSetting('matching_mode'))||localStorage.getItem('l7_matching_mode')||'auto';
+  var mm=document.getElementById('matching-mode');if(mm)mm.value=mode;
+  var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+}
+function savePreferences(){
+  var val=document.getElementById('matching-mode').value;
+  localStorage.setItem('l7_matching_mode',val);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('matching_mode',val);
+}
 
 // ═══ USER PROFILE ═══
-function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
-function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
+function loadUserProfile(){
+  var db=window.SheetsDB&&SheetsDB.isAuthenticated();
+  var json=(db&&SheetsDB.getSetting('user'))||localStorage.getItem('l7_user');
+  var p=JSON.parse(json||'{"name":"Team","role":"analyst"}');
+  document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';
+}
+function saveUserProfile(){
+  var u={name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value};
+  localStorage.setItem('l7_user',JSON.stringify(u));
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('user',JSON.stringify(u));
+  _markSettingsSaved('Profile');
+}
+function getCurrentUser(){
+  var db=window.SheetsDB&&SheetsDB.isAuthenticated();
+  var json=(db&&SheetsDB.getSetting('user'))||localStorage.getItem('l7_user');
+  return JSON.parse(json||'{"name":"Team","role":"analyst"}');
+}
 
 // ═══ CAPITAL SETTINGS ═══
-function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();_markSettingsSaved('Capital');}
-function getCapitalSettings(){return JSON.parse(localStorage.getItem('l7_capital')||'{"deployed":0,"fund":0}');}
+function saveCapitalSettings(){
+  const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;
+  const fund=parseFloat(document.getElementById('fund-size').value)||0;
+  var cap=JSON.stringify({deployed,fund});
+  localStorage.setItem('l7_capital',cap);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('capital',cap);
+  refreshCapitalDisplay();_markSettingsSaved('Capital');
+}
+function getCapitalSettings(){
+  var db=window.SheetsDB&&SheetsDB.isAuthenticated();
+  var json=(db&&SheetsDB.getSetting('capital'))||localStorage.getItem('l7_capital');
+  return JSON.parse(json||'{"deployed":0,"fund":0}');
+}
 function refreshCapitalDisplay(){
   const {deployed,fund}=getCapitalSettings();
   const el=document.getElementById('capital-display');if(!el)return;
@@ -1910,14 +2287,25 @@ function refreshCapitalDisplay(){
 }
 
 // ═══ AUDIT LOG ═══
-function getAuditLog(){return JSON.parse(localStorage.getItem('l7_audit')||'[]');}
+function getAuditLog(){
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()){
+    var cached=SheetsDB.getAuditLog();
+    if(cached!==null) return cached;
+  }
+  return JSON.parse(localStorage.getItem('l7_audit')||'[]');
+}
 function saveAuditLog(log){localStorage.setItem('l7_audit',JSON.stringify(log.slice(0,500)));}
 function addAuditEntry(type,action,entity){
-  const u=getCurrentUser(),log=getAuditLog();
-  log.unshift({id:Date.now(),ts:new Date().toISOString(),type,action,entity:entity||'',user:u.name,role:u.role});
-  saveAuditLog(log);renderAuditLog();renderHomeActivity();
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.logActivity(action, entity, type).catch(function(){});
+  const u=getCurrentUser();
+  const entry={id:Date.now(),ts:new Date().toISOString(),type,action,entity:entity||'',user:u.name,role:u.role};
+  // Always write to localStorage as local cache
+  const log=JSON.parse(localStorage.getItem('l7_audit')||'[]');
+  log.unshift(entry);
+  localStorage.setItem('l7_audit',JSON.stringify(log.slice(0,500)));
+  renderAuditLog();renderHomeActivity();
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()){
+    SheetsDB.appendAuditEntry(entry).catch(function(){});
+    SheetsDB.logActivity(action,entity,type).catch(function(){});
   }
 }
 function renderAuditLog(){
@@ -1931,7 +2319,12 @@ function renderAuditLog(){
   if(!log.length){el.innerHTML='<div class="empty">No activity recorded yet.</div>';return;}
   el.innerHTML=log.map(e=>'<div class="audit-row"><div class="audit-dot"></div><div class="audit-ts">'+formatDate(e.ts)+'</div><div class="audit-who">'+escapeHtml(e.user)+' <span class="role-badge '+e.role+'">'+e.role+'</span></div><div class="audit-action"><strong>'+escapeHtml(e.action)+'</strong>'+(e.entity?' \u2014 '+escapeHtml(e.entity):'')+'</div></div>').join('');
 }
-function clearAuditLog(){if(!confirm('Clear entire audit log?'))return;localStorage.removeItem('l7_audit');renderAuditLog();}
+function clearAuditLog(){
+  if(!confirm('Clear entire audit log?'))return;
+  localStorage.removeItem('l7_audit');
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.clearAuditLogSheet().catch(function(){});
+  renderAuditLog();
+}
 function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>({timestamp:e.ts,user:e.user,role:e.role,type:e.type,action:e.action,entity:e.entity})));}
 
 // ═══ HOME ═══
@@ -2204,7 +2597,9 @@ function clearStartupSelection(){
 function selectStartup(index){
   selectedStartup=startups[index];pdfText='';uploadedPdfName='';deckInsightsCache=null;
   // Clear previous match scores when startup changes
-  localStorage.removeItem('l7_match_scores');window._lastMatchScores={};
+  localStorage.removeItem('l7_match_scores');
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setMatchScores({});
+  window._lastMatchScores={};
   var mr=document.getElementById('match-results');if(mr)mr.style.display='none';
   const pn=document.getElementById('pdf-name');if(pn)pn.textContent='';
   document.querySelectorAll('.startup-option').forEach((e,i)=>e.classList.toggle('selected',i===index));
@@ -2258,9 +2653,10 @@ async function runMatch(){
     results.sort(function(a,b){return b.score-a.score;});
     lastMatches=results.map(function(r){return{name:r.inv.investorName||r.inv.name||'',score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
     lastPayload={matches:lastMatches};
-    // Save scores to localStorage keyed by investor name
+    // Save scores keyed by investor name
     var scoreMap={};results.forEach(function(r){var n=r.inv.investorName||r.inv.name||'';scoreMap[n]={score:r.score,verdict:r.verdict,reasons:r.reasons,concerns:r.concerns};});
     localStorage.setItem('l7_match_scores',JSON.stringify(scoreMap));
+    if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setMatchScores(scoreMap);
     window._lastMatchScores={};lastMatches.forEach(function(m){window._lastMatchScores[m.name]=m.score;});
     // Refresh Network investors tab and outreach panel to show badges
     renderNetList('investors');
@@ -2400,8 +2796,13 @@ function movePipelineStage(startup,investor,stage){
   setPipeline(raw);
   addAuditEntry('pipeline','Deal moved to '+stage,startup+' \u2194 '+investor);
   if(stage==='IC Review'&&prev!=='IC Review'){
-    var dKey='l7_diligence_'+startup;
-    if(!localStorage.getItem(dKey)){ localStorage.setItem(dKey,JSON.stringify({})); addAuditEntry('diligence','Diligence checklist created (IC Ready trigger)',startup); showToast('Diligence checklist created for '+startup); }
+    var _dState=(window.SheetsDB&&SheetsDB.isAuthenticated())?SheetsDB.getDiligence(startup):(JSON.parse(localStorage.getItem('l7_diligence_'+startup)||'null'));
+    if(!_dState||!Object.keys(_dState).length){
+      if(window.SheetsDB&&SheetsDB.isAuthenticated()){SheetsDB.setDiligence(startup,{});}
+      else{localStorage.setItem('l7_diligence_'+startup,JSON.stringify({}));}
+      addAuditEntry('diligence','Diligence checklist created (IC Ready trigger)',startup);
+      showToast('Diligence checklist created for '+startup);
+    }
   }
   renderKanban();renderPipelineList();updateStats();refreshHome();
 }
@@ -2430,7 +2831,7 @@ function renderPipelineList(){
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
   el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
-function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;setPipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;setPipeline([]);if(!window.SheetsDB||!SheetsDB.isAuthenticated())localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
 
 // ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
 function findNetEntity(type,name){
@@ -2543,8 +2944,26 @@ function bulkWhatsapp(count){const top=lastMatches.slice(0,count).filter(m=>find
 function copyAllIntros(){if(!lastMatches.length)return showError('Run a match first.');const text=lastMatches.map(m=>{const inv=findInvestorByName(m.name),s=buildEmailSubject(m,inv),b=fillTemplate(document.getElementById('email-template').value,buildMessageContext(m,inv));return m.name+'\nSubject: '+s+'\n'+b;}).join('\n\n===========\n\n');navigator.clipboard.writeText(text);addAuditEntry('outreach','All intros copied',selectedStartup?.company||'');}
 
 // ═══ TEMPLATES ═══
-function loadTemplates(){document.getElementById('email-subject-template').value=localStorage.getItem('l7_email_subject_template')||DEFAULT_EMAIL_SUBJECT;document.getElementById('email-template').value=localStorage.getItem('l7_email_template')||DEFAULT_EMAIL_TEMPLATE;document.getElementById('whatsapp-template').value=localStorage.getItem('l7_whatsapp_template')||DEFAULT_WHATSAPP_TEMPLATE;}
-function saveTemplates(){localStorage.setItem('l7_email_subject_template',document.getElementById('email-subject-template').value);localStorage.setItem('l7_email_template',document.getElementById('email-template').value);localStorage.setItem('l7_whatsapp_template',document.getElementById('whatsapp-template').value);}
+function loadTemplates(){
+  var db=window.SheetsDB&&SheetsDB.isAuthenticated();
+  function _get(key,lsKey,def){ return (db&&SheetsDB.getSetting(key))||localStorage.getItem(lsKey)||def; }
+  document.getElementById('email-subject-template').value=_get('email_subject_template','l7_email_subject_template',DEFAULT_EMAIL_SUBJECT);
+  document.getElementById('email-template').value=_get('email_template','l7_email_template',DEFAULT_EMAIL_TEMPLATE);
+  document.getElementById('whatsapp-template').value=_get('whatsapp_template','l7_whatsapp_template',DEFAULT_WHATSAPP_TEMPLATE);
+}
+function saveTemplates(){
+  var es=document.getElementById('email-subject-template').value;
+  var et=document.getElementById('email-template').value;
+  var wt=document.getElementById('whatsapp-template').value;
+  localStorage.setItem('l7_email_subject_template',es);
+  localStorage.setItem('l7_email_template',et);
+  localStorage.setItem('l7_whatsapp_template',wt);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()){
+    SheetsDB.setSetting('email_subject_template',es);
+    SheetsDB.setSetting('email_template',et);
+    SheetsDB.setSetting('whatsapp_template',wt);
+  }
+}
 
 // ═══ IC MEMO ═══
 function generateICMemo(){
@@ -2555,8 +2974,8 @@ function generateICMemo(){
     if(netStartups.length){selectedStartup={company:netStartups[0].companyName||netStartups[0].name||'',founder:netStartups[0].founderName||'',sector:netStartups[0].sector||'',stage:netStartups[0].stage||'',currentRound:netStartups[0].currentRound||'',roundSize:netStartups[0].roundSize||'',valuation:netStartups[0].valuation||'',arr:netStartups[0].arr||'',prevRevenue:netStartups[0].prevRevenue||'',website:netStartups[0].website||'',email:netStartups[0].founderEmail||'',problem:netStartups[0].problem||netStartups[0].notes||'',pitchDeckUrl:netStartups[0].pitchDeckUrl||''};}
     else {el.innerHTML='<div class="empty">Add a startup in Network &gt; Startups or select one in Match Studio.</div>';return;}
   }
-  // Build payload from lastPayload if a match has run, else from l7_match_scores
-  var matchScores=JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
+  // Build payload from lastPayload if a match has run, else from match scores cache
+  var matchScores=(window.SheetsDB&&SheetsDB.isAuthenticated())?SheetsDB.getMatchScores():JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
   var scoredMatches=Object.keys(matchScores).map(function(name){var d=matchScores[name];return{name:name,score:d.score||0,verdict:d.verdict||'',reasons:d.reasons||[],concerns:d.concerns||[]};}).sort(function(a,b){return b.score-a.score;});
   const payload=(lastPayload&&lastPayload.matches&&lastPayload.matches.length)?lastPayload:{matches:scoredMatches,deck_insights:deriveDeckInsightsFromLocalData(),founder_readiness:computeFounderReadiness(selectedStartup,null),missing_data:getMissingDataAlerts(selectedStartup)};
   const topMatches=(payload.matches||[]).slice(0,3);
@@ -2570,11 +2989,26 @@ function generateICMemo(){
   addAuditEntry('ic','IC memo generated',selectedStartup.company);
 }
 function copyICMemo(){const el=document.getElementById('memo-content');if(!el||!selectedStartup)return;navigator.clipboard.writeText(el.innerText);addAuditEntry('ic','IC memo copied',selectedStartup.company);}
-function getICVotes(){return JSON.parse(localStorage.getItem('l7_icvotes_'+(selectedStartup?.company||'global'))||'{}');}
-function saveICVotes(votes){localStorage.setItem('l7_icvotes_'+(selectedStartup?.company||'global'),JSON.stringify(votes));}
+function getICVotes(){
+  var company=selectedStartup?.company||'global';
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) return SheetsDB.getICVotes(company);
+  return JSON.parse(localStorage.getItem('l7_icvotes_'+company)||'{}');
+}
+function saveICVotes(votes){
+  var company=selectedStartup?.company||'global';
+  localStorage.setItem('l7_icvotes_'+company,JSON.stringify(votes));
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setICVotes(company,votes);
+}
+function _getICVoters(){
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()){
+    var json=SheetsDB.getSetting('ic_voters');
+    if(json) try{return JSON.parse(json);}catch(e){}
+  }
+  return JSON.parse(localStorage.getItem('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));
+}
 function renderICVotes(){
   const el=document.getElementById('ic-votes-list');if(!el)return;
-  const votes=getICVotes(),voters=JSON.parse(localStorage.getItem('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));
+  const votes=getICVotes(),voters=_getICVoters();
   if(!voters.length){el.innerHTML='<div class="empty">Add IC members to record votes.</div>';return;}
   el.innerHTML=voters.map(name=>{const v=votes[name]||{vote:null,comment:''};return'<div class="vote-row"><div class="vote-name">'+escapeHtml(name)+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="vote-btn '+(v.vote==='invest'?'selected-invest':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'invest\')">Invest</button><button class="vote-btn '+(v.vote==='watch'?'selected-watch':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'watch\')">Watch</button><button class="vote-btn '+(v.vote==='pass'?'selected-pass':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'pass\')">Pass</button><input style="width:150px;padding:5px 10px;font-size:11.5px" placeholder="Comment..." value="'+escapeHtml(v.comment||'')+'" oninput="updateICComment(\''+escapeQ(name)+'\',this.value)"></div></div>';}).join('');
   renderICVoteSummary(votes);
@@ -2582,12 +3016,27 @@ function renderICVotes(){
 function recordICVote(name,vote){const votes=getICVotes();votes[name]=votes[name]||{};votes[name].vote=vote;saveICVotes(votes);renderICVotes();generateICMemo();addAuditEntry('ic','IC vote: '+vote,name+' on '+(selectedStartup?.company||'n/a'));}
 function updateICComment(name,comment){const votes=getICVotes();votes[name]=votes[name]||{};votes[name].comment=comment;saveICVotes(votes);}
 function renderICVoteSummary(votes){const el=document.getElementById('ic-vote-summary');if(!el)return;const i=Object.values(votes).filter(v=>v.vote==='invest').length,w=Object.values(votes).filter(v=>v.vote==='watch').length,p=Object.values(votes).filter(v=>v.vote==='pass').length;el.innerHTML='<div class="mini-grid" style="grid-template-columns:repeat(3,1fr)"><div class="mini-stat"><div class="mini-value" style="color:var(--green)">'+i+'</div><div class="mini-label">Invest</div></div><div class="mini-stat"><div class="mini-value" style="color:var(--amber)">'+w+'</div><div class="mini-label">Watch</div></div><div class="mini-stat"><div class="mini-value" style="color:var(--red)">'+p+'</div><div class="mini-label">Pass</div></div></div>';}
-function addVoter(){const name=prompt('IC member name:');if(!name?.trim())return;const voters=JSON.parse(localStorage.getItem('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));if(!voters.includes(name.trim()))voters.push(name.trim());localStorage.setItem('l7_ic_voters',JSON.stringify(voters));renderICVotes();}
+function addVoter(){
+  const name=prompt('IC member name:');if(!name?.trim())return;
+  var voters=_getICVoters();
+  if(!voters.includes(name.trim()))voters.push(name.trim());
+  localStorage.setItem('l7_ic_voters',JSON.stringify(voters));
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('ic_voters',JSON.stringify(voters));
+  renderICVotes();
+}
 
 // ═══ DILIGENCE ═══
 function diligenceKey(){return'l7_diligence_'+(selectedStartup?.company||'global');}
-function getDiligenceState(){return JSON.parse(localStorage.getItem(diligenceKey())||'{}');}
-function saveDiligenceState(state){localStorage.setItem(diligenceKey(),JSON.stringify(state));}
+function getDiligenceState(){
+  var company=selectedStartup?.company||'global';
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) return SheetsDB.getDiligence(company);
+  return JSON.parse(localStorage.getItem(diligenceKey())||'{}');
+}
+function saveDiligenceState(state){
+  var company=selectedStartup?.company||'global';
+  localStorage.setItem(diligenceKey(),JSON.stringify(state));
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setDiligence(company,state);
+}
 function refreshDiligence(){
   // IC Ready badge banner
   var icEl=document.getElementById('diligence-ic-ready');
@@ -2606,17 +3055,30 @@ function refreshDiligence(){
   const completed=DILIGENCE_TEMPLATE.filter(item=>state[item.id]).length,pct=Math.round(completed/DILIGENCE_TEMPLATE.length*100);
   if(badge)badge.textContent=pct+'% complete';
   if(sumEl)sumEl.innerHTML='<div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+completed+'/'+DILIGENCE_TEMPLATE.length+'</div><div class="mini-label">Items Complete</div></div><div class="mini-stat"><div class="mini-value">'+pct+'%</div><div class="mini-label">Progress</div></div></div><div class="capital-bar" style="margin-top:10px"><div class="capital-fill" style="width:'+pct+'%"></div></div>';
-  const notesEl=document.getElementById('diligence-notes');if(notesEl)notesEl.value=localStorage.getItem(diligenceKey()+'_notes')||'';
+  const notesEl=document.getElementById('diligence-notes');if(notesEl){var _dn=(window.SheetsDB&&SheetsDB.isAuthenticated())?SheetsDB.getDiligenceNotes(selectedStartup?.company||'global'):localStorage.getItem(diligenceKey()+'_notes');notesEl.value=_dn||'';}
   renderDiligenceTasks();
 }
 function toggleDiligenceItem(id,checked){const state=getDiligenceState();state[id]=checked;saveDiligenceState(state);addAuditEntry('diligence','Diligence item '+(checked?'completed':'unchecked')+': '+id,selectedStartup?.company||'');refreshDiligence();generateICMemo();}
-function saveDiligenceNotes(){const notes=document.getElementById('diligence-notes')?.value||'';localStorage.setItem(diligenceKey()+'_notes',notes);}
+function saveDiligenceNotes(){
+  const notes=document.getElementById('diligence-notes')?.value||'';
+  var company=selectedStartup?.company||'global';
+  localStorage.setItem(diligenceKey()+'_notes',notes);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setDiligenceNotes(company,notes);
+}
 function exportDiligenceCsv(){const state=getDiligenceState();exportRowsAsCsv('log7-diligence.csv',DILIGENCE_TEMPLATE.map(item=>({company:selectedStartup?.company||'',section:item.section,item:item.label,status:state[item.id]?'Complete':'Pending'})));}
 
 // ═══ DILIGENCE TASKS ═══
 function diligenceTasksKey(){return'l7_dtasks_'+(selectedStartup?.company||'global');}
-function getDiligenceTasks(){return JSON.parse(localStorage.getItem(diligenceTasksKey())||'[]');}
-function saveDiligenceTasks(tasks){localStorage.setItem(diligenceTasksKey(),JSON.stringify(tasks));}
+function getDiligenceTasks(){
+  var company=selectedStartup?.company||'global';
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) return SheetsDB.getDiligenceTasks(company);
+  return JSON.parse(localStorage.getItem(diligenceTasksKey())||'[]');
+}
+function saveDiligenceTasks(tasks){
+  var company=selectedStartup?.company||'global';
+  localStorage.setItem(diligenceTasksKey(),JSON.stringify(tasks));
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setDiligenceTasks(company,tasks);
+}
 function addDiligenceTask(){
   if(!selectedStartup){alert('Select a startup first.');return;}
   const label=prompt('Task description:');if(!label?.trim())return;
@@ -3306,7 +3768,7 @@ function renderNetList(tab){
   var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
-  var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
+  var matchScores = tab==='investors' ? ((window.SheetsDB&&SheetsDB.isAuthenticated())?SheetsDB.getMatchScores():JSON.parse(localStorage.getItem('l7_match_scores')||'{}')) : {};
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
@@ -3837,6 +4299,9 @@ var WA_DEFAULT_TEMPLATE =
   + 'Let me know if you\'d like to connect.\n\nCheers,\nLog7 Capital';
 
 function waGetTemplate() {
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()){
+    return SheetsDB.getSetting('outreach_template')||localStorage.getItem('l7_outreach_template')||WA_DEFAULT_TEMPLATE;
+  }
   return localStorage.getItem('l7_outreach_template') || WA_DEFAULT_TEMPLATE;
 }
 
@@ -3878,6 +4343,7 @@ function waTemplateSave() {
   var ta = document.getElementById('wa-template-input');
   if (!ta) return;
   localStorage.setItem('l7_outreach_template', ta.value);
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('outreach_template',ta.value);
   var btn = event.target;
   btn.textContent = 'Saved ✓';
   setTimeout(() => { btn.textContent = 'Save'; }, 1500);
@@ -3885,6 +4351,7 @@ function waTemplateSave() {
 
 function waTemplateReset() {
   localStorage.removeItem('l7_outreach_template');
+  if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.setSetting('outreach_template',WA_DEFAULT_TEMPLATE);
   var ta = document.getElementById('wa-template-input');
   if (ta) { ta.value = WA_DEFAULT_TEMPLATE; waUpdatePreview(); }
 }
@@ -3909,7 +4376,7 @@ function renderBulkOutreachPanel() {
   if (partners.length)  console.log('First partner record:',  partners[0]);
 
   // Sort investors by match score descending if scores are available
-  var matchScoreMap = JSON.parse(localStorage.getItem('l7_match_scores') || '{}');
+  var matchScoreMap = (window.SheetsDB&&SheetsDB.isAuthenticated())?SheetsDB.getMatchScores():JSON.parse(localStorage.getItem('l7_match_scores')||'{}');
   const scores = {};
   Object.keys(matchScoreMap).forEach(k => { scores[k] = matchScoreMap[k].score != null ? matchScoreMap[k].score : matchScoreMap[k]; });
   investors = investors.slice().sort((a, b) => {
