@@ -6,6 +6,10 @@ on:
       - claude/busy-babbage-bDHke
   workflow_dispatch:
 
+env:
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,59 +21,39 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Vercel CLI and jq
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Verify token works — fails loudly if VERCEL_TOKEN is wrong
+      - name: Verify Vercel auth
+        run: vercel whoami --token="$VERCEL_TOKEN"
+
+      # Create the project (safe to re-run — errors on duplicate are ignored)
+      - name: Create project log7-capital-pro
         run: |
-          npm install --global vercel@latest
-          sudo apt-get install -y jq
+          vercel project add log7-capital-pro \
+            --token="$VERCEL_TOKEN" \
+            --scope="$VERCEL_ORG_ID" 2>&1 || echo "Project may already exist, continuing..."
 
-      # ── Step 1: Create or fetch project ID via Vercel REST API ─────
-      - name: Create / fetch log7-capital-pro project
-        id: project
+      # Link the local directory to the new project
+      - name: Link to log7-capital-pro
         run: |
-          set -e
-          TEAM="${{ secrets.VERCEL_ORG_ID }}"
-          TOKEN="${{ secrets.VERCEL_TOKEN }}"
+          vercel link \
+            --project log7-capital-pro \
+            --yes \
+            --token="$VERCEL_TOKEN" \
+            --scope="$VERCEL_ORG_ID"
 
-          # Try to create; if it already exists the API returns 409 with the existing project
-          RESPONSE=$(curl -sf -X POST \
-            "https://api.vercel.com/v9/projects?teamId=${TEAM}" \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"log7-capital-pro","framework":null}') || true
-
-          PROJECT_ID=$(echo "$RESPONSE" | jq -r '.id // empty' 2>/dev/null)
-
-          # If empty (project already exists or curl failed), fetch by name
-          if [ -z "$PROJECT_ID" ]; then
-            echo "Project may already exist — fetching by name..."
-            RESPONSE=$(curl -sf \
-              "https://api.vercel.com/v9/projects/log7-capital-pro?teamId=${TEAM}" \
-              -H "Authorization: Bearer ${TOKEN}")
-            PROJECT_ID=$(echo "$RESPONSE" | jq -r '.id')
-          fi
-
-          echo "Project ID: $PROJECT_ID"
-          echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
-
-      # ── Step 2: Write .vercel/project.json ─────────────────────────
-      - name: Write .vercel/project.json
-        run: |
-          mkdir -p .vercel
-          cat > .vercel/project.json <<EOF
-          {"projectId":"${{ steps.project.outputs.project_id }}","orgId":"${{ secrets.VERCEL_ORG_ID }}"}
-          EOF
-          cat .vercel/project.json
-
-      # ── Step 3: Set environment variables ──────────────────────────
+      # Set all 7 environment variables on the new project
       - name: Set environment variables
         run: |
           add_env() {
             local key="$1" val="$2"
             [[ -z "$val" ]] && return
             printf '%s' "$val" | vercel env add "$key" production \
-              --token="${{ secrets.VERCEL_TOKEN }}" \
-              --scope="${{ secrets.VERCEL_ORG_ID }}" \
-              --force 2>/dev/null || echo "Warning: could not set $key (may already be set)"
+              --token="$VERCEL_TOKEN" \
+              --scope="$VERCEL_ORG_ID" \
+              --force 2>/dev/null || echo "Warning: could not set $key"
           }
           add_env SHEETS_API_URL           "${{ secrets.NEW_SHEETS_API_URL }}"
           add_env UPSTASH_REDIS_REST_URL   "${{ secrets.NEW_UPSTASH_REDIS_REST_URL }}"
@@ -78,24 +62,18 @@ jobs:
           add_env TWILIO_AUTH_TOKEN        "${{ secrets.NEW_TWILIO_AUTH_TOKEN }}"
           add_env TWILIO_FROM              "${{ secrets.NEW_TWILIO_FROM }}"
           add_env TWILIO_TO                "${{ secrets.NEW_TWILIO_TO }}"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
 
-      # ── Step 4: Deploy to production ───────────────────────────────
+      # Deploy to production
       - name: Deploy to production
         id: deploy
         run: |
           URL=$(vercel deploy \
             --prod \
             --yes \
-            --token="${{ secrets.VERCEL_TOKEN }}" \
-            --scope="${{ secrets.VERCEL_ORG_ID }}")
+            --token="$VERCEL_TOKEN" \
+            --scope="$VERCEL_ORG_ID")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "✅ Deployed to: $URL"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
 
       - name: Print production URL
-        run: echo "🚀 New dashboard live at ${{ steps.deploy.outputs.url }}"
+        run: echo "🚀 Dashboard live at ${{ steps.deploy.outputs.url }}"
