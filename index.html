@@ -1033,6 +1033,8 @@ window.SheetsDB = (function(){
     migrateFromLocalStorage: migrateFromLocalStorage,
     manualMigrate: manualMigrate,
     clearMigratedData: clearMigratedData,
+    apiRaw: apiCall,
+    fetchMeta: fetchMeta,
   };
 })();
 
@@ -3638,7 +3640,25 @@ async function netFetchInvestors(){
   if(syncEl) syncEl.innerHTML = 'Fetching…';
 
   try {
-    var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
+    var rawRows = null;
+
+    // When authenticated, use the Sheets API (works regardless of sharing settings)
+    if(window.SheetsDB && SheetsDB.isAuthenticated()){
+      try {
+        var meta = await SheetsDB.fetchMeta();
+        var firstSheet = meta[0]; // first sheet title
+        if(firstSheet){
+          var data = await SheetsDB.apiRaw('GET', '/values/'+encodeURIComponent(firstSheet+'!A:H'));
+          var vals = (data.values||[]);
+          // Skip header row if first cell looks like a label (not investor name)
+          var startIdx = (vals.length && vals[0] && /name|investor/i.test(String(vals[0][0]||''))) ? 1 : 0;
+          rawRows = vals.slice(startIdx);
+        }
+      } catch(e){ console.warn('[netFetchInvestors] Sheets API fetch failed, falling back to gviz:', e.message); }
+    }
+
+    // Fall back to public gviz URL when not authenticated or API fetch failed
+    if(!rawRows) rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
 
     // Map using exact column indices; skip rows with no investor name
     var sheetMapped = [];
