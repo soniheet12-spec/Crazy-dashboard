@@ -1,4 +1,5 @@
 {
+  "name": "log7-capital-pro",
   "crons": [
     {
       "path": "/api/send-followup-reminder",
