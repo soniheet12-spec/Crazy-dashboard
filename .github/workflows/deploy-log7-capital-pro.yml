@@ -8,7 +8,6 @@ on:
 
 env:
   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
 
 jobs:
   deploy:
@@ -24,18 +23,15 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      # Verify token — fails loudly if VERCEL_TOKEN is wrong
       - name: Verify Vercel auth
         run: vercel whoami --token="$VERCEL_TOKEN"
 
-      # Create the project (idempotent)
       - name: Create project log7-capital-pro
         run: |
           vercel project add log7-capital-pro \
             --token="$VERCEL_TOKEN" \
             --scope="soniheet12-specs-projects" 2>&1 || echo "Project may already exist, continuing..."
 
-      # Link local directory to the new project
       - name: Link to log7-capital-pro
         run: |
           vercel link \
@@ -43,10 +39,8 @@ jobs:
             --yes \
             --token="$VERCEL_TOKEN" \
             --scope="soniheet12-specs-projects"
-          echo "--- .vercel/project.json ---"
           cat .vercel/project.json
 
-      # Set all 7 environment variables
       - name: Set environment variables
         run: |
           add_env() {
@@ -65,11 +59,11 @@ jobs:
           add_env TWILIO_FROM              "${{ secrets.NEW_TWILIO_FROM }}"
           add_env TWILIO_TO                "${{ secrets.NEW_TWILIO_TO }}"
 
-      # Deploy — full output visible, URL printed at end
-      - name: Deploy to production
+      - name: Deploy to production (debug)
         run: |
           vercel deploy \
             --prod \
             --yes \
+            --debug \
             --token="$VERCEL_TOKEN" \
             --scope="soniheet12-specs-projects"
