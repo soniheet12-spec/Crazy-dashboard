@@ -1,0 +1,79 @@
+name: Deploy → log7-capital-pro (NEW project)
+
+# Triggers on every push to this feature branch, or manually.
+on:
+  push:
+    branches:
+      - claude/busy-babbage-bDHke
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # ── Step 1: Link / create the new project ──────────────────
+      # .vercel/project.json has orgId but NO projectId.
+      # vercel.json has `"name": "log7-capital-pro"`.
+      # Running `vercel link --yes` with these creates a new project
+      # named log7-capital-pro inside the team if it doesn't exist yet.
+      - name: Link project (creates log7-capital-pro if new)
+        run: |
+          vercel link \
+            --yes \
+            --token="${{ secrets.VERCEL_TOKEN }}" \
+            --scope="${{ secrets.VERCEL_ORG_ID }}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+      # ── Step 2: Set all 7 environment variables ────────────────
+      # These mirror the env vars on the original dashboard-log7-capital-o6s8.
+      # Values come from GitHub secrets prefixed with NEW_.
+      - name: Set environment variables
+        run: |
+          add_env() {
+            local key="$1" val="$2"
+            [[ -z "$val" ]] && return
+            echo "$val" | vercel env add "$key" production \
+              --token="${{ secrets.VERCEL_TOKEN }}" \
+              --scope="${{ secrets.VERCEL_ORG_ID }}" \
+              --force 2>/dev/null || true
+          }
+          add_env SHEETS_API_URL           "${{ secrets.NEW_SHEETS_API_URL }}"
+          add_env UPSTASH_REDIS_REST_URL   "${{ secrets.NEW_UPSTASH_REDIS_REST_URL }}"
+          add_env UPSTASH_REDIS_REST_TOKEN "${{ secrets.NEW_UPSTASH_REDIS_REST_TOKEN }}"
+          add_env TWILIO_ACCOUNT_SID       "${{ secrets.NEW_TWILIO_ACCOUNT_SID }}"
+          add_env TWILIO_AUTH_TOKEN        "${{ secrets.NEW_TWILIO_AUTH_TOKEN }}"
+          add_env TWILIO_FROM              "${{ secrets.NEW_TWILIO_FROM }}"
+          add_env TWILIO_TO                "${{ secrets.NEW_TWILIO_TO }}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+      # ── Step 3: Deploy to production ───────────────────────────
+      - name: Deploy to production
+        id: deploy
+        run: |
+          URL=$(vercel deploy \
+            --prod \
+            --yes \
+            --token="${{ secrets.VERCEL_TOKEN }}" \
+            --scope="${{ secrets.VERCEL_ORG_ID }}")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "✅ Deployed to: $URL"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Print production URL
+        run: echo "🚀 New dashboard live at ${{ steps.deploy.outputs.url }}"
