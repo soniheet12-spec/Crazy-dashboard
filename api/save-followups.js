@@ -13,6 +13,9 @@ module.exports = async function handler(req, res) {
 
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    return res.status(500).json({ error: 'Upstash env vars not configured for this environment' });
+  }
 
   await fetch(`${url}/set/network_followups`, {
     method:  'POST',

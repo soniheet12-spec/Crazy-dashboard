@@ -63,10 +63,12 @@ module.exports = async function handler(req, res) {
 
   const body = lines.join('\n');
 
-  const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
+  const sid  = process.env.TWILIO_ACCOUNT_SID;
+  const auth = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !auth || !process.env.TWILIO_FROM || !process.env.TWILIO_TO) {
+    return res.status(500).json({ error: 'Twilio env vars not configured for this environment' });
+  }
+  const client = twilio(sid, auth);
   await client.messages.create({
     from: process.env.TWILIO_FROM,
     to:   process.env.TWILIO_TO,
