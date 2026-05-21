@@ -480,7 +480,10 @@ function initTokenClient(){
         return window.SheetsDB.fetchAll();
       }).then(function(ok){
         if(!ok) return;
-        renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+        window.SettingsDB.load().then(function(){
+          loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
+          renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+        });
         window.SheetsDB.startPolling();
       }).catch(function(e){
         console.error('[SheetsDB] ensureSheetTabsExist error:', e);
@@ -1031,6 +1034,80 @@ window.SheetsDB = (function(){
     manualMigrate: manualMigrate,
     clearMigratedData: clearMigratedData,
   };
+})();
+
+window.SettingsDB = (function(){
+  var SPREADSHEET_ID = '1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0';
+  var TOKEN_KEY = 'log7_gapi_token';
+  var TAB = 'Settings';
+  var _cache = null; // null=not loaded, {}=loaded
+
+  function getToken(){ return sessionStorage.getItem(TOKEN_KEY); }
+  function isAuth(){ return !!getToken(); }
+
+  async function _api(method, path, body){
+    var token = getToken();
+    if(!token) throw new Error('Not authenticated');
+    var opts = { method:method, headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'} };
+    if(body) opts.body = JSON.stringify(body);
+    var url = 'https://sheets.googleapis.com/v4/spreadsheets/'+SPREADSHEET_ID+path;
+    var resp = await fetch(url, opts);
+    if(!resp.ok){ var t = await resp.text(); throw new Error('API '+resp.status+': '+t.slice(0,200)); }
+    return resp.json();
+  }
+
+  async function _ensureTab(){
+    var data = await _api('GET', '?fields=sheets.properties');
+    var exists = (data.sheets||[]).some(function(s){ return s.properties.title===TAB; });
+    if(!exists){
+      await _api('POST', ':batchUpdate', { requests:[{addSheet:{properties:{title:TAB}}}] });
+      await _api('PUT', '/values/'+encodeURIComponent(TAB+'!A1')+'?valueInputOption=USER_ENTERED', { values:[['key','value','updatedAt']] });
+    }
+  }
+
+  async function _pushAll(){
+    if(!_cache) return;
+    var ts = new Date().toISOString();
+    var rows = Object.entries(_cache).filter(function(kv){ return kv[0]; }).map(function(kv){ return [kv[0], String(kv[1]||''), ts]; });
+    try {
+      await _api('POST', '/values/'+encodeURIComponent(TAB+'!A2:C')+':clear', {});
+      if(rows.length) await _api('PUT', '/values/'+encodeURIComponent(TAB+'!A1')+'?valueInputOption=USER_ENTERED', { values:[['key','value','updatedAt']].concat(rows) });
+    } catch(e){ console.warn('[SettingsDB] push failed:', e.message); }
+  }
+
+  async function load(){
+    if(!isAuth()) return;
+    try {
+      await _ensureTab();
+      var data = await _api('GET', '/values/'+encodeURIComponent(TAB+'!A:C'));
+      var rows = (data.values||[]).slice(1);
+      _cache = {};
+      rows.forEach(function(row){ if(row[0]) _cache[row[0]] = row[1]||''; });
+    } catch(e){ console.warn('[SettingsDB] load failed:', e.message); _cache = {}; }
+  }
+
+  function get(key, defaultVal){
+    var d = (defaultVal !== undefined) ? defaultVal : null;
+    if(_cache !== null && key in _cache) return _cache[key];
+    var ls = localStorage.getItem(key);
+    return ls !== null ? ls : d;
+  }
+
+  // set: caller already did localStorage.setItem — this syncs to Sheets
+  function set(key, value){
+    if(_cache === null) _cache = {};
+    _cache[key] = String(value||'');
+    if(!isAuth()) return;
+    _pushAll().catch(function(e){ console.warn('[SettingsDB] set push failed:', e.message); });
+  }
+
+  function remove(key){
+    if(_cache !== null) delete _cache[key];
+    if(!isAuth()) return;
+    _pushAll().catch(function(e){ console.warn('[SettingsDB] remove push failed:', e.message); });
+  }
+
+  return { load:load, get:get, set:set, remove:remove, isLoaded:function(){ return _cache!==null; } };
 })();
 </script>
 </head>
@@ -1788,8 +1865,11 @@ window.onload = async () => {
       return SheetsDB.fetchAll(true);
     }).then(function(ok){
       if(!ok) return;
-      renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
-      SheetsDB.startPolling();
+      return window.SettingsDB.load().then(function(){
+        loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
+        renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+        SheetsDB.startPolling();
+      });
     });
   }
 };
@@ -1887,17 +1967,17 @@ function applyTheme(name){
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
 function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
-function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
+function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');var mm=SettingsDB.get('l7_matching_mode','auto');document.getElementById('matching-mode').value=mm;var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
+function savePreferences(){var v=document.getElementById('matching-mode').value;localStorage.setItem('l7_matching_mode',v);SettingsDB.set('l7_matching_mode',v);}
 
 // ═══ USER PROFILE ═══
-function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
-function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
+function loadUserProfile(){const p=JSON.parse(SettingsDB.get('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
+function saveUserProfile(){var v=JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value});localStorage.setItem('l7_user',v);SettingsDB.set('l7_user',v);_markSettingsSaved('Profile');}
+function getCurrentUser(){return JSON.parse(SettingsDB.get('l7_user')||'{"name":"Team","role":"analyst"}');}
 
 // ═══ CAPITAL SETTINGS ═══
-function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;localStorage.setItem('l7_capital',JSON.stringify({deployed,fund}));refreshCapitalDisplay();_markSettingsSaved('Capital');}
-function getCapitalSettings(){return JSON.parse(localStorage.getItem('l7_capital')||'{"deployed":0,"fund":0}');}
+function saveCapitalSettings(){const deployed=parseFloat(document.getElementById('capital-deployed').value)||0;const fund=parseFloat(document.getElementById('fund-size').value)||0;var v=JSON.stringify({deployed,fund});localStorage.setItem('l7_capital',v);SettingsDB.set('l7_capital',v);refreshCapitalDisplay();_markSettingsSaved('Capital');}
+function getCapitalSettings(){return JSON.parse(SettingsDB.get('l7_capital')||'{"deployed":0,"fund":0}');}
 function refreshCapitalDisplay(){
   const {deployed,fund}=getCapitalSettings();
   const el=document.getElementById('capital-display');if(!el)return;
@@ -2543,8 +2623,8 @@ function bulkWhatsapp(count){const top=lastMatches.slice(0,count).filter(m=>find
 function copyAllIntros(){if(!lastMatches.length)return showError('Run a match first.');const text=lastMatches.map(m=>{const inv=findInvestorByName(m.name),s=buildEmailSubject(m,inv),b=fillTemplate(document.getElementById('email-template').value,buildMessageContext(m,inv));return m.name+'\nSubject: '+s+'\n'+b;}).join('\n\n===========\n\n');navigator.clipboard.writeText(text);addAuditEntry('outreach','All intros copied',selectedStartup?.company||'');}
 
 // ═══ TEMPLATES ═══
-function loadTemplates(){document.getElementById('email-subject-template').value=localStorage.getItem('l7_email_subject_template')||DEFAULT_EMAIL_SUBJECT;document.getElementById('email-template').value=localStorage.getItem('l7_email_template')||DEFAULT_EMAIL_TEMPLATE;document.getElementById('whatsapp-template').value=localStorage.getItem('l7_whatsapp_template')||DEFAULT_WHATSAPP_TEMPLATE;}
-function saveTemplates(){localStorage.setItem('l7_email_subject_template',document.getElementById('email-subject-template').value);localStorage.setItem('l7_email_template',document.getElementById('email-template').value);localStorage.setItem('l7_whatsapp_template',document.getElementById('whatsapp-template').value);}
+function loadTemplates(){document.getElementById('email-subject-template').value=SettingsDB.get('l7_email_subject_template')||DEFAULT_EMAIL_SUBJECT;document.getElementById('email-template').value=SettingsDB.get('l7_email_template')||DEFAULT_EMAIL_TEMPLATE;document.getElementById('whatsapp-template').value=SettingsDB.get('l7_whatsapp_template')||DEFAULT_WHATSAPP_TEMPLATE;}
+function saveTemplates(){var s=document.getElementById('email-subject-template').value,e=document.getElementById('email-template').value,w=document.getElementById('whatsapp-template').value;localStorage.setItem('l7_email_subject_template',s);localStorage.setItem('l7_email_template',e);localStorage.setItem('l7_whatsapp_template',w);SettingsDB.set('l7_email_subject_template',s);SettingsDB.set('l7_email_template',e);SettingsDB.set('l7_whatsapp_template',w);}
 
 // ═══ IC MEMO ═══
 function generateICMemo(){
@@ -2570,11 +2650,11 @@ function generateICMemo(){
   addAuditEntry('ic','IC memo generated',selectedStartup.company);
 }
 function copyICMemo(){const el=document.getElementById('memo-content');if(!el||!selectedStartup)return;navigator.clipboard.writeText(el.innerText);addAuditEntry('ic','IC memo copied',selectedStartup.company);}
-function getICVotes(){return JSON.parse(localStorage.getItem('l7_icvotes_'+(selectedStartup?.company||'global'))||'{}');}
-function saveICVotes(votes){localStorage.setItem('l7_icvotes_'+(selectedStartup?.company||'global'),JSON.stringify(votes));}
+function getICVotes(){return JSON.parse(SettingsDB.get('l7_icvotes_'+(selectedStartup?.company||'global'))||'{}');}
+function saveICVotes(votes){var key='l7_icvotes_'+(selectedStartup?.company||'global');var v=JSON.stringify(votes);localStorage.setItem(key,v);SettingsDB.set(key,v);}
 function renderICVotes(){
   const el=document.getElementById('ic-votes-list');if(!el)return;
-  const votes=getICVotes(),voters=JSON.parse(localStorage.getItem('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));
+  const votes=getICVotes(),voters=JSON.parse(SettingsDB.get('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));
   if(!voters.length){el.innerHTML='<div class="empty">Add IC members to record votes.</div>';return;}
   el.innerHTML=voters.map(name=>{const v=votes[name]||{vote:null,comment:''};return'<div class="vote-row"><div class="vote-name">'+escapeHtml(name)+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="vote-btn '+(v.vote==='invest'?'selected-invest':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'invest\')">Invest</button><button class="vote-btn '+(v.vote==='watch'?'selected-watch':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'watch\')">Watch</button><button class="vote-btn '+(v.vote==='pass'?'selected-pass':'')+'" onclick="recordICVote(\''+escapeQ(name)+'\',\'pass\')">Pass</button><input style="width:150px;padding:5px 10px;font-size:11.5px" placeholder="Comment..." value="'+escapeHtml(v.comment||'')+'" oninput="updateICComment(\''+escapeQ(name)+'\',this.value)"></div></div>';}).join('');
   renderICVoteSummary(votes);
@@ -2582,12 +2662,12 @@ function renderICVotes(){
 function recordICVote(name,vote){const votes=getICVotes();votes[name]=votes[name]||{};votes[name].vote=vote;saveICVotes(votes);renderICVotes();generateICMemo();addAuditEntry('ic','IC vote: '+vote,name+' on '+(selectedStartup?.company||'n/a'));}
 function updateICComment(name,comment){const votes=getICVotes();votes[name]=votes[name]||{};votes[name].comment=comment;saveICVotes(votes);}
 function renderICVoteSummary(votes){const el=document.getElementById('ic-vote-summary');if(!el)return;const i=Object.values(votes).filter(v=>v.vote==='invest').length,w=Object.values(votes).filter(v=>v.vote==='watch').length,p=Object.values(votes).filter(v=>v.vote==='pass').length;el.innerHTML='<div class="mini-grid" style="grid-template-columns:repeat(3,1fr)"><div class="mini-stat"><div class="mini-value" style="color:var(--green)">'+i+'</div><div class="mini-label">Invest</div></div><div class="mini-stat"><div class="mini-value" style="color:var(--amber)">'+w+'</div><div class="mini-label">Watch</div></div><div class="mini-stat"><div class="mini-value" style="color:var(--red)">'+p+'</div><div class="mini-label">Pass</div></div></div>';}
-function addVoter(){const name=prompt('IC member name:');if(!name?.trim())return;const voters=JSON.parse(localStorage.getItem('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));if(!voters.includes(name.trim()))voters.push(name.trim());localStorage.setItem('l7_ic_voters',JSON.stringify(voters));renderICVotes();}
+function addVoter(){const name=prompt('IC member name:');if(!name?.trim())return;const voters=JSON.parse(SettingsDB.get('l7_ic_voters')||JSON.stringify(IC_VOTERS_DEFAULT));if(!voters.includes(name.trim()))voters.push(name.trim());var v=JSON.stringify(voters);localStorage.setItem('l7_ic_voters',v);SettingsDB.set('l7_ic_voters',v);renderICVotes();}
 
 // ═══ DILIGENCE ═══
 function diligenceKey(){return'l7_diligence_'+(selectedStartup?.company||'global');}
-function getDiligenceState(){return JSON.parse(localStorage.getItem(diligenceKey())||'{}');}
-function saveDiligenceState(state){localStorage.setItem(diligenceKey(),JSON.stringify(state));}
+function getDiligenceState(){return JSON.parse(SettingsDB.get(diligenceKey())||'{}');}
+function saveDiligenceState(state){var v=JSON.stringify(state);localStorage.setItem(diligenceKey(),v);SettingsDB.set(diligenceKey(),v);}
 function refreshDiligence(){
   // IC Ready badge banner
   var icEl=document.getElementById('diligence-ic-ready');
@@ -2606,17 +2686,17 @@ function refreshDiligence(){
   const completed=DILIGENCE_TEMPLATE.filter(item=>state[item.id]).length,pct=Math.round(completed/DILIGENCE_TEMPLATE.length*100);
   if(badge)badge.textContent=pct+'% complete';
   if(sumEl)sumEl.innerHTML='<div class="mini-grid"><div class="mini-stat"><div class="mini-value">'+completed+'/'+DILIGENCE_TEMPLATE.length+'</div><div class="mini-label">Items Complete</div></div><div class="mini-stat"><div class="mini-value">'+pct+'%</div><div class="mini-label">Progress</div></div></div><div class="capital-bar" style="margin-top:10px"><div class="capital-fill" style="width:'+pct+'%"></div></div>';
-  const notesEl=document.getElementById('diligence-notes');if(notesEl)notesEl.value=localStorage.getItem(diligenceKey()+'_notes')||'';
+  const notesEl=document.getElementById('diligence-notes');if(notesEl)notesEl.value=SettingsDB.get(diligenceKey()+'_notes','')||'';
   renderDiligenceTasks();
 }
 function toggleDiligenceItem(id,checked){const state=getDiligenceState();state[id]=checked;saveDiligenceState(state);addAuditEntry('diligence','Diligence item '+(checked?'completed':'unchecked')+': '+id,selectedStartup?.company||'');refreshDiligence();generateICMemo();}
-function saveDiligenceNotes(){const notes=document.getElementById('diligence-notes')?.value||'';localStorage.setItem(diligenceKey()+'_notes',notes);}
+function saveDiligenceNotes(){const notes=document.getElementById('diligence-notes')?.value||'';localStorage.setItem(diligenceKey()+'_notes',notes);SettingsDB.set(diligenceKey()+'_notes',notes);}
 function exportDiligenceCsv(){const state=getDiligenceState();exportRowsAsCsv('log7-diligence.csv',DILIGENCE_TEMPLATE.map(item=>({company:selectedStartup?.company||'',section:item.section,item:item.label,status:state[item.id]?'Complete':'Pending'})));}
 
 // ═══ DILIGENCE TASKS ═══
 function diligenceTasksKey(){return'l7_dtasks_'+(selectedStartup?.company||'global');}
-function getDiligenceTasks(){return JSON.parse(localStorage.getItem(diligenceTasksKey())||'[]');}
-function saveDiligenceTasks(tasks){localStorage.setItem(diligenceTasksKey(),JSON.stringify(tasks));}
+function getDiligenceTasks(){return JSON.parse(SettingsDB.get(diligenceTasksKey())||'[]');}
+function saveDiligenceTasks(tasks){var v=JSON.stringify(tasks);localStorage.setItem(diligenceTasksKey(),v);SettingsDB.set(diligenceTasksKey(),v);}
 function addDiligenceTask(){
   if(!selectedStartup){alert('Select a startup first.');return;}
   const label=prompt('Task description:');if(!label?.trim())return;
@@ -3837,7 +3917,7 @@ var WA_DEFAULT_TEMPLATE =
   + 'Let me know if you\'d like to connect.\n\nCheers,\nLog7 Capital';
 
 function waGetTemplate() {
-  return localStorage.getItem('l7_outreach_template') || WA_DEFAULT_TEMPLATE;
+  return SettingsDB.get('l7_outreach_template') || WA_DEFAULT_TEMPLATE;
 }
 
 function waFillTemplate(tpl, name) {
@@ -3877,14 +3957,14 @@ function waUpdatePreview() {
 function waTemplateSave() {
   var ta = document.getElementById('wa-template-input');
   if (!ta) return;
-  localStorage.setItem('l7_outreach_template', ta.value);
+  localStorage.setItem('l7_outreach_template', ta.value); SettingsDB.set('l7_outreach_template', ta.value);
   var btn = event.target;
   btn.textContent = 'Saved ✓';
   setTimeout(() => { btn.textContent = 'Save'; }, 1500);
 }
 
 function waTemplateReset() {
-  localStorage.removeItem('l7_outreach_template');
+  localStorage.removeItem('l7_outreach_template'); SettingsDB.remove('l7_outreach_template');
   var ta = document.getElementById('wa-template-input');
   if (ta) { ta.value = WA_DEFAULT_TEMPLATE; waUpdatePreview(); }
 }
