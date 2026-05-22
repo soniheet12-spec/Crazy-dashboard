@@ -3394,7 +3394,9 @@ function renderNetList(tab){
   }
   var fields = netFields(tab);
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
-  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey).slice(0,4);
+  var emailKey = tab==='startups' ? 'founderEmail' : 'contactEmail';
+  var showEmail = tab==='investors' || tab==='partnerships' || tab==='startups';
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey).slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
@@ -3402,6 +3404,7 @@ function renderNetList(tab){
     + '<thead><tr style="border-bottom:1px solid var(--border)">'
     + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Contact No.</th>'
+    + (showEmail?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Email</th>':'')
     + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
     + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
@@ -3428,6 +3431,13 @@ function renderNetList(tab){
     // Phone cell
     var phone = row[phoneKey]||'—';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+(phone!=='—'?'<a href="tel:'+escapeHtml(phone)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(phone)+'</a>':'—')+'</td>';
+    // Email cell
+    if(showEmail){
+      var email = row[emailKey]||'';
+      html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'
+        +(email?'<a href="mailto:'+escapeHtml(email)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(email)+'</a>':'—')
+        +'</td>';
+    }
     // Notes cell
     if(showNotes){
       var notesVal = row.notes||'';
@@ -3524,7 +3534,11 @@ function buildNetForm(tab, data){
     } else if(f.type==='textarea'){
       html += '<textarea id="nf-'+f.key+'" style="width:100%;min-height:70px">'+escapeHtml(val)+'</textarea>';
     } else {
-      html += '<input type="'+f.type+'" id="nf-'+f.key+'" value="'+escapeHtml(val)+'" style="width:100%"'+(f.required?' required':'')+' placeholder="'+f.label+'">';
+      var extra = '';
+      if(f.type==='email'){
+        extra = ' oninput="var v=this.value.trim();this.style.borderColor=(!v||/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(v))?\'\':\' var(--amber)\'"';
+      }
+      html += '<input type="text" id="nf-'+f.key+'" value="'+escapeHtml(val)+'" style="width:100%"'+(f.required?' required':'')+' placeholder="'+f.label+'"'+extra+'>';
     }
     html += '</div>';
   });
