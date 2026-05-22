@@ -59,11 +59,15 @@ jobs:
           add_env TWILIO_FROM              "${{ secrets.NEW_TWILIO_FROM }}"
           add_env TWILIO_TO                "${{ secrets.NEW_TWILIO_TO }}"
 
-      - name: Deploy to production (debug)
+      - name: Deploy and promote to production
         run: |
-          vercel deploy \
-            --prod \
+          DEPLOYMENT_URL=$(vercel deploy \
             --yes \
-            --debug \
+            --token="$VERCEL_TOKEN" \
+            --scope="soniheet12-specs-projects" 2>&1 | tail -1)
+          echo "Preview URL: $DEPLOYMENT_URL"
+          vercel promote "$DEPLOYMENT_URL" \
+            --yes \
             --token="$VERCEL_TOKEN" \
             --scope="soniheet12-specs-projects"
+          echo "Promoted to production."
