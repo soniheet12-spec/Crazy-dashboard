@@ -517,7 +517,7 @@ function initTokenClient(){
         if(!ok) return;
         window.SettingsDB.load().then(function(){
           loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
-          renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+          renderNetworkTab(); renderKanban(); renderPipelineList(); renderNetPipelineSection(); refreshHome();
         });
         window.SheetsDB.startPolling();
       }).catch(function(e){
@@ -710,10 +710,11 @@ window.SheetsDB = (function(){
     startups:     ['_id','Name','Contact','Phone','Email','Sector','Stage','Status','ReferredBy','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     partnerships: ['_id','Name','Type','ContactName','ContactEmail','ContactPhone','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
     pipeline:     ['_id','Startup','Investor','Score','Verdict','Stage','Hot','SavedAt','CRMStatus','CRMNotes','CRMTags','CRMWarmIntro','CRMFollowUp'],
+    net_pipeline: ['_id','Name','Company','Type','Status','Notes','LastUpdated','SourceTab','SourceId'],
     ActivityLog:  ['Timestamp','Action','Entity','Detail'],
   };
 
-  var _cache = { investors:[], startups:[], partnerships:[], pipeline:[] };
+  var _cache = { investors:[], startups:[], partnerships:[], pipeline:[], net_pipeline:[] };
   var _sheetIds = {};
   var _lastSync = null;
   var _pollInterval = null;
@@ -823,12 +824,15 @@ window.SheetsDB = (function(){
   function fromStartup(o,id){ return [id||o.id||('st_'+Date.now()),o.companyName||'',o.founderName||'',o.founderPhone||'',o.founderEmail||'',o.sector||'',o.stage||'',o.status||'',o.referredBy||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
   function fromPartnership(o,id){ return [id||o.id||('pa_'+Date.now()),o.partnerName||'',o.type||'',o.contactName||'',o.contactEmail||'',o.contactPhone||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
   function fromPipeline(o,id){ var crm=o._crm||{}; return [id||o.id||('pl_'+Date.now()),o.startup||'',o.investor||'',String(o.score||0),o.verdict||'',o.stage||'Sourcing',String(o.hot||false),o.savedAt||new Date().toISOString(),crm.status||'not contacted',crm.notes||'',(crm.tags||[]).join('|'),crm.warmIntro||'',crm.followUp||'']; }
+  function toNetPipeline(r){ return { id:r._id||'', _rowIndex:r._rowIndex, name:r.Name||'', company:r.Company||'', type:r.Type||'', status:r.Status||'', notes:r.Notes||'', lastUpdated:r.LastUpdated||'', sourceTab:r.SourceTab||'', sourceId:r.SourceId||'' }; }
+  function fromNetPipeline(o,id){ return [id||o.id||('np_'+Date.now()),o.name||'',o.company||'',o.type||'',o.status||'',o.notes||'',o.lastUpdated||new Date().toISOString(),o.sourceTab||'',o.sourceId||'']; }
 
   var _tabMap = {
     investors:    { toObj:toInvestor,    fromObj:fromInvestor },
     startups:     { toObj:toStartup,     fromObj:fromStartup },
     partnerships: { toObj:toPartnership, fromObj:fromPartnership },
     pipeline:     { toObj:toPipeline,    fromObj:fromPipeline },
+    net_pipeline: { toObj:toNetPipeline, fromObj:fromNetPipeline },
   };
 
   // Push full tab contents (clear data rows then rewrite)
@@ -882,7 +886,7 @@ window.SheetsDB = (function(){
         var id = pg.id;
         if(id==='page-home') refreshHome();
         else if(id==='page-network') renderNetworkTab();
-        else if(id==='page-pipeline'){ renderKanban(); renderPipelineList(); }
+        else if(id==='page-pipeline'){ renderKanban(); renderPipelineList(); renderNetPipelineSection(); }
       });
     }, 60000);
   }
@@ -1156,7 +1160,6 @@ window.SettingsDB = (function(){
     <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
     <button class="nav-tab" onclick="showTab('match',this)">Match Studio</button>
     <button class="nav-tab" onclick="showTab('pipeline',this)">Pipeline</button>
-    <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
     <button class="nav-tab" onclick="showTab('deck',this)">Deck Insights</button>
     <button class="nav-tab" onclick="showTab('memo',this)">IC Memo</button>
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
@@ -1436,22 +1439,22 @@ window.SettingsDB = (function(){
       </div>
       <div id="pipeline-list"></div>
     </div>
-  </div>
-
-  <!-- ═══ STARTUPS ═══ -->
-  <div id="page-startups" class="page">
-    <div class="section-bar">
-      <div class="section-title">Startups</div>
-      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
-    </div>
-    <div class="card" style="margin-bottom:14px">
-      <div class="card-header"><div class="card-title">Search</div></div>
-      <div class="field" style="margin-bottom:0">
-        <input id="startup-search" placeholder="Company, founder, sector, location..." oninput="renderStartups()">
+    <div class="card" style="margin-top:16px">
+      <div class="card-header">
+        <div class="card-title">Network Pipeline</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="net-pipeline-filter-type" onchange="renderNetPipelineSection()" style="font-size:11px;padding:4px 8px">
+            <option value="">All Types</option>
+            <option value="Investor">Investor</option>
+            <option value="Partner">Partner</option>
+            <option value="Startup">Startup</option>
+          </select>
+          <select id="net-pipeline-filter-status" onchange="renderNetPipelineSection()" style="font-size:11px;padding:4px 8px">
+            <option value="">All Stages</option>
+          </select>
+        </div>
       </div>
-    </div>
-    <div class="card flush">
-      <div id="startup-list-tab"><div class="empty">Load data from Google Sheets</div></div>
+      <div id="net-pipeline-list"><div class="empty">No contacts added to pipeline yet. Use the "+ Pipeline" button in the Network tab.</div></div>
     </div>
   </div>
 
@@ -1706,6 +1709,17 @@ window.SettingsDB = (function(){
     </div>
   </div>
 
+  <!-- NET PIPELINE MODAL -->
+  <div id="net-pipeline-modal" class="hidden" style="position:fixed;inset:0;z-index:70;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:480px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header" style="margin-bottom:16px">
+        <div class="card-title" id="net-pipeline-modal-title">Add to Pipeline</div>
+        <button class="action-btn danger" onclick="closeNetPipelineModal()" style="padding:4px 10px">&#x2715;</button>
+      </div>
+      <div id="net-pipeline-modal-body"></div>
+    </div>
+  </div>
+
   <!-- MODALS -->
   <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
   <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
@@ -1886,7 +1900,7 @@ window.onload = async () => {
   await initDocsDb();
   await loadData();
   refreshDocsSelectors();refreshHome();
-  refreshDiligence();renderKanban();renderPipelineList();
+  refreshDiligence();renderKanban();renderPipelineList();renderNetPipelineSection();
   renderAuditLog();renderICVotes();
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
@@ -1900,7 +1914,7 @@ window.onload = async () => {
       if(!ok) return;
       return window.SettingsDB.load().then(function(){
         loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
-        renderNetworkTab(); renderKanban(); renderPipelineList(); refreshHome();
+        renderNetworkTab(); renderKanban(); renderPipelineList(); renderNetPipelineSection(); refreshHome();
         SheetsDB.startPolling();
       });
     });
@@ -1914,8 +1928,8 @@ function showTab(name,btn){
   document.getElementById('page-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='pipeline'){
-    renderKanban();renderPipelineList();
-    if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchTabInto('pipeline').then(function(){renderKanban();renderPipelineList();});
+    renderKanban();renderPipelineList();renderNetPipelineSection();
+    if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchTabInto('pipeline').then(function(){renderKanban();renderPipelineList();renderNetPipelineSection();});
   }
   if(name==='audit') renderAuditLog();
   if(name==='memo') generateICMemo();
@@ -2277,10 +2291,10 @@ async function loadData(){
   if(invR.status==='fulfilled'){investors=extractRows(invR.value).filter(r=>r['Full Name']).map(mapInvestor);}else{invErr=invR.reason?.message||'Investor sheet failed';investors=[];}
   if(stR.status==='fulfilled'){const rows=extractRows(stR.value);startups=rows.filter(hasCompanyName).map(mapStartup);if(!startups.length&&rows.length)stErr='Startup sheet rows found but no company names detected.';}else{stErr=stR.reason?.message||'Startup sheet failed';startups=[];}
   ['stat-investors'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=investors.length;});
-  ['st-count','stat-startups'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=startups.length;});
-  renderStartups();renderStartupMatchList();clearStartupSelection();refreshDocsSelectors();
+  ['st-count'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=startups.length;});
+  renderStartupMatchList();clearStartupSelection();refreshDocsSelectors();
   if(prev){const idx=startups.findIndex(s=>s.company===prev);if(idx>=0)selectStartup(idx);}
-  renderKanban();renderPipelineList();refreshHome();updateStats();showLoading('');
+  renderKanban();renderPipelineList();renderNetPipelineSection();refreshHome();updateStats();showLoading('');
   if(invErr||stErr)showError([invErr?'Investor: '+invErr:'',stErr?'Startup: '+stErr:''].filter(Boolean).join(' | '));
   addAuditEntry('match','Data refreshed from Google Sheets');
 }
@@ -2295,13 +2309,6 @@ async function callClaude(apiKey,prompt,maxTokens,systemPrompt){
 }
 
 // ═══ INVESTORS & STARTUPS TABS ═══
-function renderStartups(){
-  const el=document.getElementById('startup-list-tab');if(!el)return;
-  const search=(document.getElementById('startup-search')?.value||'').toLowerCase();
-  let list=startups;if(search)list=list.filter(s=>(s.company+s.founder+s.sector+s.location).toLowerCase().includes(search));
-  if(!list.length){el.innerHTML='<div class="empty">No startups match your search.</div>';return;}
-  el.innerHTML=list.map(s=>'<div class="startup-row"><div class="avatar">'+initials(s.company)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(s.company)+' <span class="badge">'+escapeHtml(s.stage||'Stage n/a')+'</span></div><div class="row-meta">'+escapeHtml(s.founder||'Founder n/a')+' | '+escapeHtml(s.sector||'Sector n/a')+' | '+escapeHtml(s.location||'Location n/a')+'</div><div class="tag-row">'+(s.roundSize?'<span class="tag info">'+escapeHtml(s.roundSize)+'</span>':'')+(s.arr?'<span class="tag good">ARR '+escapeHtml(s.arr)+'</span>':'')+'</div>'+(s.problem?'<div class="row-copy">'+escapeHtml(s.problem)+'</div>':'')+'</div></div>').join('');
-}
 function renderStartupMatchList(){
   const el=document.getElementById('startup-list-match');if(!el)return;
   if(!startups.length){el.innerHTML='<div class="empty">Load data from Google Sheets to begin.</div>';return;}
@@ -2495,7 +2502,149 @@ function setPipeline(data){
   }
   localStorage.setItem('l7_pipeline', JSON.stringify(data));
 }
-function saveMatchToPipeline(name){
+function getNetPipeline(){
+  if(window.SheetsDB && SheetsDB.isAuthenticated()) return (SheetsDB.cache.net_pipeline||[]);
+  return JSON.parse(localStorage.getItem('l7_net_pipeline')||'[]');
+}
+function saveNetPipeline(data){
+  localStorage.setItem('l7_net_pipeline', JSON.stringify(data));
+  if(window.SheetsDB && SheetsDB.isAuthenticated()){
+    SheetsDB.cache.net_pipeline = data;
+    SheetsDB.pushTab('net_pipeline', data).catch(function(e){ console.error('[saveNetPipeline]', e); });
+  }
+}
+function isInNetPipeline(sourceTab, sourceId){
+  return getNetPipeline().some(function(p){ return p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId); });
+}
+function getNetPipelineEntry(sourceTab, sourceId){
+  return getNetPipeline().find(function(p){ return p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId); });
+}
+
+var _netPipelineEditId = null;
+
+function openNetPipelineModal(tab, rowId){
+  var rows = netLoad(tab);
+  var row = rows.find(function(r){ return String(r.id)===String(rowId); });
+  if(!row) return;
+  var nameKey = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
+  var name = row[nameKey]||'';
+  var company = tab==='investors'?(row.fundName||''):tab==='partnerships'?(row.partnerName||''):(row.companyName||'');
+  var type = tab==='investors'?'Investor':tab==='startups'?'Startup':'Partner';
+  var existing = getNetPipelineEntry(tab, rowId);
+  _netPipelineEditId = existing ? existing.id : null;
+  var statusOpts = PIPELINE_STAGES.map(function(s){
+    return '<option value="'+s+'"'+(existing&&existing.status===s?' selected':(!existing&&s===PIPELINE_STAGES[0]?' selected':''))+'>'+s+'</option>';
+  }).join('');
+  document.getElementById('net-pipeline-modal-title').textContent = existing ? 'Edit Pipeline Entry' : 'Add to Pipeline';
+  document.getElementById('net-pipeline-modal-body').innerHTML =
+    '<div class="field" style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Name</label>'
+    +'<input type="text" id="npl-name" value="'+escapeHtml(name)+'" style="width:100%" readonly></div>'
+    +'<div class="field" style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Company / Fund</label>'
+    +'<input type="text" id="npl-company" value="'+escapeHtml(company)+'" style="width:100%" readonly></div>'
+    +'<div class="field" style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Type</label>'
+    +'<input type="text" id="npl-type" value="'+escapeHtml(type)+'" style="width:100%" readonly></div>'
+    +'<div class="field" style="margin-bottom:12px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Pipeline Status</label>'
+    +'<select id="npl-status" style="width:100%">'+statusOpts+'</select></div>'
+    +'<div class="field" style="margin-bottom:18px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Notes</label>'
+    +'<textarea id="npl-notes" style="width:100%;min-height:80px">'+escapeHtml(existing?existing.notes:'')+'</textarea></div>'
+    +'<div style="display:flex;gap:10px">'
+    +'<button class="action-btn primary" style="flex:1" onclick="saveNetPipelineEntry(\''+escapeQ(tab)+'\',\''+escapeQ(String(rowId))+'\')">Save</button>'
+    +(existing?'<button class="action-btn danger" onclick="removeNetPipelineEntry(\''+escapeQ(tab)+'\',\''+escapeQ(String(rowId))+'\')">Remove</button>':'')
+    +'<button class="action-btn secondary" onclick="closeNetPipelineModal()">Cancel</button>'
+    +'</div>';
+  var m = document.getElementById('net-pipeline-modal');
+  m.classList.remove('hidden'); m.style.display='flex';
+}
+function closeNetPipelineModal(){
+  var m = document.getElementById('net-pipeline-modal');
+  m.classList.add('hidden'); m.style.display='none';
+}
+function saveNetPipelineEntry(sourceTab, sourceId){
+  var name = document.getElementById('npl-name').value;
+  var company = document.getElementById('npl-company').value;
+  var type = document.getElementById('npl-type').value;
+  var status = document.getElementById('npl-status').value;
+  var notes = document.getElementById('npl-notes').value.trim();
+  var data = getNetPipeline();
+  var now = new Date().toISOString();
+  if(_netPipelineEditId){
+    var idx = data.findIndex(function(p){ return String(p.id)===String(_netPipelineEditId); });
+    if(idx>-1){ data[idx] = Object.assign(data[idx], {status:status, notes:notes, lastUpdated:now}); }
+  } else {
+    data.push({id:'np_'+Date.now(), name:name, company:company, type:type, status:status, notes:notes, lastUpdated:now, sourceTab:sourceTab, sourceId:String(sourceId)});
+  }
+  saveNetPipeline(data);
+  closeNetPipelineModal();
+  renderNetList(sourceTab);
+  renderNetPipelineSection();
+}
+function removeNetPipelineEntry(sourceTab, sourceId){
+  if(!confirm('Remove from pipeline?')) return;
+  var data = getNetPipeline().filter(function(p){ return !(p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId)); });
+  saveNetPipeline(data);
+  closeNetPipelineModal();
+  renderNetList(sourceTab);
+  renderNetPipelineSection();
+}
+function renderNetPipelineSection(){
+  var el = document.getElementById('net-pipeline-list');
+  if(!el) return;
+  var stageFilter = document.getElementById('net-pipeline-filter-status');
+  if(stageFilter && stageFilter.options.length<=1){
+    PIPELINE_STAGES.forEach(function(s){ var o=document.createElement('option');o.value=s;o.textContent=s;stageFilter.appendChild(o); });
+  }
+  var typeFilter  = (document.getElementById('net-pipeline-filter-type')||{}).value||'';
+  var statusFilter= (stageFilter||{}).value||'';
+  var data = getNetPipeline();
+  if(typeFilter)   data = data.filter(function(p){ return p.type===typeFilter; });
+  if(statusFilter) data = data.filter(function(p){ return p.status===statusFilter; });
+  if(!data.length){ el.innerHTML='<div class="empty" style="padding:20px">No entries match. Use "+ Pipeline" in the Network tab.</div>'; return; }
+  var html='<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="border-bottom:1px solid var(--border)">'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Name</th>'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Company</th>'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Type</th>'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Status</th>'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:180px">Notes</th>'
+    +'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">Last Updated</th>'
+    +'<th style="padding:8px 10px"></th>'
+    +'</tr></thead><tbody>';
+  data.forEach(function(p){
+    var stageOpts=PIPELINE_STAGES.map(function(s){ return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+s+'</option>'; }).join('');
+    var notesTrunc=(p.notes||'').slice(0,60)+((p.notes||'').length>60?'…':'');
+    var lastUpd=p.lastUpdated?new Date(p.lastUpdated).toLocaleDateString('en-IN'):'—';
+    html+='<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+      +'<td style="padding:8px 10px;font-weight:500">'+escapeHtml(p.name||'—')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--muted)">'+escapeHtml(p.company||'—')+'</td>'
+      +'<td style="padding:8px 10px"><span class="badge">'+escapeHtml(p.type||'—')+'</span></td>'
+      +'<td style="padding:8px 10px"><select style="font-size:11px;padding:3px 6px;border-radius:5px" onchange="updateNetPipelineStatus(\''+p.id+'\',this.value)">'+stageOpts+'</select></td>'
+      +'<td style="padding:8px 10px;color:var(--muted);font-size:11.5px;max-width:180px" title="'+escapeHtml(p.notes||'')+'">'+escapeHtml(notesTrunc||'—')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--muted);white-space:nowrap">'+escapeHtml(lastUpd)+'</td>'
+      +'<td style="padding:8px 10px;white-space:nowrap">'
+      +'<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openNetPipelineEditById(\''+p.id+'\')">Edit</button>'
+      +'<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetPipelineById(\''+p.id+'\')">Remove</button>'
+      +'</td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function updateNetPipelineStatus(id, status){
+  var data=getNetPipeline();
+  var idx=data.findIndex(function(p){ return String(p.id)===String(id); });
+  if(idx>-1){ data[idx].status=status; data[idx].lastUpdated=new Date().toISOString(); }
+  saveNetPipeline(data);
+}
+function openNetPipelineEditById(id){
+  var entry=getNetPipeline().find(function(p){ return String(p.id)===String(id); });
+  if(entry) openNetPipelineModal(entry.sourceTab, entry.sourceId);
+}
+function deleteNetPipelineById(id){
+  if(!confirm('Remove from pipeline?')) return;
+  var entry=getNetPipeline().find(function(p){ return String(p.id)===String(id); });
+  saveNetPipeline(getNetPipeline().filter(function(p){ return String(p.id)!==String(id); }));
+  renderNetPipelineSection();
+  if(entry) renderNetList(entry.sourceTab);
+}
   const match=(lastPayload?.matches||[]).find(m=>m.name===name);if(!match||!selectedStartup)return;
   const raw = window.SheetsDB && SheetsDB.isAuthenticated() ? (SheetsDB.cache.pipeline||[]) : getPipeline();
   if(!raw.find(item=>item.startup===selectedStartup.company&&item.investor===name)){
@@ -3504,6 +3653,9 @@ function renderNetList(tab){
       : '';
     html += '<td style="padding:8px 10px;white-space:nowrap">'
       + resetBtn
+      + (isInNetPipeline(tab, row.id)
+          ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px;color:var(--green);border-color:var(--green)" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">&#x2713; In Pipeline</button>'
+          : '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">+ Pipeline</button>')
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+row.id+'\')">Edit</button>'
       + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')">Delete</button>'
       + '</td></tr>';
@@ -4451,7 +4603,7 @@ document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
 
 // ═══ GLOBAL SEARCH ═══
 function goToTab(name){
-  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var map={home:0,network:1,match:2,pipeline:3,deck:4,memo:5,diligence:6,audit:7,docs:8};
   var idx=map[name];if(idx==null)return;
   var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
 }
