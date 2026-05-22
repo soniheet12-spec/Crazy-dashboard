@@ -1641,6 +1641,8 @@ window.SettingsDB = (function(){
       <div class="section-title">Network</div>
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
       <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
+      <button class="ghost-btn" onclick="openCsvImport()">Import CSV</button>
+      <input type="file" id="csv-import-file-input" accept=".csv" style="display:none" onchange="handleCsvFileSelect(event)">
     </div>
     <div class="subtabs" style="margin-bottom:18px">
       <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
@@ -1680,6 +1682,17 @@ window.SettingsDB = (function(){
         <button class="action-btn primary" style="flex:1" onclick="saveNetworkEntry()">Save</button>
         <button class="action-btn secondary" onclick="closeNetworkModal()">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- CSV IMPORT MODAL -->
+  <div id="csv-import-modal" class="hidden" style="position:fixed;inset:0;z-index:70;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:760px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:92vh;overflow-y:auto">
+      <div class="card-header" style="margin-bottom:16px">
+        <div class="card-title" id="csv-import-title">Import CSV</div>
+        <button class="action-btn danger" onclick="closeCsvImport()" style="padding:4px 10px">&#x2715;</button>
+      </div>
+      <div id="csv-import-body"></div>
     </div>
   </div>
 
@@ -3624,6 +3637,260 @@ function exportNetCsv(){
     colMap[tab].forEach(function(k){ out[k] = r[k]||''; });
     return out;
   }));
+}
+
+// ── CSV IMPORT ─────────────────────────────────────────────────
+
+var _csvImportState = null; // { tab, headers, rows, mapping, parsed }
+
+function openCsvImport(){
+  _csvImportState = { tab: _netActiveTab };
+  document.getElementById('csv-import-title').textContent =
+    'Import CSV → ' + _netActiveTab.charAt(0).toUpperCase() + _netActiveTab.slice(1);
+  _renderCsvStep1();
+  var m = document.getElementById('csv-import-modal');
+  m.classList.remove('hidden'); m.style.display='flex';
+}
+
+function closeCsvImport(){
+  var m = document.getElementById('csv-import-modal');
+  m.classList.add('hidden'); m.style.display='none';
+  _csvImportState = null;
+}
+
+function _renderCsvStep1(){
+  document.getElementById('csv-import-body').innerHTML =
+    '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Select a <strong>.csv</strong> file to import into the <strong>'+_csvImportState.tab+'</strong> tab. The first row must be column headers.</p>'
+    +'<button class="action-btn primary" onclick="document.getElementById(\'csv-import-file-input\').click()">Choose CSV File</button>'
+    +'<p style="font-size:11px;color:var(--muted);margin-top:10px">Tip: export your existing data first to see the expected column names.</p>';
+}
+
+function handleCsvFileSelect(e){
+  var file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){ _parseCsvFile(ev.target.result); };
+  reader.readAsText(file);
+}
+
+function _parseCsvFile(text){
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var rows = [];
+  for(var i=0;i<lines.length;i++){
+    var row = _parseCsvLine(lines[i]);
+    if(row.length) rows.push(row);
+  }
+  if(rows.length < 2){ showError('CSV must have at least a header row and one data row.'); return; }
+  _csvImportState.headers = rows[0].map(function(h){ return h.trim(); });
+  _csvImportState.rawRows = rows.slice(1);
+  _renderCsvStep2();
+}
+
+function _parseCsvLine(line){
+  var result=[], cur='', inQ=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+    else if(c===','&&!inQ){ result.push(cur); cur=''; }
+    else cur+=c;
+  }
+  result.push(cur);
+  return result.map(function(v){ return v.trim(); });
+}
+
+function _renderCsvStep2(){
+  var s = _csvImportState;
+  var fields = netFields(s.tab);
+  // Auto-map: try to match CSV header to field key or label (case-insensitive)
+  var mapping = {}; // fieldKey → csvColIndex or ''
+  fields.forEach(function(f){
+    var matched = -1;
+    s.headers.forEach(function(h, i){
+      var hn = h.toLowerCase().replace(/[\s_\-]/g,'');
+      var fk = f.key.toLowerCase().replace(/[\s_\-]/g,'');
+      var fl = f.label.toLowerCase().replace(/[\s_\-]/g,'');
+      if(hn===fk||hn===fl||hn.includes(fk)||fk.includes(hn)){ if(matched===-1) matched=i; }
+    });
+    mapping[f.key] = matched >= 0 ? String(matched) : '';
+  });
+  s.mapping = mapping;
+
+  var html = '<p style="font-size:12.5px;color:var(--muted);margin-bottom:14px">Found <strong>'+s.headers.length+'</strong> columns and <strong>'+s.rawRows.length+'</strong> data rows. Map CSV columns to fields below.</p>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:18px">';
+  html += '<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 8px;color:var(--muted)">Field</th><th style="text-align:left;padding:6px 8px;color:var(--muted)">CSV Column</th><th style="text-align:left;padding:6px 8px;color:var(--muted)">Preview (row 1)</th></tr></thead><tbody>';
+  fields.forEach(function(f){
+    var selVal = mapping[f.key];
+    var opts = '<option value="">— skip —</option>';
+    s.headers.forEach(function(h,i){
+      opts += '<option value="'+i+'"'+(String(i)===selVal?' selected':'')+'>'+escapeHtml(h)+'</option>';
+    });
+    var preview = (selVal!=='' && s.rawRows[0]) ? escapeHtml((s.rawRows[0][parseInt(selVal)]||'').slice(0,40)) : '<span style="color:var(--muted)">—</span>';
+    html += '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:6px 8px;white-space:nowrap">'+(f.required?'<strong>':'')+escapeHtml(f.label)+(f.required?'</strong> <span style="color:var(--red)">*</span>':'')+'</td>'
+      +'<td style="padding:6px 8px"><select style="width:100%;font-size:12px" onchange="updateCsvMapping(\''+f.key+'\',this.value)">'+opts+'</select></td>'
+      +'<td style="padding:6px 8px;color:var(--muted);font-size:11.5px" id="csv-prev-'+f.key+'">'+preview+'</td>'
+      +'</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="display:flex;gap:10px">'
+    +'<button class="action-btn primary" onclick="runCsvPreview()">Preview Import</button>'
+    +'<button class="action-btn secondary" onclick="closeCsvImport()">Cancel</button>'
+    +'</div>';
+  document.getElementById('csv-import-body').innerHTML = html;
+}
+
+function updateCsvMapping(fieldKey, colIdx){
+  _csvImportState.mapping[fieldKey] = colIdx;
+  var preview = '';
+  if(colIdx !== '' && _csvImportState.rawRows[0]){
+    preview = escapeHtml((_csvImportState.rawRows[0][parseInt(colIdx)]||'').slice(0,40));
+  } else {
+    preview = '<span style="color:var(--muted)">—</span>';
+  }
+  var el = document.getElementById('csv-prev-'+fieldKey);
+  if(el) el.innerHTML = preview;
+}
+
+function runCsvPreview(){
+  var s = _csvImportState;
+  var fields = netFields(s.tab);
+  var reqFields = fields.filter(function(f){ return f.required; });
+  for(var ri=0;ri<reqFields.length;ri++){
+    if(s.mapping[reqFields[ri].key] === ''){ showError('Please map the required field: '+reqFields[ri].label); return; }
+  }
+
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emailKeys = fields.filter(function(f){ return f.type==='email'; }).map(function(f){ return f.key; });
+
+  var parsed = [];
+  s.rawRows.forEach(function(row, ri){
+    var entry = {};
+    var blank = true;
+    fields.forEach(function(f){
+      var ci = s.mapping[f.key];
+      var val = (ci!=='' && row[parseInt(ci)] !== undefined) ? row[parseInt(ci)].trim() : '';
+      entry[f.key] = val;
+      if(val) blank = false;
+    });
+    if(blank){ parsed.push({ row:ri+2, entry:entry, skip:true, reason:'blank row' }); return; }
+    var warns = [];
+    emailKeys.forEach(function(k){
+      if(entry[k] && !emailRe.test(entry[k])) warns.push('invalid email: '+entry[k]);
+    });
+    var reqMissing = reqFields.filter(function(f){ return !entry[f.key]; });
+    if(reqMissing.length){ parsed.push({ row:ri+2, entry:entry, skip:true, reason:'missing required: '+reqMissing.map(function(f){return f.label;}).join(', ') }); return; }
+    parsed.push({ row:ri+2, entry:entry, skip:false, warns:warns });
+  });
+  s.parsed = parsed;
+  _renderCsvStep3();
+}
+
+function _renderCsvStep3(){
+  var s = _csvImportState;
+  var toImport = s.parsed.filter(function(p){ return !p.skip; });
+  var toSkip   = s.parsed.filter(function(p){ return p.skip; });
+  var nameKey  = s.tab==='investors'?'investorName':s.tab==='startups'?'companyName':'partnerName';
+
+  var html = '<p style="font-size:13px;margin-bottom:14px">'
+    +'<strong style="color:var(--green)">'+toImport.length+' rows</strong> will be imported &nbsp;·&nbsp; '
+    +'<strong style="color:var(--amber)">'+toSkip.length+' rows</strong> will be skipped.</p>';
+
+  if(toImport.length){
+    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">ROWS TO IMPORT</div>';
+    html += '<div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:14px">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html += '<thead><tr style="background:var(--s2)"><th style="padding:5px 8px;text-align:left">#</th><th style="padding:5px 8px;text-align:left">Name</th><th style="padding:5px 8px;text-align:left">Warning</th></tr></thead><tbody>';
+    toImport.forEach(function(p){
+      var warn = p.warns && p.warns.length ? '<span style="color:var(--amber)">⚠ '+escapeHtml(p.warns.join('; '))+'</span>' : '<span style="color:var(--green)">✓</span>';
+      html += '<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px;color:var(--muted)">'+p.row+'</td><td style="padding:5px 8px">'+escapeHtml(p.entry[nameKey]||'—')+'</td><td style="padding:5px 8px">'+warn+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if(toSkip.length){
+    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">ROWS TO SKIP</div>';
+    html += '<div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:14px">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    toSkip.forEach(function(p){
+      html += '<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px;color:var(--muted);width:40px">'+p.row+'</td><td style="padding:5px 8px">'+escapeHtml(p.entry[nameKey]||'(blank)')+'</td><td style="padding:5px 8px;color:var(--amber)">'+escapeHtml(p.reason)+'</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  html += '<div style="display:flex;gap:10px;margin-top:4px">'
+    +(toImport.length?'<button class="action-btn primary" onclick="confirmCsvImport()">Import '+toImport.length+' Rows</button>':'')
+    +'<button class="action-btn secondary" onclick="_renderCsvStep2()">Back</button>'
+    +'<button class="action-btn secondary" onclick="closeCsvImport()">Cancel</button>'
+    +'</div>';
+  document.getElementById('csv-import-body').innerHTML = html;
+}
+
+async function confirmCsvImport(){
+  var s = _csvImportState;
+  var toImport = s.parsed.filter(function(p){ return !p.skip; });
+  if(!toImport.length){ closeCsvImport(); return; }
+
+  document.getElementById('csv-import-body').innerHTML =
+    '<div style="text-align:center;padding:30px 0;color:var(--muted)">Importing '+toImport.length+' rows…</div>';
+
+  var tab = s.tab;
+  var rows = netLoad(tab);
+  // Build dedup set from existing primary name key
+  var nameKey = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
+  var existingNames = new Set(rows.map(function(r){ return (r[nameKey]||'').toLowerCase().trim(); }));
+
+  var succeeded=[], skipped=[], failed=[];
+  var nextId = netNextId(rows);
+
+  toImport.forEach(function(p){
+    var name = (p.entry[nameKey]||'').toLowerCase().trim();
+    if(name && existingNames.has(name)){
+      skipped.push({ row:p.row, name:p.entry[nameKey], reason:'duplicate' });
+      return;
+    }
+    var entry = Object.assign({}, p.entry);
+    entry.id = nextId++;
+    entry.dateAdded = new Date().toISOString();
+    rows.push(entry);
+    if(name) existingNames.add(name);
+    succeeded.push({ row:p.row, name:p.entry[nameKey] });
+  });
+
+  // Persist
+  try {
+    netSave(tab, rows);
+  } catch(e){
+    failed = succeeded.splice(0);
+    failed.forEach(function(f){ f.reason = e.message||'write failed'; });
+  }
+
+  renderNetList(tab);
+  _renderCsvSummary(succeeded, skipped, failed);
+}
+
+function _renderCsvSummary(succeeded, skipped, failed){
+  var html = '<div style="font-size:15px;font-weight:700;margin-bottom:14px">';
+  if(succeeded.length) html += '<span style="color:var(--green)">✓ '+succeeded.length+' imported</span>&nbsp;&nbsp;';
+  if(skipped.length)   html += '<span style="color:var(--amber)">⊘ '+skipped.length+' skipped</span>&nbsp;&nbsp;';
+  if(failed.length)    html += '<span style="color:var(--red)">✗ '+failed.length+' failed</span>';
+  html += '</div>';
+
+  if(skipped.length){
+    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px">SKIPPED</div>';
+    html += '<div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:12px">';
+    skipped.forEach(function(r){ html+='<div style="padding:4px 8px;border-top:1px solid var(--border);color:var(--amber)">Row '+r.row+' — '+escapeHtml(r.name||'?')+': '+escapeHtml(r.reason)+'</div>'; });
+    html += '</div>';
+  }
+  if(failed.length){
+    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px">FAILED</div>';
+    html += '<div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:12px">';
+    failed.forEach(function(r){ html+='<div style="padding:4px 8px;border-top:1px solid var(--border);color:var(--red)">Row '+r.row+' — '+escapeHtml(r.name||'?')+': '+escapeHtml(r.reason)+'</div>'; });
+    html += '</div>';
+  }
+
+  html += '<button class="action-btn primary" onclick="closeCsvImport()" style="margin-top:4px">Done</button>';
+  document.getElementById('csv-import-body').innerHTML = html;
 }
 
 // ── NETWORK INVESTORS SHEET SYNC ───────────────────────────────
