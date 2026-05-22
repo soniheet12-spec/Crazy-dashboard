@@ -1209,87 +1209,106 @@ window.SettingsDB = (function(){
 </script>
 </head>
 <body>
-<nav>
-  <div class="logo">Log7 Capital</div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showTab('home',this)">Home</button>
-    <button class="nav-tab" id="nav-tab-network" onclick="showTab('network',this)">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></button>
-    <button class="nav-tab" onclick="showTab('match',this)">Match Studio</button>
-    <button class="nav-tab" onclick="showTab('pipeline',this)">Pipeline</button>
-    <button class="nav-tab" onclick="showTab('deck',this)">Deck Insights</button>
-    <button class="nav-tab" onclick="showTab('memo',this)">IC Memo</button>
-    <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
-    <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
-    <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
-    <button class="nav-tab" onclick="showTab('backup',this)">&#128190; Backup</button>
+<aside id="sidebar">
+  <div class="sb-header">
+    <span class="sb-logo">Log7 Capital</span>
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Collapse sidebar">&#9776;</button>
   </div>
-  <div class="nav-right">
-    <div id="global-search-wrap" style="position:relative;margin-right:10px">
-      <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
-      <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
-    </div>
-        <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
-    <button class="pill-btn" onclick="window.print()">Print / PDF</button>
-    <div class="settings-wrap" id="settings-wrap">
-      <button class="settings-toggle" onclick="toggleSettings()">Settings ▾</button>
-      <div class="settings-menu">
-        <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
-        <div class="settings-section">
-          <div class="settings-label">Active User / Role</div>
-          <div class="field-row" style="margin-bottom:0">
-            <div class="field" style="margin-bottom:0">
-              <input id="user-name" placeholder="Your name" oninput="saveUserProfile()">
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <select id="user-role" onchange="saveUserProfile()">
-                <option value="analyst">Analyst</option>
-                <option value="associate">Associate</option>
-                <option value="partner">Partner</option>
-              </select>
-            </div>
+  <nav class="sb-nav">
+    <button class="nav-tab active" data-tab="home" onclick="showTab('home',this)"><span class="tab-icon">&#127968;</span><span class="tab-label">Home</span></button>
+    <button class="nav-tab" id="nav-tab-network" data-tab="network" onclick="showTab('network',this)"><span class="tab-icon">&#127760;</span><span class="tab-label">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></span></button>
+    <div class="sb-section-label">Deal Flow</div>
+    <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon">&#128200;</span><span class="tab-label">Pipeline</span></button>
+    <button class="nav-tab" data-tab="match" onclick="showTab('match',this)"><span class="tab-icon">&#10024;</span><span class="tab-label">Match Studio</span></button>
+    <div class="sb-section-label">Research</div>
+    <button class="nav-tab" data-tab="deck" onclick="showTab('deck',this)"><span class="tab-icon">&#128196;</span><span class="tab-label">Deck Insights</span></button>
+    <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon">&#128269;</span><span class="tab-label">Diligence</span></button>
+    <button class="nav-tab" data-tab="memo" onclick="showTab('memo',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">IC Memo</span></button>
+    <div class="sb-section-label">Admin</div>
+    <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon">&#128193;</span><span class="tab-label">Docs</span></button>
+    <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">Audit Log</span></button>
+    <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon">&#128190;</span><span class="tab-label">Backup</span></button>
+  </nav>
+  <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0" id="settings-wrap" class="settings-wrap">
+    <button class="settings-toggle" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px" onclick="toggleSettings()"><span class="tab-icon">&#9881;</span><span class="tab-label">Settings</span></button>
+    <div class="settings-menu" style="bottom:60px;top:auto;right:0;left:0;width:auto;max-width:400px">
+      <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
+      <div class="settings-section">
+        <div class="settings-label">Active User / Role</div>
+        <div class="field-row" style="margin-bottom:0">
+          <div class="field" style="margin-bottom:0">
+            <input id="user-name" placeholder="Your name" oninput="saveUserProfile()">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <select id="user-role" onchange="saveUserProfile()">
+              <option value="analyst">Analyst</option>
+              <option value="associate">Associate</option>
+              <option value="partner">Partner</option>
+            </select>
           </div>
         </div>
-        <div class="settings-section">
-          <div class="settings-label">Anthropic API Key</div>
-          <input type="password" id="api-key" placeholder="Paste your Anthropic API key here" oninput="saveKey()">
-          <div class="template-help"><span id="key-status"></span></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Anthropic API Key</div>
+        <input type="password" id="api-key" placeholder="Paste your Anthropic API key here" oninput="saveKey()">
+        <div class="template-help"><span id="key-status"></span></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Matching Mode</div>
+        <select id="matching-mode" onchange="savePreferences()">
+          <option value="auto">Auto (use AI when key exists)</option>
+          <option value="ai">AI only</option>
+          <option value="rules">No-API fallback only</option>
+        </select>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Capital Deployed (&#8377; Cr)</div>
+        <input type="number" id="capital-deployed" placeholder="e.g. 45" oninput="saveCapitalSettings()">
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Fund Size (&#8377; Cr)</div>
+        <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
+      </div>
+      <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
+        <div class="settings-label">&#128190; Google Drive Backup &amp; Sheets Sync</div>
+        <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
+          <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
         </div>
-        <div class="settings-section">
-          <div class="settings-label">Matching Mode</div>
-          <select id="matching-mode" onchange="savePreferences()">
-            <option value="auto">Auto (use AI when key exists)</option>
-            <option value="ai">AI only</option>
-            <option value="rules">No-API fallback only</option>
-          </select>
-        </div>
-        <div class="settings-section">
-          <div class="settings-label">Capital Deployed (&#8377; Cr)</div>
-          <input type="number" id="capital-deployed" placeholder="e.g. 45" oninput="saveCapitalSettings()">
-        </div>
-        <div class="settings-section">
-          <div class="settings-label">Fund Size (&#8377; Cr)</div>
-          <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
-        </div>
-        <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
-          <div class="settings-label">&#128190; Google Drive Backup &amp; Sheets Sync</div>
-          <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
-            <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
-          </div>
-        </div>
-        <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
-          <div class="settings-label">&#128257; Migrate Local Data → Sheets</div>
-          <div id="migrate-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Copies all localStorage entries to Google Sheets.</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button onclick="window.SheetsDB&&SheetsDB.manualMigrate('migrate-status')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128257; Migrate Local Data → Sheets</button>
-            <button id="migrate-clear-btn" onclick="window.SheetsDB&&SheetsDB.clearMigratedData(this)" style="display:none;background:var(--red);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128465; Clear Local Data</button>
-          </div>
+      </div>
+      <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
+        <div class="settings-label">&#128257; Migrate Local Data → Sheets</div>
+        <div id="migrate-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Copies all localStorage entries to Google Sheets.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button onclick="window.SheetsDB&&SheetsDB.manualMigrate('migrate-status')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128257; Migrate Local Data → Sheets</button>
+          <button id="migrate-clear-btn" onclick="window.SheetsDB&&SheetsDB.clearMigratedData(this)" style="display:none;background:var(--red);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128465; Clear Local Data</button>
         </div>
       </div>
     </div>
   </div>
-</nav>
+</aside>
+<div id="sb-overlay" onclick="closeSidebar()"></div>
+<div id="main-wrap">
+<div id="topbar">
+  <button id="sb-hamburger" onclick="toggleSidebar()" title="Toggle menu">&#9776;</button>
+  <div id="global-search-wrap" style="position:relative;margin-right:4px">
+    <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
+    <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
+  </div>
+  <div class="topbar-actions" style="display:flex;gap:8px;align-items:center">
+    <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
+    <button class="pill-btn" onclick="window.print()">Print / PDF</button>
+  </div>
+  <div class="overflow-menu-wrap" id="topbar-overflow" style="display:none">
+    <button class="overflow-btn" onclick="document.getElementById('topbar-overflow').classList.toggle('open')">&#8942;</button>
+    <div class="overflow-menu">
+      <button onclick="exportMatchesCsv();document.getElementById('topbar-overflow').classList.remove('open')">Export CSV</button>
+      <button onclick="window.print();document.getElementById('topbar-overflow').classList.remove('open')">Print / PDF</button>
+      <button onclick="showTab('backup',document.querySelector('.nav-tab[data-tab=\'backup\']'));document.getElementById('topbar-overflow').classList.remove('open')">&#128190; Backup</button>
+    </div>
+  </div>
+</div>
 
 <div class="container">
   <div id="error-box" class="error-box hidden"></div>
@@ -1310,7 +1329,7 @@ window.SettingsDB = (function(){
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start">
       <div>
         <div class="card" style="margin-bottom:14px">
-          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Full Board &#8599;</button></div></div>
+          <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="goToTab('pipeline')">Full Board &#8599;</button></div></div>
           <div id="home-pipeline-snapshot"><div class="empty" style="padding:18px">No pipeline deals yet.</div></div>
         </div>
         <div class="card">
@@ -1337,10 +1356,6 @@ window.SettingsDB = (function(){
         <div class="card" style="margin-bottom:14px">
           <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span><button id="wa-remind-btn" class="mini-btn" style="margin-left:auto" onclick="sendWhatsAppReminder()">📲 Send WhatsApp Reminder Now</button></div>
           <div id="home-net-followups"><div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div></div>
-          <details id="fu-debug-wrap" style="margin:8px 12px 4px;font-size:11px;color:var(--muted)">
-            <summary style="cursor:pointer;font-weight:600;padding:4px 0">🔍 Follow-up Debug Panel</summary>
-            <div id="fu-debug-body" style="margin-top:6px;padding:8px;background:var(--s2);border-radius:6px;white-space:pre-wrap;font-family:monospace;font-size:10.5px;max-height:300px;overflow-y:auto">loading…</div>
-          </details>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Recent Activity</div></div>
@@ -1465,7 +1480,7 @@ window.SettingsDB = (function(){
         <div class="mobile-sticky-actions">
           <div class="action-row" style="margin-top:0">
             <button class="action-btn primary" onclick="runMatch()">Run Match</button>
-            <button class="action-btn secondary" onclick="showTab('pipeline',document.querySelectorAll('.nav-tab')[3])">Open Pipeline</button>
+            <button class="action-btn secondary" onclick="goToTab('pipeline')">Open Pipeline</button>
           </div>
         </div>
       </div>
@@ -1797,6 +1812,7 @@ window.SettingsDB = (function(){
   </div>
 
 </div><!-- end container -->
+</div><!-- end main-wrap -->
 
 <script>
 const NET_KEYS = {
@@ -2138,7 +2154,7 @@ function refreshHome(){
   const contactedCount=contactedInv.length+contactedSt.length+contactedPa.length||pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted').length;
   [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startupCount],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contactedCount]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const notifEl=document.getElementById('home-notifications');
-  if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
+  if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="goToTab(\'pipeline\')">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
   const prEl=document.getElementById('home-priority-list');
   if(prEl){const rows=pipeline.slice(0,6);if(!rows.length){prEl.innerHTML='<div class="empty">Save matches to pipeline to see priorities.</div>';}else prEl.innerHTML=rows.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="pipeline-row"><div class="avatar">'+initials(item.investor)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(item.investor)+' <span class="badge">'+escapeHtml(item.startup)+'</span></div><div class="row-meta">'+crm.status+' | Score: '+item.score+(crm.followUp?' | Due: '+crm.followUp:'')+'</div></div></div>';}).join('');}
   refreshCapitalDisplay();renderHomeActivity();refreshNetFollowups();
@@ -2155,11 +2171,7 @@ function refreshNetFollowups(){
   var el = document.getElementById('home-net-followups');
   var badge = document.getElementById('net-followup-badge');
   var navBadge = document.getElementById('net-nav-badge');
-  var debugEl = document.getElementById('fu-debug-body');
   if(!el) return;
-
-  var debugLines = [];
-  function dbg(s){ debugLines.push(s); }
 
   try {
 
@@ -2173,10 +2185,6 @@ function refreshNetFollowups(){
     +String(sevenDaysMs.getMonth()+1).padStart(2,'0')+'-'
     +String(sevenDaysMs.getDate()).padStart(2,'0');
 
-  dbg('Today: '+today);
-  dbg('All localStorage keys: '+Object.keys(localStorage).join(', '));
-  dbg('');
-
   var TAB_COLORS = {
     partnerships: {bg:'rgba(91,192,248,0.15)',border:'rgba(91,192,248,0.4)',text:'var(--blue)',label:'Partnership'},
     investors:    {bg:'rgba(62,207,142,0.12)',border:'rgba(62,207,142,0.35)',text:'var(--green)',label:'Investor'},
@@ -2189,26 +2197,12 @@ function refreshNetFollowups(){
   var allFollowups = [];
   ['partnerships','investors','startups'].forEach(function(tab){
     var tabRows = netLoad(tab);
-    dbg('--- '+tab+' ---');
-    dbg('Total records: '+tabRows.length);
-    tabRows.forEach(function(row, i){
-      var nameKey = tab==='partnerships'?'partnerName':tab==='investors'?'investorName':'companyName';
-      var name = row[nameKey]||'(no name)';
+    tabRows.forEach(function(row){
       var fud = row.followUpDate;
       var d = fud ? String(fud).split('T')[0].trim() : '';
-      var match = d ? (d <= today ? 'DUE ✓' : (d <= sevenDays ? 'UPCOMING' : 'FUTURE')) : 'NO DATE';
-      dbg('  ['+i+'] '+name+' | followUpDate: "'+fud+'" | normalised: "'+d+'" | '+match);
       if(d) allFollowups.push({tab:tab, row:row, date:d});
     });
-    dbg('');
   });
-
-  dbg('Total with any followUpDate: '+allFollowups.length);
-  var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
-  var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
-                             .sort(function(a,b){ return a.date.localeCompare(b.date); });
-  dbg('Due today (<='+today+'): '+dueToday.length);
-  dbg('Upcoming 7 days: '+upcoming.length);
 
   var dueToday = allFollowups.filter(function(f){ return f.date <= today; });
   var upcoming = allFollowups.filter(function(f){ return f.date > today && f.date <= sevenDays; })
@@ -2265,11 +2259,8 @@ function refreshNetFollowups(){
   el.innerHTML = html;
 
   } catch(err) {
-    dbg('EXCEPTION: '+err);
     el.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Error in refreshNetFollowups: '+escapeHtml(String(err))+'</div>';
   }
-
-  if(debugEl) debugEl.textContent = debugLines.join('\n');
 }
 
 function netMarkDone(tab, id){
@@ -2768,7 +2759,7 @@ function openNetEntityModal(type,name){
   title.textContent = (type==='investor'?'Investor: ':'Startup: ') + (name||'Unknown');
   if(!rec){
     body.innerHTML = '<div class="empty" style="padding:20px">No matching record in Network &gt; '+(type==='investor'?'Investors':'Startups')+'.</div>'
-      + '<div style="margin-top:12px"><button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);">Open Network Tab</button></div>';
+      + '<div style="margin-top:12px"><button class="action-btn primary" onclick="closeNetEntityModal();goToTab(\'network\');">Open Network Tab</button></div>';
   } else {
     var rows = Object.keys(rec).filter(function(k){return !k.startsWith('_')&&k!=='id'&&rec[k]!=null&&rec[k]!=='';}).map(function(k){
       var label = k.replace(/([A-Z])/g,' $1').replace(/^./,function(c){return c.toUpperCase();});
@@ -2776,7 +2767,7 @@ function openNetEntityModal(type,name){
     }).join('');
     body.innerHTML = '<div class="detail-list">'+rows+'</div>'
       + '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
-      + '<button class="action-btn primary" onclick="closeNetEntityModal();showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1]);switchNetTab(\''+(type==='investor'?'investors':'startups')+'\',document.getElementById(\'net-tab-\'+(type===\'investor\'?\'investors\':\'startups\')));">Open in Network</button>'
+      + '<button class="action-btn primary" onclick="closeNetEntityModal();goToTab(\'network\');switchNetTab(\''+(type==='investor'?'investors':'startups')+'\',document.getElementById(\'net-tab-\'+(type===\'investor\'?\'investors\':\'startups\')));">Open in Network</button>'
       + '</div>';
   }
   modal.classList.remove('hidden');modal.style.display='flex';
@@ -2985,7 +2976,7 @@ function filterDocsByEntity(type,name){
   var typeEl=document.getElementById('docs-entity-type'),nameEl=document.getElementById('docs-entity-name');
   if(typeEl&&['startup','investor'].includes(type)){typeEl.value=type;refreshDocsSelectors();}
   if(nameEl){var opt=Array.from(nameEl.options).find(function(o){return o.value===name;});if(!opt){var o=document.createElement('option');o.value=o.textContent=name;nameEl.appendChild(o);}nameEl.value=name;refreshDocsUI();}
-  if(typeof goToTab==='function') goToTab('docs'); else { var btn=document.querySelectorAll('.nav-tab')[9]; if(btn) showTab('docs',btn); }
+  goToTab('docs');
 }
 async function handleDocUpload(e){const file=e.target.files[0];if(!file)return;const entityType=document.getElementById('docs-entity-type').value,entityName=document.getElementById('docs-entity-name').value,category=document.getElementById('docs-category').value,notes=document.getElementById('docs-notes').value;document.getElementById('docs-upload-status').textContent='Saving...';const reader=new FileReader();reader.onload=async()=>{await saveDocumentRecord({entityType,entityName,category,notes,fileName:file.name,mimeType:file.type||'application/octet-stream',sizeKb:Math.round(file.size/1024),dataUrl:reader.result,createdAt:new Date().toISOString()});document.getElementById('docs-upload-status').textContent=file.name+' stored';document.getElementById('docs-notes').value='';document.getElementById('docs-file-input').value='';addAuditEntry('doc','Document uploaded: '+file.name,entityType+': '+entityName);refreshDocsUI();refreshDocCountCache();};reader.readAsDataURL(file);}
 async function downloadStoredDoc(id){const docs=await getAllDocuments(),doc=docs.find(d=>d.id===id);if(!doc)return;const a=document.createElement('a');a.href=doc.dataUrl;a.download=doc.fileName;document.body.appendChild(a);a.click();document.body.removeChild(a);}
@@ -4656,13 +4647,27 @@ function sendWhatsApp(phone, name) {
   if (typeof addAuditEntry === 'function') addAuditEntry('outreach','WhatsApp sent',name+' ('+phone+')');
 }
 
-document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
+document.addEventListener('DOMContentLoaded', function(){
+  renderBulkOutreachPanel();
+  if(localStorage.getItem('l7_sb_collapsed')==='1') document.body.classList.add('sb-collapsed');
+});
 
 // ═══ GLOBAL SEARCH ═══
 function goToTab(name){
-  var map={home:0,network:1,match:2,pipeline:3,deck:4,memo:5,diligence:6,audit:7,docs:8};
-  var idx=map[name];if(idx==null)return;
-  var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
+  var btn=document.querySelector('.nav-tab[data-tab="'+name+'"]');
+  if(btn)showTab(name,btn);
+}
+function toggleSidebar(){
+  var isMobile=window.innerWidth<=768;
+  if(isMobile){
+    document.body.classList.toggle('sb-open');
+  } else {
+    document.body.classList.toggle('sb-collapsed');
+    localStorage.setItem('l7_sb_collapsed', document.body.classList.contains('sb-collapsed')?'1':'0');
+  }
+}
+function closeSidebar(){
+  document.body.classList.remove('sb-open');
 }
 function runGlobalSearch(q){
   var box=document.getElementById('global-search-results');if(!box)return;
