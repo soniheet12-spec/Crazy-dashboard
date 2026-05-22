@@ -6,6 +6,7 @@
 <title>Log7 Capital</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   /* ── Steel Light (fixed theme) ── */
   :root{--bg:#f4f6f9;--s1:#ffffff;--s2:#eef0f4;--s3:#e4e7ed;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);--text:#1a2035;--muted:#7a8aa0;--accent:#2c5fe8;--accent-soft:rgba(44,95,232,0.1);--green:#189a5e;--amber:#d4810a;--red:#d43c3c;--blue:#1a7fd4;}
@@ -1228,6 +1229,7 @@ window.SettingsDB = (function(){
     <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon">&#128193;</span><span class="tab-label">Docs</span></button>
     <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">Audit Log</span></button>
     <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon">&#128190;</span><span class="tab-label">Backup</span></button>
+    <button class="nav-tab" data-tab="mandate" onclick="showTab('mandate',this)"><span class="tab-icon">&#128220;</span><span class="tab-label">Mandate</span></button>
   </nav>
   <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0" id="settings-wrap" class="settings-wrap">
     <button class="settings-toggle" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px" onclick="toggleSettings()"><span class="tab-icon">&#9881;</span><span class="tab-label">Settings</span></button>
@@ -1808,6 +1810,40 @@ window.SettingsDB = (function(){
     </div>
     <div class="card" style="max-width:640px">
       <div id="backup-panel-container"></div>
+    </div>
+  </div>
+
+
+  <!-- ═══ MANDATE ═══ -->
+  <div id="page-mandate" class="page">
+    <div class="section-bar">
+      <div class="section-title">Mandate Agreement Generator</div>
+    </div>
+    <div class="module-banner">
+      <strong>Client-side PDF generation — no server required.</strong>
+      Fill in the four fields below and click Generate. The mandate agreement PDF downloads instantly to your device.
+    </div>
+    <div class="card" style="max-width:580px">
+      <div class="card-header"><div class="card-title">Agreement Details</div></div>
+      <div class="field">
+        <label>Client Name (Authorised Signatory)</label>
+        <input id="mand-client-name" type="text" placeholder="e.g. Rahul Sharma" oninput="mandateCheckReady()">
+      </div>
+      <div class="field">
+        <label>Company Name</label>
+        <input id="mand-company" type="text" placeholder="e.g. Naiye Bharat Private Limited" oninput="mandateCheckReady()">
+      </div>
+      <div class="field">
+        <label>Success Fee %</label>
+        <input id="mand-fee" type="number" min="0" max="100" step="0.01" placeholder="e.g. 2" oninput="mandateCheckReady()">
+      </div>
+      <div class="field">
+        <label>Client Office Address</label>
+        <textarea id="mand-address" rows="3" placeholder="Full registered office address" oninput="mandateCheckReady()"></textarea>
+      </div>
+      <button id="mand-generate-btn" class="action-btn primary" style="width:100%;padding:12px;font-size:13px;margin-top:4px" onclick="generateMandate()" disabled>
+        &#128462; Generate &amp; Download Mandate PDF
+      </button>
     </div>
   </div>
 
@@ -4746,6 +4782,305 @@ document.addEventListener('keydown', function(e){
   var key=String(e.key||'').toLowerCase();
   if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
 });
+</script>
+
+<script>
+// ═══ MANDATE PDF GENERATOR ═══
+function mandateCheckReady(){
+  var ok = ['mand-client-name','mand-company','mand-fee','mand-address'].every(function(id){
+    var el=document.getElementById(id); return el && el.value.trim()!=='';
+  });
+  var btn=document.getElementById('mand-generate-btn');
+  if(btn) btn.disabled=!ok;
+}
+
+function generateMandate(){
+  var clientName = document.getElementById('mand-client-name').value.trim();
+  var company    = document.getElementById('mand-company').value.trim();
+  var fee        = document.getElementById('mand-fee').value.trim();
+  var address    = document.getElementById('mand-address').value.trim();
+  if(!clientName||!company||!fee||!address) return;
+
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ unit:'mm', format:'a4', compress:true });
+
+  var ML=25, MR=25, MT=25, PW=210, PH=297;
+  var TW = PW - ML - MR;  // 160mm usable width
+  var y = MT;
+  var pageNum = 1;
+
+  // today's date
+  var now = new Date();
+  var dd=String(now.getDate()).padStart(2,'0');
+  var mm=String(now.getMonth()+1).padStart(2,'0');
+  var yyyy=now.getFullYear();
+  var dateStr = dd+'/'+mm+'/'+yyyy;
+  var dateShort = dd+mm+yyyy;
+
+  function setFont(bold, size){
+    doc.setFont('times', bold?'bold':'normal');
+    doc.setFontSize(size||10);
+  }
+
+  function addPageIfNeeded(extra){
+    if(y + (extra||0) > PH - MR){
+      doc.addPage(); pageNum++; y=MT;
+    }
+  }
+
+  // wrap text and print paragraph; returns new y
+  function para(text, indent, lineH, bold, size){
+    indent = indent||0; lineH=lineH||5; size=size||10;
+    setFont(bold||false, size);
+    var lines = doc.splitTextToSize(text, TW - indent);
+    lines.forEach(function(line){
+      addPageIfNeeded(lineH);
+      doc.text(line, ML+indent, y);
+      y+=lineH;
+    });
+    return y;
+  }
+
+  function heading(text, size){
+    size=size||10;
+    y+=2;
+    addPageIfNeeded(7);
+    setFont(true, size);
+    doc.text(text, ML, y);
+    y+=6;
+    setFont(false,10);
+  }
+
+  function hline(){
+    addPageIfNeeded(3);
+    doc.setDrawColor(180);
+    doc.line(ML, y, PW-MR, y);
+    y+=4;
+    doc.setDrawColor(0);
+  }
+
+  function sp(n){ y+=(n||4); }
+
+  // ─── PAGE 1: TITLE & PARTIES ───────────────────────────────────────────────
+  setFont(true,14);
+  doc.text('Mandate Agreement', PW/2, y, {align:'center'});
+  y+=10;
+  setFont(false,10);
+
+  para('This Sell-side Mandate Agreement (the "Agreement") is made and entered on '+dateStr+' ("Effective Date") at Mumbai:');
+  sp(4);
+
+  heading('BETWEEN:');
+  para('Log7 Partners LLP, B-3/540, Urvi Darshan Society, Charkop, Kandivali West, Mumbai 400067, through designated partner Mr. Heet Soni ("Log7 Capital") of the FIRST PART.');
+  sp(4);
+
+  heading('AND:');
+  para(company+', having its registered office at '+address+'. Represented by its authorised signatory '+clientName+' ("Customer") of the SECOND PART.');
+  sp(4);
+
+  hline();
+
+  heading('WHEREAS:');
+  para('A.  The Customer is desirous of raising growth capital / strategic investment from third-party investors for its business and operations.');
+  sp(3);
+  para('B.  Log7 Capital is engaged in the business of providing fund-raising advisory and transaction facilitation services to growth-stage companies.');
+  sp(3);
+  para('C.  The Customer desires to engage Log7 Capital on a sell-side mandate basis and Log7 Capital is willing to provide such services, subject to the terms and conditions set out herein.');
+  sp(4);
+
+  para('NOW, THEREFORE, in consideration of the mutual covenants and agreements set forth herein, and for other good and valuable consideration, the receipt and sufficiency of which are hereby acknowledged, the parties agree as follows:');
+  sp(6);
+
+  // ─── SECTION 1: DEFINITIONS ────────────────────────────────────────────────
+  heading('1.  DEFINITIONS');
+  para('In this Agreement, the following terms shall have the meanings ascribed to them below:');
+  sp(3);
+  para('"Affiliate" means, in relation to a party, any entity that directly or indirectly controls, is controlled by, or is under common control with such party, where "control" means ownership of more than 50% of voting securities.', 6);
+  sp(3);
+  para('"Agreement" means this Sell-side Mandate Agreement together with all schedules, annexures, and amendments hereto.', 6);
+  sp(3);
+  para('"Applicable Laws" means all statutes, regulations, rules, orders, and guidelines applicable in India, including but not limited to the Companies Act 2013, SEBI regulations, and Foreign Exchange Management Act.', 6);
+  sp(3);
+  para('"Services" means the fund-raising advisory, investor introductions, transaction facilitation, and related services described in Schedule A hereto.', 6);
+  sp(3);
+  para('"Term" means the period commencing on the Effective Date and continuing for six (6) months, unless earlier terminated in accordance with Clause 7.', 6);
+  sp(3);
+  para('"Investor" means any person, entity, fund, or vehicle that the parties agree to pursue in connection with the transaction contemplated herein, and shall specifically include:', 6);
+  sp(2);
+  para('(a)  Any investor introduced by Log7 Capital to the Customer during the Term;', 12);
+  sp(2);
+  para('(b)  Any investor with whom discussions were re-initiated or revived by Log7 Capital during the Term, regardless of whether prior contact was established;', 12);
+  sp(2);
+  para('(c)  Any investor introduced by a co-adviser or sub-agent engaged by or co-operating with Log7 Capital; and', 12);
+  sp(2);
+  para('(d)  Any entity controlled by, controlling, or under common control with any person falling within (a) to (c) above.', 12);
+  sp(6);
+
+  // ─── SECTION 2: SCOPE ──────────────────────────────────────────────────────
+  heading('2.  SCOPE OF SERVICES');
+  para('Log7 Capital shall offer to the Customer the services set out in Schedule A appended hereto. Log7 Capital shall work collaboratively with the Customer and prospective Investors to facilitate the successful closing of the proposed investment transaction. The precise scope, deliverables, and timelines shall be as mutually agreed between the parties in writing from time to time.');
+  sp(6);
+
+  // ─── SECTION 3: CONSIDERATION ──────────────────────────────────────────────
+  heading('3.  CONSIDERATION AND PAYMENT');
+  para('In consideration of the Services rendered by Log7 Capital, the Customer agrees to pay the fees and charges as set out in Schedule A of this Agreement. All payments shall be made in Indian Rupees (INR) unless otherwise agreed in writing. Fees are exclusive of applicable taxes including Goods and Services Tax (GST), which shall be payable by the Customer in addition to the fees at the prevailing statutory rate. Log7 Capital shall raise invoices upon achievement of the relevant milestone, and payment shall be made within the time specified in Schedule A. Time is of the essence in respect of all payment obligations.');
+  sp(6);
+
+  // ─── SECTION 4: INDEMNIFICATION ────────────────────────────────────────────
+  heading('4.  INDEMNIFICATION');
+  para('Each party (the "Indemnifying Party") agrees to indemnify, defend, and hold harmless the other party and its directors, officers, employees, agents, and permitted successors and assigns (collectively, "Indemnified Party") from and against any and all losses, liabilities, damages, claims, costs, and expenses (including reasonable legal fees) arising out of or relating to any breach of this Agreement by the Indemnifying Party, or any negligent or wrongful act or omission of the Indemnifying Party. Notwithstanding the foregoing, no indemnification obligation shall apply to losses arising out of the Indemnified Party\'s own gross negligence, wilful misconduct, or bad faith.');
+  sp(6);
+
+  // ─── SECTION 5: CONFIDENTIALITY ────────────────────────────────────────────
+  heading('5.  CONFIDENTIALITY');
+  para('5.1  Log7 Capital shall maintain strict confidentiality with respect to all Confidential Information of the Customer and shall not disclose such information to any third party without the prior written consent of the Customer, except as required by Applicable Laws or regulatory authority.');
+  sp(3);
+  para('5.2  The Customer shall likewise maintain confidentiality with respect to all information relating to Investors sourced by Log7 Capital, including investor identities, investment theses, and negotiation positions, and shall not directly approach such Investors without the prior written consent of Log7 Capital during the Term and for a period of eighteen (18) months thereafter.');
+  sp(3);
+  para('5.3  Log7 Capital may, without breaching this Agreement, use aggregated insights, market intelligence, or anonymised data derived from its engagement with the Customer for the purpose of making general market recommendations or developing its service offerings, provided that no Confidential Information of the Customer is identifiable from such use.');
+  sp(6);
+
+  // ─── SECTION 6: INTELLECTUAL PROPERTY ─────────────────────────────────────
+  heading('6.  INTELLECTUAL PROPERTY RIGHTS');
+  para('All intellectual property rights in the methodologies, tools, databases, templates, models, and know-how developed or used by Log7 Capital in connection with the Services shall remain the exclusive property of Log7 Capital. The Customer is granted a limited, non-exclusive, non-transferable licence to use deliverables prepared by Log7 Capital solely for the Customer\'s internal business purposes in connection with the transaction contemplated herein. The Customer shall not reproduce, distribute, or commercialise any such deliverables without the prior written consent of Log7 Capital.');
+  sp(6);
+
+  // ─── SECTION 7: VALIDITY & TERMINATION ─────────────────────────────────────
+  heading('7.  VALIDITY AND TERMINATION');
+  para('7.1  This Agreement shall be valid for an initial period of six (6) months from the Effective Date ("Initial Term") and shall automatically expire at the end of the Initial Term unless extended by mutual written agreement of the parties.');
+  sp(3);
+  para('7.2  Either party may terminate this Agreement prior to expiry of the Initial Term by providing fifteen (15) days\' prior written notice to the other party. Termination shall not affect any accrued rights or obligations of either party as at the date of termination.');
+  sp(3);
+  para('7.3  The fee obligations set out in Schedule A shall survive termination or expiry of this Agreement and shall remain enforceable for a period of twelve (12) months from the date of termination or expiry.');
+  sp(3);
+  para('7.4  Tail Clause: If, within eighteen (18) months following the termination or expiry of this Agreement, the Customer completes a transaction with any Investor that was introduced, identified, or engaged by Log7 Capital during the Term, the Customer shall pay to Log7 Capital the full Success Fee set out in Schedule A as if the Agreement had been in force at the time of closing.');
+  sp(6);
+
+  // ─── SECTION 8: GOVERNING LAW ──────────────────────────────────────────────
+  heading('8.  GOVERNING LAW AND DISPUTE RESOLUTION');
+  para('This Agreement shall be governed by and construed in accordance with the laws of India. Subject to Clause 9.3, the parties irrevocably submit to the exclusive jurisdiction of the courts at Mumbai. Any dispute, controversy, or claim arising out of or in connection with this Agreement, or the breach, termination, or invalidity thereof, shall be finally settled by arbitration pursuant to the Arbitration and Conciliation Act, 1996 as amended from time to time. The arbitration shall be conducted by a sole arbitrator appointed by mutual consent of the parties. The seat and venue of arbitration shall be Mumbai, India. The language of arbitration shall be English. The award of the arbitrator shall be final and binding on the parties.');
+  sp(6);
+
+  // ─── SECTION 9: MISCELLANEOUS ──────────────────────────────────────────────
+  heading('9.  MISCELLANEOUS');
+  para('9.1  Notices. Any notice or communication required or permitted under this Agreement shall be in writing and delivered by hand, courier, or email with confirmation of receipt to:');
+  sp(3);
+  para('Log7 Capital: Heet Soni, Designated Partner, Log7 Partners LLP; Email: heet@log7capital.com', 8);
+  sp(2);
+  para('Customer: '+clientName+', '+company, 8);
+  sp(4);
+  para('9.2  Waiver and Amendment. No waiver of any provision of this Agreement shall be effective unless made in writing and signed by the waiving party. No amendment to this Agreement shall be binding unless executed in writing by authorised representatives of both parties.');
+  sp(3);
+  para('9.3  Arbitration. Any dispute arising out of this Agreement shall be referred to and finally resolved by arbitration in accordance with Clause 8 above. Pending resolution of any dispute, the parties shall continue to perform their respective obligations under this Agreement.');
+  sp(3);
+  para('9.4  Entire Agreement. This Agreement, including all Schedules hereto, constitutes the entire agreement between the parties with respect to the subject matter hereof and supersedes all prior negotiations, representations, warranties, and understandings of the parties.');
+  sp(3);
+  para('9.5  Marketing Communications. Log7 Capital may reference the Customer\'s name and logo on its website, marketing materials, and investor presentations for the purpose of indicating its client relationships. Any press releases or public announcements referencing the Customer\'s involvement with Log7 Capital shall require the prior written approval of the Customer, which shall not be unreasonably withheld or delayed.');
+  sp(8);
+
+  // ─── SIGNATURE BLOCK (Main Agreement) ─────────────────────────────────────
+  addPageIfNeeded(50);
+  hline();
+  setFont(true,10);
+  var col1x=ML, col2x=ML+TW/2+10;
+  doc.text('For Log7 Partners LLP', col1x, y);
+  doc.text('For '+company, col2x, y);
+  y+=8;
+  setFont(false,10);
+  doc.text('_________________________', col1x, y);
+  doc.text('_________________________', col2x, y);
+  y+=6;
+  doc.text('Designated Partner: Heet Soni', col1x, y);
+  doc.text('Authorised Signatory: '+clientName, col2x, y);
+  y+=5;
+  doc.text('Founder, Log7 Capital', col1x, y);
+  doc.text('Founder, '+company, col2x, y);
+  y+=5;
+  doc.text('Date: ____________________', col1x, y);
+  doc.text('Date: ____________________', col2x, y);
+
+  // ─── SCHEDULE A ────────────────────────────────────────────────────────────
+  doc.addPage(); pageNum++; y=MT;
+
+  setFont(true,12);
+  doc.text('SCHEDULE A – FEES', PW/2, y, {align:'center'});
+  y+=6;
+  setFont(true,10);
+  doc.text('Details of Product & Services and Payment Terms', PW/2, y, {align:'center'});
+  y+=8;
+  setFont(false,10);
+
+  para('Log7 Capital will be responsible for raising funds for '+company+'.');
+  sp(2);
+  para('All fees are quoted in Indian Rupees (INR).');
+  sp(5);
+
+  // Fee table
+  var tCols=[8,68,50,34]; // widths for #, Milestone, Fees, Payment Due
+  var tX=[ML, ML+tCols[0], ML+tCols[0]+tCols[1], ML+tCols[0]+tCols[1]+tCols[2]];
+  var rowH=8;
+
+  setFont(true,9);
+  doc.setFillColor(235,237,242);
+  doc.rect(ML, y, TW, rowH, 'F');
+  var thLabels=['#','Milestone','Fees','Payment Due'];
+  thLabels.forEach(function(h,i){ doc.text(h, tX[i]+2, y+5.5); });
+  y+=rowH;
+
+  setFont(false,9);
+  // Row 1
+  var r1=[
+    '1',
+    'Raising funds for\n'+company,
+    fee+'% Success Fee\n+ 18% GST',
+    'Immediately on\nclosing of the\ntransaction'
+  ];
+  var lineH9=4.5;
+  var maxLines=Math.max.apply(null, r1.map(function(v){ return v.split('\n').length; }));
+  var r1H=maxLines*lineH9+4;
+  doc.rect(ML, y, TW, r1H);
+  r1.forEach(function(val,i){
+    val.split('\n').forEach(function(line,li){
+      doc.text(line, tX[i]+2, y+5+li*lineH9);
+    });
+  });
+  // column dividers
+  [tCols[0],tCols[0]+tCols[1],tCols[0]+tCols[1]+tCols[2]].forEach(function(cx){
+    doc.line(ML+cx, y, ML+cx, y+r1H);
+  });
+  y+=r1H+6;
+
+  setFont(false,10);
+  para('(A)  Success Fees: A success fee of '+fee+'% of the total Transaction Amount shall be payable by the Customer immediately upon closure of the transaction and disbursement of the first tranche of funds. The success fee shall be calculated on the total Transaction Amount irrespective of whether the funds are received in one or more tranches.', 6);
+  sp(4);
+  para('(B)  Transaction Amount: The Transaction Amount shall include all cash, cash equivalents, and non-cash instruments (including but not limited to equity shares, preference shares, convertible instruments, warrants, and other securities) received by the Customer in connection with the transaction. The value of any non-cash components shall be determined at fair market value as agreed between the parties and shall be added to the cash component for the purpose of computing the success fee.', 6);
+  sp(8);
+
+  // Signature block Schedule A
+  hline();
+  setFont(true,10);
+  doc.text('For Log7 Partners LLP', col1x, y);
+  doc.text('For '+company, col2x, y);
+  y+=8;
+  setFont(false,10);
+  doc.text('_________________________', col1x, y);
+  doc.text('_________________________', col2x, y);
+  y+=6;
+  doc.text('Designated Partner: Heet Soni', col1x, y);
+  doc.text('Authorised Signatory: '+clientName, col2x, y);
+  y+=5;
+  doc.text('Founder, Log7 Capital', col1x, y);
+  doc.text('Founder, '+company, col2x, y);
+  y+=5;
+  doc.text('Date: ____________________', col1x, y);
+  doc.text('Date: ____________________', col2x, y);
+
+  // Save
+  var filename='Mandate_'+company.replace(/[^a-zA-Z0-9]/g,'_')+'_'+dateShort+'.pdf';
+  doc.save(filename);
+
+  showToast('Mandate generated successfully');
+}
 </script>
 </body>
 </html>
