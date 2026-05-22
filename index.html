@@ -2645,6 +2645,7 @@ function deleteNetPipelineById(id){
   renderNetPipelineSection();
   if(entry) renderNetList(entry.sourceTab);
 }
+function saveToPipeline(name){
   const match=(lastPayload?.matches||[]).find(m=>m.name===name);if(!match||!selectedStartup)return;
   const raw = window.SheetsDB && SheetsDB.isAuthenticated() ? (SheetsDB.cache.pipeline||[]) : getPipeline();
   if(!raw.find(item=>item.startup===selectedStartup.company&&item.investor===name)){
