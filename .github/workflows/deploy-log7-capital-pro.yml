@@ -59,15 +59,16 @@ jobs:
           add_env TWILIO_FROM              "${{ secrets.NEW_TWILIO_FROM }}"
           add_env TWILIO_TO                "${{ secrets.NEW_TWILIO_TO }}"
 
-      - name: Deploy and promote to production
+      - name: Deploy and alias to production
         run: |
+          set -e
           DEPLOYMENT_URL=$(vercel deploy \
             --yes \
             --token="$VERCEL_TOKEN" \
-            --scope="soniheet12-specs-projects" 2>&1 | tail -1)
-          echo "Preview URL: $DEPLOYMENT_URL"
-          vercel promote "$DEPLOYMENT_URL" \
-            --yes \
+            --scope="soniheet12-specs-projects" \
+            2>/dev/null)
+          echo "Deployed preview: $DEPLOYMENT_URL"
+          vercel alias set "$DEPLOYMENT_URL" log7-capital-pro.vercel.app \
             --token="$VERCEL_TOKEN" \
             --scope="soniheet12-specs-projects"
-          echo "Promoted to production."
+          echo "Aliased to production."
