@@ -17,11 +17,20 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Upstash env vars not configured for this environment' });
   }
 
-  await fetch(`${url}/set/network_followups`, {
-    method:  'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body:    JSON.stringify(JSON.stringify(followups)), // Upstash stores as string
-  });
+  // Validate URL before attempting fetch to avoid unhandled TypeError
+  try { new URL(url); } catch {
+    return res.status(500).json({ error: 'UPSTASH_REDIS_REST_URL is not a valid URL' });
+  }
+
+  try {
+    await fetch(`${url}/set/network_followups`, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify(JSON.stringify(followups)), // Upstash stores as string
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to reach Upstash: ' + e.message });
+  }
 
   return res.status(200).json({ ok: true, saved: followups.length });
 };
