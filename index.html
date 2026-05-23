@@ -4,56 +4,54 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log7 Capital</title>
+<script>
+/* Flash prevention — runs before any CSS or render */
+(function(){
+  if(localStorage.getItem('dark_mode')==='1')
+    document.documentElement.setAttribute('data-theme','dark');
+})();
+</script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-  /* ── Steel Light (fixed theme) ── */
-  :root{--bg:#f4f6f9;--s1:#ffffff;--s2:#eef0f4;--s3:#e4e7ed;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);--text:#1a2035;--muted:#7a8aa0;--accent:#2c5fe8;--accent-soft:rgba(44,95,232,0.1);--green:#189a5e;--amber:#d4810a;--red:#d43c3c;--blue:#1a7fd4;}
-  body{background:linear-gradient(135deg,#eef2f7 0%,#f4f6f9 60%);}
-  .action-btn{background:#eef0f4!important;border-color:rgba(0,0,0,0.12)!important;color:#1a2035!important;}
-  .action-btn.primary{background:#2c5fe8!important;color:#fff!important;border-color:transparent!important;}
-  .action-btn.secondary{background:transparent!important;}
-  .action-btn.danger{color:#d43c3c!important;background:transparent!important;border-color:rgba(212,60,60,0.25)!important;}
-  #topbar{background:rgba(255,255,255,0.97)!important;border-bottom-color:rgba(0,0,0,0.08)!important;}
-  #sidebar{background:#ffffff!important;border-right-color:rgba(0,0,0,0.08)!important;}
-  .card,.match-card{background:#ffffff!important;border-color:rgba(0,0,0,0.08)!important;box-shadow:0 2px 16px rgba(0,0,0,0.06)!important;}
-  .stat,.mini-stat,.kanban-col,.kanban-card,.check-item{background:#eef0f4!important;border-color:rgba(0,0,0,0.08)!important;}
-  input,select,textarea{background:#eef0f4!important;border-color:rgba(0,0,0,0.12)!important;color:#1a2035!important;}
-  input:focus,select:focus,textarea:focus{border-color:#2c5fe8!important;box-shadow:0 0 0 3px rgba(44,95,232,0.1)!important;}
-  .badge{background:#e4e7ed!important;color:#4a5568!important;border-color:rgba(0,0,0,0.1)!important;}
-  .settings-menu{background:rgba(255,255,255,0.99)!important;border-color:rgba(0,0,0,0.12)!important;}
-  .drop-zone{background:#eef0f4!important;border-color:rgba(0,0,0,0.14)!important;}
-  .drop-zone:hover,.drop-zone.over{background:rgba(44,95,232,0.06)!important;border-color:#2c5fe8!important;}
-  .hero-card{background:radial-gradient(circle at top right,rgba(44,95,232,0.08),transparent 40%),#ffffff!important;}
-  .kanban-col.drag-over{border-color:#2c5fe8!important;background:rgba(44,95,232,0.05)!important;}
-  .insight-card{background:linear-gradient(135deg,rgba(44,95,232,0.06),rgba(26,127,212,0.03)),#fff!important;border-color:rgba(44,95,232,0.15)!important;}
-  .module-banner{background:linear-gradient(135deg,rgba(44,95,232,0.05),rgba(26,127,212,0.02)),#fff!important;border-color:rgba(44,95,232,0.12)!important;}
-  .startup-option:hover,.startup-option.selected{background:rgba(44,95,232,0.06)!important;}
+  /* ── Flash prevention: apply dark theme attr before any render ── */
+  /* (JS in <head> sets this before CSS loads — see inline script above) */
+
+  /* ── Light mode defaults (also the steel theme values) ── */
+  :root {
+    --bg:#f4f6f9; --s1:#ffffff; --s2:#eef0f4; --s3:#e4e7ed;
+    --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14);
+    --text:#1a2035; --muted:#7a8aa0;
+    --accent:#2c5fe8; --accent-soft:rgba(44,95,232,0.1);
+    --green:#189a5e; --amber:#d4810a; --red:#d43c3c; --blue:#1a7fd4;
+    --body-bg: linear-gradient(135deg,#eef2f7 0%,#f4f6f9 60%);
+    --topbar-bg: rgba(255,255,255,0.97);
+    --settings-menu-bg: rgba(255,255,255,0.99);
+  }
+
+  /* ── Dark mode variable overrides (midnight palette) ── */
+  [data-theme="dark"] {
+    --bg:#080c12; --s1:#0e1420; --s2:#141c2e; --s3:#1a2438;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --text:#e8edf5; --muted:#6b7a96;
+    --accent:#3b6fd4; --accent-soft:rgba(59,111,212,0.14);
+    --green:#3ecf8e; --amber:#f5a623; --red:#f06565; --blue:#5bc0f8;
+    --body-bg: linear-gradient(135deg,#060a10 0%,#080c12 60%);
+    --topbar-bg: rgba(14,20,32,0.97);
+    --settings-menu-bg: rgba(14,20,32,0.99);
+  }
+
   .kanban-col[data-stage="Money in the Bank"] .kanban-col-header{color:var(--green)!important;font-weight:700;}
   .kanban-col[data-stage="Money in the Bank"]{border-top:3px solid var(--green);}
   @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes auth-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+  .auth-shake{animation:auth-shake 0.4s ease;}
 
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-  :root {
-    --bg:#f4f6f9;
-    --s1:#ffffff;
-    --s2:#eef0f4;
-    --s3:#e4e7ed;
-    --border:rgba(0,0,0,0.08);
-    --border2:rgba(0,0,0,0.14);
-    --text:#1a2035;
-    --muted:#7a8aa0;
-    --accent:#2c5fe8;
-    --accent-soft:rgba(44,95,232,0.1);
-    --green:#189a5e;
-    --amber:#d4810a;
-    --red:#d43c3c;
-    --blue:#1a7fd4;
-  }
   * { box-sizing:border-box; margin:0; padding:0; }
   body {
-    background:linear-gradient(135deg,#eef2f7 0%,#f4f6f9 60%);
+    background:var(--body-bg);
     color:var(--text);
     font-family:'Poppins', sans-serif;
     min-height:100vh;
@@ -105,7 +103,7 @@
   #topbar {
     position:sticky; top:0; z-index:20; height:56px;
     display:flex; align-items:center; gap:10px; padding:0 16px;
-    background:rgba(255,255,255,0.97); border-bottom:1px solid var(--border);
+    background:var(--topbar-bg); border-bottom:1px solid var(--border);
     backdrop-filter:blur(16px);
   }
   #sb-hamburger {
@@ -254,7 +252,7 @@
   .settings-menu {
     position:absolute; right:0; top:calc(100% + 10px); width:min(400px, calc(100vw - 32px));
     display:none; padding:16px; border-radius:10px; border:1px solid var(--border2);
-    background:rgba(255,255,255,0.99); box-shadow:0 16px 48px rgba(0,0,0,0.5);
+    background:var(--settings-menu-bg); box-shadow:0 16px 48px rgba(0,0,0,0.5);
     max-height:calc(100vh - 80px); overflow-y:auto;
   }
   .settings-wrap.open .settings-menu { display:block; }
@@ -375,30 +373,110 @@
 
   @media (max-width:1200px) { .kanban-board { grid-template-columns:repeat(3,1fr); } }
   @media (max-width:1024px) { .grid-main, .grid-two, .grid-three, .insight-grid, .pipeline-grid, .stat-grid { grid-template-columns:1fr; } .hero-title { max-width:none; } }
+  /* ── Mobile top bar (only visible on mobile) ── */
+  #mobile-topbar {
+    display:none; position:fixed; top:0; left:0; right:0; z-index:50; height:52px;
+    background:var(--s1); border-bottom:1px solid var(--border);
+    align-items:center; padding:0 12px; gap:10px;
+  }
+  #mobile-topbar .mob-logo {
+    flex:1; text-align:center; font-weight:700; font-size:13px; letter-spacing:0.06em;
+    text-transform:uppercase; color:var(--text);
+  }
+  #mobile-topbar button {
+    background:transparent; border:none; cursor:pointer; font-size:20px;
+    color:var(--muted); padding:6px; border-radius:6px; min-width:40px; min-height:40px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #mobile-topbar button:active { background:var(--s2); }
+
   @media (max-width:768px) {
-    #sidebar { transform:translateX(-100%); transition:transform 0.22s ease; width:220px !important; }
-    body.sb-open #sidebar { transform:translateX(0); }
+    /* Show mobile topbar, hide desktop topbar hamburger */
+    #mobile-topbar { display:flex; }
+    #topbar { display:none; }
+    /* Sidebar: overlay slide-in, wider for easier tap targets */
+    #sidebar {
+      transform:translateX(-100%); transition:transform 0.22s ease;
+      width:280px !important; z-index:1000;
+    }
+    body.sb-open #sidebar { transform:translateX(0); box-shadow:4px 0 24px rgba(0,0,0,0.3); }
     body.sb-open #sb-overlay { display:block; }
-    #main-wrap { margin-left:0 !important; }
+    body.sb-open { overflow:hidden; }
+    /* Main content */
+    #main-wrap { margin-left:0 !important; padding-top:52px; }
     #sb-hamburger { display:flex !important; }
-    #global-search-wrap input { width:140px !important; }
-    .container { padding:14px; }
-    .section-title { font-size:1.35rem; } .field-row { grid-template-columns:1fr; }
-    .hero-title { font-size:1.6rem; } .hero-copy { font-size:13px; }
-    .card { border-radius:8px; padding:14px; } .match-card { padding:14px; }
-    .match-head { flex-direction:column; align-items:stretch; } .score { text-align:left; min-width:0; }
+    .container { padding:12px; }
+    .section-title { font-size:1.2rem; }
+    .field-row { grid-template-columns:1fr; }
+    .hero-title { font-size:1.5rem; }
+    .hero-copy { font-size:13px; }
+    .card { border-radius:8px; padding:14px; }
+    .match-card { padding:14px; }
+    .match-head { flex-direction:column; align-items:stretch; }
+    .score { text-align:left; min-width:0; }
     .settings-menu { right:-6px; left:auto; max-width:90vw; }
     .inline-actions, .action-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .inline-actions > *, .action-row > * { width:100%; }
+    /* Touch targets */
     .mini-btn, .ghost-btn, .pill-btn, .action-btn, .subtab, .settings-toggle, button.action-btn { min-height:44px; }
-    input, select, textarea { min-height:44px; font-size:14px; }
+    input, select, textarea { min-height:44px; font-size:16px; } /* 16px prevents iOS zoom */
     .mobile-sticky-actions { display:block; }
-    .kanban-board { grid-template-columns:1fr; gap:10px; }
+    /* Kanban: horizontal scroll with fixed-width columns */
+    .kanban-board {
+      display:flex !important; gap:12px !important; overflow-x:auto !important;
+      padding-bottom:12px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    }
+    .kanban-col { min-width:260px; max-width:260px; scroll-snap-align:start; flex-shrink:0; }
+    /* Stats grid */
     .stat-grid { grid-template-columns:repeat(2,1fr); }
+    /* Tables */
     table { display:block; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
     #whatsapp-outreach-panel, .outreach-list { max-height:60vh; overflow-y:auto; }
     .topbar-actions { display:none; }
     #topbar-overflow { display:flex !important; }
+    /* Bulk action bar: stack on mobile */
+    #bulk-action-bar { flex-direction:column; align-items:flex-start; }
+    /* Home layout: single column on mobile */
+    #page-home > div[style*="grid-template-columns:minmax"] { display:block !important; }
+    #page-home > div[style*="grid-template-columns:minmax"] > div { margin-bottom:14px; }
+    /* Section bar wraps on mobile */
+    .section-bar { flex-wrap:wrap; gap:8px; }
+    .section-bar .ghost-btn, .section-bar select { min-height:40px; }
+    /* Floating FAB: higher on mobile to clear browser chrome */
+    #fab-btn { bottom:80px; }
+    /* Full-screen modals on mobile */
+    #network-modal > div, #csv-import-modal > div, #net-entity-modal > div,
+    #add-deal-modal > div, #simulator-modal > div, #objection-modal > div,
+    #shortcuts-modal > div, #quick-note-modal > div {
+      max-width:100% !important; margin:0 !important; border-radius:0 !important;
+      min-height:100dvh; overflow-y:auto;
+    }
+    #network-modal, #csv-import-modal, #net-entity-modal, #add-deal-modal,
+    #simulator-modal, #objection-modal, #shortcuts-modal, #quick-note-modal {
+      padding:0 !important; align-items:flex-start !important;
+    }
+    .field-row { grid-template-columns:1fr !important; }
+    .settings-menu { right:0; left:0; width:100vw; max-width:100vw !important; border-radius:0 0 10px 10px; }
+  }
+  @media (max-width:480px) {
+    .container { padding:10px; }
+    .section-title { font-size:1.1rem; }
+    .action-btn { padding:6px 10px; font-size:11px; }
+    .subtab { padding:6px 10px; font-size:11px; }
+    .card { padding:12px; border-radius:8px; }
+    .stat-value,.mini-value { font-size:1.25rem; }
+    .hero-title { font-size:1.35rem; }
+    .hero-copy { font-size:12px; }
+    .grid-two,.grid-three { grid-template-columns:1fr; }
+    .stat-grid { grid-template-columns:1fr 1fr; }
+    /* Network table: allow horizontal scroll with minimum column widths */
+    #net-list-partnerships table, #net-list-investors table, #net-list-startups table { min-width:600px; }
+    .insight-grid,.pipeline-grid { grid-template-columns:1fr; }
+    .section-bar { flex-wrap:wrap; }
+    .section-bar .section-title { flex-basis:100%; }
+    .card[style*="overflow-x:auto"] { -webkit-overflow-scrolling:touch; }
+    /* Global search on tiny screens */
+    #global-search-wrap { display:none; }
   }
   @media (max-width:480px) {
     #global-search-wrap input { width:110px !important; }
@@ -1212,6 +1290,28 @@ window.SettingsDB = (function(){
 </script>
 </head>
 <body>
+<!-- ── Password Gate ───────────────────────────────────────────────────────── -->
+<div id="auth-overlay" style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div id="auth-card" style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:36px 32px;width:100%;max-width:380px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="font-size:36px;margin-bottom:10px">🔒</div>
+    <div style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text);margin-bottom:4px">Log7 Capital</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:24px">Enter password to access the dashboard</div>
+    <input id="auth-input" type="password" placeholder="Password" autocomplete="current-password"
+      style="font-size:16px;width:100%;text-align:center;letter-spacing:0.1em;margin-bottom:12px"
+      onkeydown="if(event.key==='Enter')submitAuth()">
+    <div id="auth-error" style="color:var(--red);font-size:12px;min-height:18px;margin-bottom:10px"></div>
+    <button onclick="submitAuth()" style="width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Unlock</button>
+  </div>
+</div>
+
+<!-- ── Mobile Top Bar (hidden on desktop via CSS) ────────────────────────── -->
+<div id="mobile-topbar">
+  <button onclick="toggleSidebar()" title="Menu">☰</button>
+  <span class="mob-logo">Log7 Capital</span>
+  <button id="mob-dark-btn" onclick="toggleDarkMode()" title="Toggle dark mode"><span id="mob-dark-icon">🌙</span></button>
+  <button onclick="lockApp()" title="Lock">🔒</button>
+</div>
+
 <aside id="sidebar">
   <div class="sb-header">
     <span class="sb-logo">Log7 Capital</span>
@@ -1233,10 +1333,11 @@ window.SettingsDB = (function(){
     <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon">&#128190;</span><span class="tab-label">Backup</span></button>
     <button class="nav-tab" data-tab="mandate" onclick="showTab('mandate',this)"><span class="tab-icon">&#128220;</span><span class="tab-label">Mandate</span></button>
   </nav>
-  <div style="padding:6px 12px;border-top:1px solid var(--border);flex-shrink:0">
-    <button id="dark-mode-btn" onclick="toggleDarkMode()" title="Toggle dark/light mode" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;background:transparent;border:none;cursor:pointer;color:var(--muted);font-family:'Poppins',sans-serif">
+  <div style="padding:6px 12px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:4px">
+    <button id="dark-mode-btn" onclick="toggleDarkMode()" title="Toggle dark/light mode" style="flex:1;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;background:transparent;border:none;cursor:pointer;color:var(--muted);font-family:'Poppins',sans-serif">
       <span class="tab-icon" id="dark-mode-icon">🌙</span><span class="tab-label" id="dark-mode-label">Dark Mode</span>
     </button>
+    <button onclick="lockApp()" title="Lock dashboard" style="display:flex;align-items:center;justify-content:center;padding:8px;border-radius:6px;font-size:16px;background:transparent;border:none;cursor:pointer;color:var(--muted);font-family:'Poppins',sans-serif;min-width:36px" class="tab-icon-only">🔒</button>
   </div>
   <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0" id="settings-wrap" class="settings-wrap">
     <button class="settings-toggle" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px" onclick="toggleSettings()"><span class="tab-icon">&#9881;</span><span class="tab-label">Settings</span></button>
@@ -2228,7 +2329,14 @@ function applyTheme(name){
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
 function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
-function loadPreferences(){applyTheme(localStorage.getItem('dark_mode')==='1'?'midnight':'steel');var mm=SettingsDB.get('l7_matching_mode','auto');document.getElementById('matching-mode').value=mm;var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
+function loadPreferences(){
+  // Dark mode is applied in <head> flash-prevention script; just sync the button state
+  applyDarkModeState(localStorage.getItem('dark_mode')==='1');
+  var mm=SettingsDB.get('l7_matching_mode','auto');
+  document.getElementById('matching-mode').value=mm;
+  var ts=localStorage.getItem('l7_settings_last_saved');
+  var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+}
 function savePreferences(){var v=document.getElementById('matching-mode').value;localStorage.setItem('l7_matching_mode',v);SettingsDB.set('l7_matching_mode',v);}
 
 // ═══ USER PROFILE ═══
@@ -4885,7 +4993,7 @@ function sendWhatsApp(phone, name) {
 document.addEventListener('DOMContentLoaded', function(){
   renderBulkOutreachPanel();
   if(localStorage.getItem('l7_sb_collapsed')==='1') document.body.classList.add('sb-collapsed');
-  // Apply dark mode preference before first render
+  // Sync dark mode icon state (data-theme already applied in <head>)
   applyDarkModeState(localStorage.getItem('dark_mode')==='1');
   // Migrate IC Review stage (one-time)
   migrateIcReviewStage();
@@ -5521,16 +5629,24 @@ function mandSelectStartup(idx){
 <script>
 // ── Dark Mode ──────────────────────────────────────────────────────────────────
 function toggleDarkMode(){
-  var isDark = localStorage.getItem('dark_mode')==='1';
-  applyDarkModeState(!isDark);
-  localStorage.setItem('dark_mode', isDark?'0':'1');
+  var isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  var newDark = !isDark;
+  localStorage.setItem('dark_mode', newDark?'1':'0');
+  applyDarkModeState(newDark);
 }
 function applyDarkModeState(dark){
-  applyTheme(dark?'midnight':'steel');
+  if(dark){
+    document.documentElement.setAttribute('data-theme','dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
   var icon  = document.getElementById('dark-mode-icon');
   var label = document.getElementById('dark-mode-label');
   if(icon)  icon.textContent  = dark ? '☀️' : '🌙';
   if(label) label.textContent = dark ? 'Light Mode' : 'Dark Mode';
+  // Also keep the sidebar mobile dark-mode icon in sync
+  var mIcon = document.getElementById('mob-dark-icon');
+  if(mIcon) mIcon.textContent = dark ? '☀️' : '🌙';
 }
 
 // ── Pinned Notes ───────────────────────────────────────────────────────────────
@@ -5591,6 +5707,51 @@ function saveQuickNote(){
     localStorage.setItem('pinned_notes', pinned.value);
   }
 }
+
+// ── Password Auth ─────────────────────────────────────────────────────────────
+var AUTH_PASSWORD = 'Log7@2025';
+var AUTH_DURATION = 8 * 60 * 60 * 1000; // 8 hours in ms
+
+function checkAuth(){
+  var unlocked = localStorage.getItem('auth_unlocked');
+  var unlockTime = parseInt(localStorage.getItem('auth_unlock_time')||'0', 10);
+  var expired = Date.now() - unlockTime > AUTH_DURATION;
+  if(unlocked === 'true' && !expired){
+    hideAuthOverlay();
+  }
+  // else: overlay stays visible (default)
+}
+
+function submitAuth(){
+  var inp = document.getElementById('auth-input');
+  var val = inp ? inp.value : '';
+  if(val === AUTH_PASSWORD){
+    localStorage.setItem('auth_unlocked','true');
+    localStorage.setItem('auth_unlock_time', String(Date.now()));
+    hideAuthOverlay();
+  } else {
+    var errEl = document.getElementById('auth-error');
+    var card  = document.getElementById('auth-card');
+    if(errEl) errEl.textContent = 'Incorrect password. Please try again.';
+    if(card){ card.classList.remove('auth-shake'); void card.offsetWidth; card.classList.add('auth-shake'); }
+    if(inp) inp.value = '';
+    setTimeout(function(){ if(errEl) errEl.textContent = ''; }, 3000);
+  }
+}
+
+function hideAuthOverlay(){
+  var ov = document.getElementById('auth-overlay');
+  if(ov){ ov.style.display='none'; ov.style.pointerEvents='none'; }
+}
+
+function lockApp(){
+  localStorage.removeItem('auth_unlocked');
+  localStorage.removeItem('auth_unlock_time');
+  location.reload();
+}
+
+// Check auth immediately on script load
+(function(){ checkAuth(); })();
 
 // ── Stage migration (IC Review → Diligence) ────────────────────────────────────
 function migrateIcReviewStage(){
