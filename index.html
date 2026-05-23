@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log7 Capital</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2c5fe8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Log7 Capital">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <script>
 /* Flash prevention — runs before any CSS or render */
 (function(){
@@ -5875,6 +5881,16 @@ function printPipelineReport(){
   if(!win){showToast('Allow pop-ups to print report.');return;}
   win.document.write(html); win.document.close();
   win.onload=function(){win.print();};
+}
+</script>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/sw.js')
+      .then(function(r){ console.log('[SW] registered, scope:', r.scope); })
+      .catch(function(e){ console.warn('[SW] registration failed:', e); });
+  });
 }
 </script>
 </body>
