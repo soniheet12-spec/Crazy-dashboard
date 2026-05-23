@@ -30,6 +30,8 @@
   .insight-card{background:linear-gradient(135deg,rgba(44,95,232,0.06),rgba(26,127,212,0.03)),#fff!important;border-color:rgba(44,95,232,0.15)!important;}
   .module-banner{background:linear-gradient(135deg,rgba(44,95,232,0.05),rgba(26,127,212,0.02)),#fff!important;border-color:rgba(44,95,232,0.12)!important;}
   .startup-option:hover,.startup-option.selected{background:rgba(44,95,232,0.06)!important;}
+  .kanban-col[data-stage="Money in the Bank"] .kanban-col-header{color:var(--green)!important;font-weight:700;}
+  .kanban-col[data-stage="Money in the Bank"]{border-top:3px solid var(--green);}
   @keyframes spin{to{transform:rotate(360deg);}}
 
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -1231,6 +1233,11 @@ window.SettingsDB = (function(){
     <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon">&#128190;</span><span class="tab-label">Backup</span></button>
     <button class="nav-tab" data-tab="mandate" onclick="showTab('mandate',this)"><span class="tab-icon">&#128220;</span><span class="tab-label">Mandate</span></button>
   </nav>
+  <div style="padding:6px 12px;border-top:1px solid var(--border);flex-shrink:0">
+    <button id="dark-mode-btn" onclick="toggleDarkMode()" title="Toggle dark/light mode" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;background:transparent;border:none;cursor:pointer;color:var(--muted);font-family:'Poppins',sans-serif">
+      <span class="tab-icon" id="dark-mode-icon">🌙</span><span class="tab-label" id="dark-mode-label">Dark Mode</span>
+    </button>
+  </div>
   <div style="padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0" id="settings-wrap" class="settings-wrap">
     <button class="settings-toggle" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px" onclick="toggleSettings()"><span class="tab-icon">&#9881;</span><span class="tab-label">Settings</span></button>
     <div class="settings-menu" style="bottom:60px;top:auto;right:0;left:0;width:auto;max-width:400px">
@@ -1362,6 +1369,13 @@ window.SettingsDB = (function(){
         <div class="card">
           <div class="card-header"><div class="card-title">Recent Activity</div></div>
           <div id="home-recent-activity"><div class="empty" style="padding:12px;font-size:12px">Activity appears here.</div></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-header">
+            <div class="card-title">📌 Quick Notes</div>
+            <span id="pinned-notes-saved" style="font-size:10px;color:var(--green);opacity:0;transition:opacity 0.4s">Saved</span>
+          </div>
+          <textarea id="pinned-notes" rows="4" placeholder="Quick notes during calls…" style="width:100%;resize:vertical;font-size:12.5px;line-height:1.5;font-family:'Poppins',sans-serif;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" oninput="debouncePinnedNotes()"></textarea>
         </div>
       </div>
     </div>
@@ -1495,9 +1509,11 @@ window.SettingsDB = (function(){
       <div class="section-title">Deal Pipeline</div>
       <button class="ghost-btn" onclick="openAddDealModal()">+ Add Deal</button>
       <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
+      <button class="ghost-btn" onclick="printPipelineReport()">Print Report</button>
       <button class="ghost-btn" onclick="renderPipelineList()">List View</button>
       <button class="ghost-btn" onclick="renderKanban()">Board View</button>
       <button class="ghost-btn" onclick="clearPipeline()">Clear All</button>
+      <select id="pipeline-tag-filter" onchange="renderPipelineList();renderKanban()" style="font-size:11px;padding:5px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--s2);color:var(--text)"><option value="">All Tags</option></select>
     </div>
     <div class="card">
       <div class="card-header">
@@ -1898,6 +1914,10 @@ window.SettingsDB = (function(){
         <input id="mand-client-name" type="text" placeholder="e.g. Rahul Sharma" oninput="mandateCheckReady()">
       </div>
       <div class="field">
+        <label>Founder Email <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input id="mand-founder-email" type="email" placeholder="e.g. rahul@company.com">
+      </div>
+      <div class="field">
         <label>Company Name</label>
         <input id="mand-company" type="text" placeholder="e.g. Naiye Bharat Private Limited" oninput="mandateCheckReady()">
       </div>
@@ -2049,7 +2069,7 @@ const NET_INVESTOR_URL = 'https://docs.google.com/spreadsheets/d/1D5WXgPhKfEckVf
 const STARTUP_URL  = 'https://script.google.com/macros/s/AKfycbzC8EGVpxsDfU_zHDFYmla3SRA-LT-FAjgHFQey5CXqY7JsMYA4wClhK0hj9Tj1trSU/exec';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const PIPELINE_STAGES = ['Sourcing','First Call','Diligence','IC Review','Term Sheet','Closed'];
+const PIPELINE_STAGES = ['Sourcing','First Call','Diligence','Term Sheet','Closed','Money in the Bank'];
 const CRM_STATUSES = ['not contacted','emailed','whatsapped','replied','meeting booked','passed','invested'];
 const IC_VOTERS_DEFAULT = ['Partner 1','Partner 2','Partner 3'];
 const DILIGENCE_TEMPLATE = [
@@ -2208,7 +2228,7 @@ function applyTheme(name){
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
 function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
-function loadPreferences(){applyTheme('steel');var mm=SettingsDB.get('l7_matching_mode','auto');document.getElementById('matching-mode').value=mm;var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
+function loadPreferences(){applyTheme(localStorage.getItem('dark_mode')==='1'?'midnight':'steel');var mm=SettingsDB.get('l7_matching_mode','auto');document.getElementById('matching-mode').value=mm;var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
 function savePreferences(){var v=document.getElementById('matching-mode').value;localStorage.setItem('l7_matching_mode',v);SettingsDB.set('l7_matching_mode',v);}
 
 // ═══ USER PROFILE ═══
@@ -2901,14 +2921,55 @@ function renderKanban(){
   function parseCr(v){if(v==null)return 0;var s=String(v);var m=s.replace(/,/g,'').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;}
   function stageTotal(items){return items.reduce(function(acc,it){return acc+parseCr(sizeBy[String(it.startup).toLowerCase()]||0);},0);}
   function fmtCr(n){return n>0?' \u2022 \u20b9'+(n>=1?n.toFixed(n%1===0?0:1):n)+'Cr':'';}
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  var tagFilter=document.getElementById('pipeline-tag-filter')?document.getElementById('pipeline-tag-filter').value:'';
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>{
+    var colItems=byStage[stage];
+    if(tagFilter) colItems=colItems.filter(function(item){return(item.tags||[]).includes(tagFilter);});
+    return'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+colItems.length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+colItems.map(item=>{
+      const crm=getInvestorCRM(item.startup,item.investor);
+      var tagChipsK=(item.tags||[]).map(function(t){return'<span style="display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:1px 6px;font-size:8.5px;margin:1px">'+escapeHtml(t)+'</span>';}).join('');
+      return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div>'+(tagChipsK?'<div style="margin-top:4px">'+tagChipsK+'</div>':'')+'<div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';
+    }).join('')+'</div>';
+  }).join('')+'</div>';
+  refreshTagFilter();
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
-  const el=document.getElementById('pipeline-list');if(!el)return;const pipeline=getPipeline();
+  var el=document.getElementById('pipeline-list'); if(!el)return;
+  var pipeline=getPipeline();
+  refreshTagFilter();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
+  var tagFilter=document.getElementById('pipeline-tag-filter')?document.getElementById('pipeline-tag-filter').value:'';
+  var displayed=tagFilter?pipeline.filter(function(item){return(item.tags||[]).includes(tagFilter);}):pipeline;
+  var stageOpts=PIPELINE_STAGES.map(function(s){return'<option value="'+s+'">'+s+'</option>';}).join('');
+  var rows=displayed.map(function(item){
+    var crm=getInvestorCRM(item.startup,item.investor);
+    var tagChips=(item.tags||[]).map(function(t){return'<span style="display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;margin:1px">'+escapeHtml(t)+'</span>';}).join('');
+    return'<tr>'
+      +'<td style="width:32px"><input type="checkbox" class="deal-checkbox" data-startup="'+escapeHtml(item.startup)+'" data-investor="'+escapeHtml(item.investor)+'" onchange="updateBulkBar()"></td>'
+      +'<td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td>'
+      +'<td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td>'
+      +'<td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td>'
+      +'<td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td>'
+      +'<td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td>'
+      +'<td>'+(tagChips||'<span style="color:var(--muted);font-size:10px">\u2014</span>')+'</td>'
+      +'<td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td>'
+      +'<td>'+(crm.followUp||'\u2014')+'</td>'
+      +'<td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td>'
+      +'</tr>';
+  }).join('');
+  el.innerHTML='<div id="bulk-action-bar" style="display:none;background:var(--accent-soft);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span id="bulk-selected-count" style="font-size:12px;font-weight:600;color:var(--accent)">0 selected</span>'
+    +'<span style="color:var(--muted);font-size:12px">\u2014 Move to:</span>'
+    +'<select id="bulk-stage-select" style="font-size:11px;padding:4px 8px">'+stageOpts+'</select>'
+    +'<button class="action-btn primary" style="padding:5px 12px;font-size:11px" onclick="applyBulkStage()">Apply</button>'
+    +'<button class="action-btn secondary" style="padding:5px 12px;font-size:11px" onclick="clearBulkSelection()">Cancel</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table class="table"><thead><tr>'
+    +'<th style="width:32px"><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAllDeals(this.checked)" title="Select all"></th>'
+    +'<th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Tags</th><th>Status</th><th>Follow-Up</th><th></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;setPipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
 
@@ -2955,12 +3016,16 @@ function openAddDealModal(){
       + (!invs.length?'Add at least one investor in <strong>Network &gt; Investors</strong>.':'')
       + '</div>';
   } else {
+    _addDealTags=[];
     var stOpts  = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
     var invOpts = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
     var stageOpts = PIPELINE_STAGES.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+    var presetTags=['Hot 🔥','Waiting on docs','Partner intro needed','On hold','Follow up','Term sheet out'];
+    var presetHtml=presetTags.map(function(t){return '<span onclick="addDealTag(\''+escapeQ(t)+'\')" style="cursor:pointer;display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:2px 9px;font-size:10px;margin:2px">'+escapeHtml(t)+'</span>';}).join('');
     body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
       + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
       + '<div class="field-row"><div class="field"><label>Score (0-100)</label><input id="add-deal-score" type="number" min="0" max="100" value="50"></div><div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div></div>'
+      + '<div class="field"><label>Tags</label><div id="add-deal-tag-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:20px;margin-bottom:6px"></div><input id="add-deal-tag-input" placeholder="Type a tag, press Enter or comma" style="font-size:12px;width:100%" onkeydown="addDealTagOnKey(event)"><div style="margin-top:6px">'+presetHtml+'</div></div>'
       + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
   }
   var modal=document.getElementById('add-deal-modal');modal.classList.remove('hidden');modal.style.display='flex';
@@ -2976,7 +3041,7 @@ function submitAddDeal(){
   if(pipeline.find(function(i){return i.startup===startup&&i.investor===investor;})){
     return showError('That deal is already in the pipeline.');
   }
-  pipeline.unshift({id:'pl_'+Date.now(),startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage,hot:false,_crm:{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}});
+  pipeline.unshift({id:'pl_'+Date.now(),startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage,hot:false,tags:_addDealTags.slice(),_crm:{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}});
   setPipeline(pipeline.slice(0,500));
   addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
   closeAddDealModal();
@@ -4820,6 +4885,10 @@ function sendWhatsApp(phone, name) {
 document.addEventListener('DOMContentLoaded', function(){
   renderBulkOutreachPanel();
   if(localStorage.getItem('l7_sb_collapsed')==='1') document.body.classList.add('sb-collapsed');
+  // Apply dark mode preference before first render
+  applyDarkModeState(localStorage.getItem('dark_mode')==='1');
+  // Migrate IC Review stage (one-time)
+  migrateIcReviewStage();
   // Hide Network Pipeline card if already merged
   if(localStorage.getItem('pipeline_merged_v1')){
     var card=document.getElementById('net-pipeline-card');
@@ -4827,6 +4896,12 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   // Run one-time merge (no-op if already done)
   setTimeout(mergeNetPipelineToMain, 500);
+  // Load pinned notes
+  loadPinnedNotes();
+  // Storage event → update home count reactively from other tabs
+  window.addEventListener('storage', function(e){
+    if(e.key==='l7_pipeline'){ refreshHome(); updateStats(); }
+  });
 });
 
 // ═══ GLOBAL SEARCH ═══
@@ -4897,31 +4972,32 @@ function globalSearchPick(payload){
 function closeGlobalSearch(){var b=document.getElementById('global-search-results');if(b){b.style.display='none';}}
 
 // ═══ KEYBOARD SHORTCUTS ═══
+function openShortcutsModal(){var m=document.getElementById('shortcuts-modal');if(m){m.classList.remove('hidden');m.style.display='flex';}}
+function closeShortcutsModal(){var m=document.getElementById('shortcuts-modal');if(m){m.classList.add('hidden');m.style.display='none';}}
+
 document.addEventListener('keydown', function(e){
   var tag=(e.target&&e.target.tagName)||'';
   var typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
-  // Ctrl/Cmd + K → focus search (works even while typing elsewhere)
+  // Ctrl/Cmd + K → focus search (works even while typing)
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==='k'||e.key==='K')){
     e.preventDefault();var s=document.getElementById('global-search');if(s){s.focus();s.select();}
     return;
   }
-  // Ctrl/Cmd + ? → shortcut help
-  if((e.ctrlKey||e.metaKey)&&(e.key==='?'||e.key==='/')){
-    e.preventDefault();alert('Keyboard shortcuts:\n\nCtrl+K — focus global search\nH — Home\nN — Network\nM — Match Studio\nP — Pipeline\nD — Diligence\nEsc — close any open modal');
-    return;
-  }
   if(e.key==='Escape'){
-    var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','net-modal'];
+    var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','network-modal','shortcuts-modal','quick-note-modal'];
     var any=false;
     modals.forEach(function(id){var m=document.getElementById(id);if(m&&!m.classList.contains('hidden')){m.classList.add('hidden');m.style.display='none';any=true;}});
-    closeGlobalSearch();
+    closeGlobalSearch();closeFabMenu();
     if(any){e.preventDefault();}
     return;
   }
   if(typing)return;
-  var map={h:'home',n:'network',m:'match',p:'pipeline',d:'diligence'};
   var key=String(e.key||'').toLowerCase();
-  if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(key==='?'||e.key==='/'){ e.preventDefault(); openShortcutsModal(); return; }
+  if(key==='n'){ e.preventDefault(); openAddDealModal(); return; }
+  var map={h:'home',p:'pipeline',d:'diligence',s:'match',m:'mandate'};
+  if(map[key]){e.preventDefault();goToTab(map[key]);}
 });
 </script>
 
@@ -5031,7 +5107,9 @@ function mandateCheckReady(){
 
 // ── PDF generator ────────────────────────────────────────────────────────────
 function generateMandate(){
-  var clientName = document.getElementById('mand-client-name').value.trim();
+  var clientName   = document.getElementById('mand-client-name').value.trim();
+  var founderEmail = (document.getElementById('mand-founder-email')||{}).value||'';
+  founderEmail     = founderEmail.trim();
   var company    = document.getElementById('mand-company').value.trim();
   var fee        = document.getElementById('mand-fee').value.trim();
   var address    = document.getElementById('mand-address').value.trim();
@@ -5171,7 +5249,7 @@ function generateMandate(){
   heading('9.  MISCELLANEOUS');
   para('9.1  Notices. Any notice or communication required or permitted under this Agreement shall be in writing and delivered by hand, courier, or email with confirmation of receipt to:');sp(3);
   para('Log7 Capital: '+sigName+', Designated Partner, Log7 Partners LLP; Email: '+sigEmail,8);sp(2);
-  para('Customer: '+clientName+', '+company,8);sp(4);
+  para('Customer: '+clientName+', '+company+(founderEmail?'; Email: '+founderEmail:''),8);sp(4);
   para('9.2  Waiver and Amendment. No waiver of any provision of this Agreement shall be effective unless made in writing and signed by the waiving party. No amendment to this Agreement shall be binding unless executed in writing by authorised representatives of both parties.');sp(3);
   para('9.3  Arbitration. Any dispute arising out of this Agreement shall be referred to and finally resolved by arbitration in accordance with Clause 8 above. Pending resolution of any dispute, the parties shall continue to perform their respective obligations under this Agreement.');sp(3);
   para('9.4  Entire Agreement. This Agreement, including all Schedules hereto, constitutes the entire agreement between the parties with respect to the subject matter hereof and supersedes all prior negotiations, representations, warranties, and understandings of the parties.');sp(3);
@@ -5265,6 +5343,7 @@ function generateMandate(){
     date: new Date().toISOString(),
     company: company,
     clientName: clientName,
+    founderEmail: founderEmail,
     fee: fee,
     address: address,
     signatoryKey: sigKey,
@@ -5283,7 +5362,8 @@ function generateMandate(){
   var emBtn = document.getElementById('mand-email-btn');
   var panel = document.getElementById('mand-post-actions');
   if(waBtn) waBtn.href = 'https://wa.me/?text='+encodeURIComponent(msg);
-  if(emBtn) emBtn.href = 'mailto:?subject='+encodeURIComponent('Mandate Agreement – '+company)+'&body='+encodeURIComponent(msg);
+  if(emBtn) emBtn.href = 'mailto:'+(founderEmail?encodeURIComponent(founderEmail):'')+
+    '?subject='+encodeURIComponent('Mandate Agreement – '+company)+'&body='+encodeURIComponent(msg);
   if(panel) panel.style.display='block';
 }
 
@@ -5326,6 +5406,8 @@ function mandRegenerate(idx){
   var log = JSON.parse(localStorage.getItem('mandate_log')||'[]');
   var entry = log[idx]; if(!entry) return;
   document.getElementById('mand-client-name').value = entry.clientName||'';
+  var emailEl = document.getElementById('mand-founder-email');
+  if(emailEl) emailEl.value = entry.founderEmail||'';
   document.getElementById('mand-company').value = entry.company||'';
   document.getElementById('mand-fee').value = entry.fee||'';
   document.getElementById('mand-address').value = entry.address||'';
@@ -5383,6 +5465,255 @@ function mandSelectStartup(idx){
   if(companyEl) companyEl.value = s.companyName||'';
   if(clientEl)  clientEl.value  = s.founderName||'';
   mandateCheckReady();
+}
+</script>
+
+<!-- ── Shortcuts Modal ───────────────────────────────────────────────────── -->
+<div id="shortcuts-modal" class="hidden" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeShortcutsModal()">
+  <div style="max-width:460px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px">
+    <div class="card-header" style="margin-bottom:16px">
+      <div class="card-title">⌨️ Keyboard Shortcuts</div>
+      <button class="action-btn danger" onclick="closeShortcutsModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="border-bottom:2px solid var(--border)"><th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Key</th><th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Action</th></tr></thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">?</kbd></td><td style="padding:8px 10px">Show shortcuts</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">H</kbd></td><td style="padding:8px 10px">Go to Home</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">N</kbd></td><td style="padding:8px 10px">New Deal</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">P</kbd></td><td style="padding:8px 10px">Go to Pipeline</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">S</kbd></td><td style="padding:8px 10px">Go to Match Studio</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">M</kbd></td><td style="padding:8px 10px">Go to Mandate</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">D</kbd></td><td style="padding:8px 10px">Go to Diligence</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Ctrl+K</kbd></td><td style="padding:8px 10px">Focus global search</td></tr>
+        <tr><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Esc</kbd></td><td style="padding:8px 10px">Close any open modal</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Floating Quick-Add FAB ────────────────────────────────────────────── -->
+<button id="fab-btn" onclick="toggleFabMenu()" title="Quick add" style="position:fixed;bottom:28px;right:24px;z-index:9999;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(44,95,232,0.4);transition:transform 0.2s" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">+</button>
+
+<div id="fab-menu" style="display:none;position:fixed;bottom:90px;right:24px;z-index:9998;background:var(--s1);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);overflow:hidden;min-width:210px">
+  <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--muted);padding:8px 14px;border-bottom:1px solid var(--border);background:var(--s2)">QUICK ADD</div>
+  <button onclick="closeFabMenu();openAddDealModal()" style="width:100%;text-align:left;padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:12.5px;color:var(--text);font-family:'Poppins',sans-serif;display:flex;align-items:center;gap:8px" onmouseenter="this.style.background='var(--s2)'" onmouseleave="this.style.background='transparent'">➕ Add Deal</button>
+  <button onclick="closeFabMenu();openNetworkModal('startups')" style="width:100%;text-align:left;padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:12.5px;color:var(--text);font-family:'Poppins',sans-serif;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseenter="this.style.background='var(--s2)'" onmouseleave="this.style.background='transparent'">👤 Add Startup</button>
+  <button onclick="closeFabMenu();openNetworkModal('investors')" style="width:100%;text-align:left;padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:12.5px;color:var(--text);font-family:'Poppins',sans-serif;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseenter="this.style.background='var(--s2)'" onmouseleave="this.style.background='transparent'">💼 Add Investor</button>
+  <button onclick="closeFabMenu();openQuickNoteModal()" style="width:100%;text-align:left;padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:12.5px;color:var(--text);font-family:'Poppins',sans-serif;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseenter="this.style.background='var(--s2)'" onmouseleave="this.style.background='transparent'">📝 Add Note</button>
+</div>
+
+<!-- ── Quick Note Modal ───────────────────────────────────────────────────── -->
+<div id="quick-note-modal" class="hidden" style="position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeQuickNoteModal()">
+  <div style="max-width:440px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px">
+    <div class="card-header" style="margin-bottom:12px">
+      <div class="card-title">📝 Quick Note</div>
+      <button onclick="closeQuickNoteModal()" class="action-btn danger" style="padding:4px 10px">✕</button>
+    </div>
+    <textarea id="quick-note-text" rows="5" placeholder="Type your note…" style="width:100%;font-family:'Poppins',sans-serif;font-size:13px;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="action-btn primary" style="flex:1" onclick="saveQuickNote()">Save Note</button>
+      <button class="action-btn secondary" onclick="closeQuickNoteModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Dark Mode ──────────────────────────────────────────────────────────────────
+function toggleDarkMode(){
+  var isDark = localStorage.getItem('dark_mode')==='1';
+  applyDarkModeState(!isDark);
+  localStorage.setItem('dark_mode', isDark?'0':'1');
+}
+function applyDarkModeState(dark){
+  applyTheme(dark?'midnight':'steel');
+  var icon  = document.getElementById('dark-mode-icon');
+  var label = document.getElementById('dark-mode-label');
+  if(icon)  icon.textContent  = dark ? '☀️' : '🌙';
+  if(label) label.textContent = dark ? 'Light Mode' : 'Dark Mode';
+}
+
+// ── Pinned Notes ───────────────────────────────────────────────────────────────
+var _pinnedNotesTimer = null;
+function debouncePinnedNotes(){
+  clearTimeout(_pinnedNotesTimer);
+  _pinnedNotesTimer = setTimeout(function(){
+    var el = document.getElementById('pinned-notes');
+    if(el) localStorage.setItem('pinned_notes', el.value);
+    var ind = document.getElementById('pinned-notes-saved');
+    if(ind){ ind.style.opacity='1'; setTimeout(function(){ind.style.opacity='0';},1200); }
+  }, 500);
+}
+function loadPinnedNotes(){
+  var el = document.getElementById('pinned-notes');
+  if(el) el.value = localStorage.getItem('pinned_notes')||'';
+}
+
+// ── Floating FAB ───────────────────────────────────────────────────────────────
+function toggleFabMenu(){
+  var m = document.getElementById('fab-menu');
+  if(!m) return;
+  m.style.display = m.style.display==='none' ? 'block' : 'none';
+}
+function closeFabMenu(){
+  var m = document.getElementById('fab-menu'); if(m) m.style.display='none';
+}
+document.addEventListener('click', function(e){
+  var fab = document.getElementById('fab-btn');
+  var menu = document.getElementById('fab-menu');
+  if(menu && menu.style.display!=='none' && !menu.contains(e.target) && e.target!==fab)
+    menu.style.display='none';
+});
+function openQuickNoteModal(){
+  var t = document.getElementById('quick-note-text');
+  if(t) t.value='';
+  var m = document.getElementById('quick-note-modal');
+  if(m){m.classList.remove('hidden');m.style.display='flex';}
+}
+function closeQuickNoteModal(){
+  var m = document.getElementById('quick-note-modal');
+  if(m){m.classList.add('hidden');m.style.display='none';}
+}
+function saveQuickNote(){
+  var t = document.getElementById('quick-note-text');
+  var text = t ? t.value.trim() : '';
+  if(!text){ showToast('Note is empty.'); return; }
+  var notes = JSON.parse(localStorage.getItem('quick_notes')||'[]');
+  notes.unshift({id:'qn_'+Date.now(), text:text, ts:new Date().toISOString()});
+  localStorage.setItem('quick_notes', JSON.stringify(notes));
+  closeQuickNoteModal();
+  showToast('Note saved.');
+  // Append to home pinned notes widget
+  var pinned = document.getElementById('pinned-notes');
+  if(pinned){
+    var ts = new Date().toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    pinned.value = (pinned.value ? pinned.value+'\n' : '') + ts + ': ' + text;
+    localStorage.setItem('pinned_notes', pinned.value);
+  }
+}
+
+// ── Stage migration (IC Review → Diligence) ────────────────────────────────────
+function migrateIcReviewStage(){
+  if(localStorage.getItem('stage_migration_ic_review_v1')) return;
+  var pipeline = JSON.parse(localStorage.getItem('l7_pipeline')||'[]');
+  var changed = false;
+  pipeline.forEach(function(item){ if(item.stage==='IC Review'){ item.stage='Diligence'; changed=true; } });
+  if(changed) localStorage.setItem('l7_pipeline', JSON.stringify(pipeline));
+  localStorage.setItem('stage_migration_ic_review_v1','1');
+}
+
+// ── Tag helpers ────────────────────────────────────────────────────────────────
+function tagColor(tag){
+  var colors=['#e84545','#2c5fe8','#189a5e','#d4810a','#7c3aed','#0891b2','#be185d','#4f46e5'];
+  var h=0; for(var i=0;i<tag.length;i++){h=((h*31)+tag.charCodeAt(i))|0;}
+  return colors[Math.abs(h)%colors.length];
+}
+var _addDealTags=[];
+function addDealTagOnKey(e){
+  if(e.key==='Enter'||e.key===','){ e.preventDefault(); addDealTag(e.target.value); e.target.value=''; }
+}
+function addDealTag(tag){
+  tag=tag.replace(/,/g,'').trim(); if(!tag) return;
+  if(!_addDealTags.includes(tag)) _addDealTags.push(tag);
+  renderAddDealTagChips();
+}
+function removeDealTag(tag){
+  _addDealTags=_addDealTags.filter(function(t){return t!==tag;});
+  renderAddDealTagChips();
+}
+function renderAddDealTagChips(){
+  var el=document.getElementById('add-deal-tag-chips'); if(!el) return;
+  el.innerHTML=_addDealTags.map(function(t){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:2px 9px;font-size:10px">'+escapeHtml(t)
+      +'<button onclick="removeDealTag(\''+escapeQ(t)+'\')" style="background:none;border:none;color:#fff;cursor:pointer;padding:0;font-size:12px;line-height:1">×</button></span>';
+  }).join('');
+}
+function refreshTagFilter(){
+  var sel=document.getElementById('pipeline-tag-filter'); if(!sel) return;
+  var pipeline=getPipeline();
+  var allTags=new Set();
+  pipeline.forEach(function(item){ (item.tags||[]).forEach(function(t){allTags.add(t);}); });
+  var cur=sel.value;
+  sel.innerHTML='<option value="">All Tags</option>'+Array.from(allTags).map(function(t){
+    return '<option value="'+escapeHtml(t)+'"'+(t===cur?' selected':'')+'>'+escapeHtml(t)+'</option>';
+  }).join('');
+}
+
+// ── Bulk stage update helpers ──────────────────────────────────────────────────
+function toggleSelectAllDeals(checked){
+  document.querySelectorAll('.deal-checkbox').forEach(function(cb){cb.checked=checked;});
+  updateBulkBar();
+}
+function updateBulkBar(){
+  var checked=document.querySelectorAll('.deal-checkbox:checked');
+  var bar=document.getElementById('bulk-action-bar');
+  var cnt=document.getElementById('bulk-selected-count');
+  if(bar) bar.style.display=checked.length?'flex':'none';
+  if(cnt) cnt.textContent=checked.length+' deal'+(checked.length!==1?'s':'')+' selected';
+}
+function applyBulkStage(){
+  var checked=Array.from(document.querySelectorAll('.deal-checkbox:checked'));
+  if(!checked.length) return;
+  var stage=document.getElementById('bulk-stage-select').value;
+  var pipeline=getPipeline();
+  checked.forEach(function(cb){
+    var startup=cb.dataset.startup, investor=cb.dataset.investor;
+    var item=pipeline.find(function(i){return i.startup===startup&&i.investor===investor;});
+    if(item) item.stage=stage;
+  });
+  setPipeline(pipeline);
+  addAuditEntry('pipeline','Bulk stage update to '+stage,checked.length+' deals');
+  renderPipelineList();renderKanban();refreshHome();updateStats();
+}
+function clearBulkSelection(){
+  document.querySelectorAll('.deal-checkbox').forEach(function(cb){cb.checked=false;});
+  var all=document.getElementById('bulk-select-all'); if(all) all.checked=false;
+  updateBulkBar();
+}
+
+// ── Print Pipeline Report ──────────────────────────────────────────────────────
+function printPipelineReport(){
+  var pipeline=getPipeline();
+  var today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+  var byStage={};
+  PIPELINE_STAGES.forEach(function(s){byStage[s]=[];});
+  pipeline.forEach(function(item){
+    var s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];
+    byStage[s].push(item);
+  });
+  var stageSummary=PIPELINE_STAGES.map(function(s){return s+': '+byStage[s].length;}).join(' | ');
+  var rows='';
+  PIPELINE_STAGES.forEach(function(stage){
+    if(!byStage[stage].length) return;
+    rows+='<tr style="background:#e8edf5"><td colspan="5" style="padding:8px 10px;font-weight:700;font-size:13px">'+stage+' ('+byStage[stage].length+')</td></tr>';
+    byStage[stage].forEach(function(item){
+      var crm=getInvestorCRM(item.startup,item.investor);
+      var tags=(item.tags||[]).join(', ')||'—';
+      rows+='<tr><td style="padding:7px 10px">'+(item.investor||'—')+'</td>'
+        +'<td style="padding:7px 10px">'+(item.startup||'—')+'</td>'
+        +'<td style="padding:7px 10px">'+(item.score!=null?item.score:'—')+'</td>'
+        +'<td style="padding:7px 10px">'+(crm.status||'—')+'</td>'
+        +'<td style="padding:7px 10px">'+tags+'</td></tr>';
+    });
+  });
+  var html='<!DOCTYPE html><html><head><title>Pipeline Report — Log7 Capital</title><style>'
+    +'body{font-family:Georgia,serif;padding:32px;color:#111;max-width:960px;margin:0 auto}'
+    +'h1{font-size:22px;margin-bottom:4px}h2{font-size:14px;font-weight:400;color:#555;margin-bottom:20px}'
+    +'.summary{background:#f4f6f9;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:20px}'
+    +'table{width:100%;border-collapse:collapse;font-size:12px}'
+    +'th{background:#1a2035;color:#fff;padding:9px 10px;text-align:left}'
+    +'tr:nth-child(even) td{background:#f9fafb}'
+    +'td{border-bottom:1px solid #e4e7ed}'
+    +'@media print{@page{size:A4 portrait;margin:18mm}}'
+    +'</style></head><body>'
+    +'<h1>Log7 Capital — Pipeline Report</h1><h2>Generated: '+today+'</h2>'
+    +'<div class="summary">Total deals: <strong>'+pipeline.length+'</strong> &nbsp;|&nbsp; '+stageSummary+'</div>'
+    +'<table><thead><tr><th>Investor</th><th>Company</th><th>Score</th><th>Status</th><th>Tags</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></body></html>';
+  var win=window.open('','_blank');
+  if(!win){showToast('Allow pop-ups to print report.');return;}
+  win.document.write(html); win.document.close();
+  win.onload=function(){win.print();};
 }
 </script>
 </body>
