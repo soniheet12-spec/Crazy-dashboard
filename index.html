@@ -1316,6 +1316,14 @@ window.SettingsDB = (function(){
   <span class="mob-logo">Log7 Capital</span>
   <button id="mob-dark-btn" onclick="toggleDarkMode()" title="Toggle dark mode"><span id="mob-dark-icon">🌙</span></button>
   <button onclick="lockApp()" title="Lock">🔒</button>
+  <div class="overflow-menu-wrap" id="mob-overflow" style="position:relative">
+    <button onclick="document.getElementById('mob-overflow').classList.toggle('open')" title="More actions" style="font-size:20px">⋮</button>
+    <div class="overflow-menu" style="right:0;top:calc(100% + 6px);z-index:200">
+      <button onclick="exportMatchesCsv();document.getElementById('mob-overflow').classList.remove('open')">Export CSV</button>
+      <button onclick="window.print();document.getElementById('mob-overflow').classList.remove('open')">Print / PDF</button>
+      <button onclick="goToTab('backup');document.getElementById('mob-overflow').classList.remove('open')">💾 Backup</button>
+    </div>
+  </div>
 </div>
 
 <aside id="sidebar">
