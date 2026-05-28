@@ -1,4 +1,4 @@
-const CACHE = 'log7-v2';
+const CACHE = 'log7-v3';
 const SHELL = [
   '/',
   '/index.html',
@@ -30,11 +30,29 @@ self.addEventListener('fetch', e => {
       url.hostname.includes('accounts.google.com') ||
       url.pathname.startsWith('/api/')) return;
 
+  // Network-first for HTML/navigation so new deploys show up immediately.
+  const isHTML = e.request.mode === 'navigate' ||
+    (e.request.headers.get('accept') || '').includes('text/html') ||
+    url.pathname === '/' || url.pathname === '/index.html';
+
+  if (isHTML) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok && url.origin === self.location.origin) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(c => c || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for static assets.
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        // Cache successful same-origin responses
         if (res.ok && url.origin === self.location.origin) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
