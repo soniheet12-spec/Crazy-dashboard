@@ -6578,6 +6578,823 @@ function showReminderBanner(msg, url, onClick){
 </script>
 
 <script>
+// ═══════════════════════════════════════════════════════════════════
+//  UI/UX ENHANCEMENTS  (purely additive — no data logic changed)
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── 0. INJECT GLOBAL STYLES ──────────────────────────────────────
+(function injectStyles(){
+  var s = document.createElement('style');
+  s.id = 'ux-enhancements-css';
+  s.textContent = `
+/* ── 7. Modal animations ── */
+@keyframes ux-fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes ux-slideUp { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+.ux-modal-overlay { animation: ux-fadeIn 150ms ease both }
+.ux-modal-card    { animation: ux-slideUp 200ms cubic-bezier(.16,1,.3,1) both }
+
+/* ── 4. Network bulk bar ── */
+#net-bulk-bar {
+  position:sticky; bottom:0; z-index:40;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 16px;
+  background:var(--s1); border-top:1px solid var(--border2);
+  box-shadow:0 -2px 12px rgba(0,0,0,.08);
+  transform:translateY(100%); transition:transform 200ms ease;
+}
+#net-bulk-bar.visible { transform:translateY(0); }
+
+/* ── 5. Stage color pills ── */
+.sp-sourcing      { background:#F1EFE8; color:#888780 }
+.sp-first-call    { background:#E6F1FB; color:#185FA5 }
+.sp-diligence     { background:#FAEEDA; color:#BA7517 }
+.sp-term-sheet    { background:#EEEDFE; color:#534AB7 }
+.sp-closed        { background:#EAF3DE; color:#3B6D11 }
+.sp-money         { background:#EAF3DE; color:#3B6D11 }
+.sp-passed        { background:#FCEBEB; color:#A32D2D }
+.sp-default       { background:var(--s2); color:var(--muted) }
+.stage-pill {
+  display:inline-block; font-size:10.5px; font-weight:500;
+  padding:2px 9px; border-radius:999px; white-space:nowrap;
+}
+
+/* ── 12. Zebra striping ── */
+.ux-zebra tr:nth-child(even) td { background:var(--s2) }
+.ux-zebra tr:hover td { background:var(--s3) !important }
+
+/* ── 10. Sortable column headers ── */
+.ux-sortable { cursor:pointer; user-select:none; white-space:nowrap }
+.ux-sortable:hover { color:var(--text) }
+.ux-sort-arrow { font-size:10px; margin-left:3px; color:var(--muted) }
+.ux-sort-arrow.active { color:#2c5fe8 }
+
+/* ── 11. Table footer ── */
+.ux-table-footer {
+  padding:6px 12px; font-size:12px; color:var(--muted);
+  border-top:1px solid var(--border); text-align:left;
+}
+
+/* ── 3. Star pin ── */
+.ux-star { background:none; border:none; cursor:pointer; font-size:15px; padding:2px 4px; line-height:1; color:var(--muted); flex-shrink:0 }
+.ux-star.pinned { color:#EF9F27 }
+tr.ux-pinned { border-left:2px solid #EF9F27 !important }
+
+/* ── 13. Toast overhaul ── */
+#ux-toast-container {
+  position:fixed; bottom:20px; right:20px; z-index:10000;
+  display:flex; flex-direction:column; gap:8px; pointer-events:none;
+}
+.ux-toast {
+  display:flex; align-items:center; gap:10px; min-width:260px; max-width:320px;
+  padding:12px 14px; border-radius:8px;
+  background:var(--s1); border:0.5px solid var(--border2);
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  font-size:13px; color:var(--text);
+  pointer-events:auto;
+  animation:ux-slideInRight 200ms ease both;
+}
+.ux-toast.removing { animation:ux-slideOutRight 200ms ease both }
+@keyframes ux-slideInRight  { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes ux-slideOutRight { from{transform:translateX(0);opacity:1} to{transform:translateX(110%);opacity:0} }
+.ux-toast-icon { font-size:15px; flex-shrink:0 }
+.ux-toast-msg  { flex:1; line-height:1.4 }
+.ux-toast-x    { cursor:pointer; font-size:14px; color:var(--muted); flex-shrink:0; background:none; border:none; padding:0 }
+
+/* ── 15. Inline edit cell ── */
+.ux-editable { cursor:text }
+.ux-editable:hover { background:var(--accent-soft) }
+input.ux-inline-input {
+  width:100%; font-size:13px; font-family:inherit; padding:3px 6px;
+  background:var(--s1); border:1px solid #2c5fe8; border-radius:4px;
+  color:var(--text); box-sizing:border-box;
+}
+
+/* ── 16. Context menu ── */
+#ux-ctx-menu {
+  position:fixed; z-index:10001;
+  background:var(--s1); border:0.5px solid var(--border2);
+  border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1);
+  min-width:200px; overflow:hidden;
+  animation:ux-fadeIn 100ms ease both;
+}
+.ux-ctx-item {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 14px; font-size:13px; cursor:pointer;
+  color:var(--text); white-space:nowrap;
+}
+.ux-ctx-item:hover { background:var(--s2) }
+.ux-ctx-sep { height:0.5px; background:var(--border2); margin:3px 0 }
+
+/* ── 17. Last outreach column ── */
+.ux-outreach-fresh  { color:var(--green); font-size:11.5px }
+.ux-outreach-ok     { color:var(--amber); font-size:11.5px }
+.ux-outreach-old    { color:var(--red);   font-size:11.5px }
+.ux-outreach-never  { color:var(--muted); font-size:11.5px }
+
+/* ── 9. This week bar ── */
+#home-week-bar {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;
+}
+.ux-week-card {
+  background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:12px 14px;
+}
+.ux-week-val { font-size:24px; font-weight:500; color:var(--text); line-height:1.1 }
+.ux-week-label { font-size:12px; font-weight:500; color:var(--text); margin-top:4px }
+.ux-week-sub   { font-size:11px; color:var(--muted); margin-top:2px }
+`;
+  document.head.appendChild(s);
+})();
+
+// ─── 1. PHONE AUTO-FORMAT ──────────────────────────────────────────
+function uxFormatPhone(val){
+  var digits=(val||'').replace(/\D/g,'').replace(/^91/,'');
+  var t=digits.substring(0,10);
+  if(t.length<=5) return t.length?'+91 '+t:'';
+  return '+91 '+t.slice(0,5)+' '+t.slice(5);
+}
+function uxApplyPhoneFormat(inp){
+  var raw=inp.value; var fmt=uxFormatPhone(raw);
+  // Store cursor intent
+  var sel=inp.selectionStart;
+  inp.value=fmt;
+  // Restore cursor approximately
+  try{ inp.setSelectionRange(fmt.length,fmt.length); }catch(e){}
+}
+function uxAttachPhoneFormatting(){
+  // Apply to all phone inputs now present and any added dynamically
+  document.querySelectorAll('input[type="tel"], input[id*="phone" i], input[id*="Phone"]').forEach(function(inp){
+    if(inp._uxPhoneFmt) return;
+    inp._uxPhoneFmt=true;
+    // Format existing value display (raw digits kept in value for forms that submit raw)
+    if(inp.value) inp.value=uxFormatPhone(inp.value);
+    inp.addEventListener('input',function(){ uxApplyPhoneFormat(this); });
+  });
+}
+// Re-attach after modals open (network modal mutates DOM)
+document.addEventListener('click',function(e){
+  setTimeout(uxAttachPhoneFormatting,120);
+});
+
+// ─── 2. ONE-CLICK COPY ICONS ──────────────────────────────────────
+function uxCopyValue(val, iconEl){
+  if(!val) return;
+  var done=function(){
+    if(iconEl){ iconEl.textContent='✓'; iconEl.style.color='var(--green)';
+      setTimeout(function(){ iconEl.textContent='⎘'; iconEl.style.color=''; },1500); }
+    uxToast('Copied!','info');
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(val).then(done).catch(done);
+  } else {
+    var ta=document.createElement('textarea'); ta.value=val;
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta); done();
+  }
+}
+function uxCopyBtn(val){
+  return ' <button title="Copy" onclick="uxCopyValue(\''+escapeQ(String(val||''))+'\',this)" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);padding:0 3px;vertical-align:middle" class="ux-copy-btn">⎘</button>';
+}
+
+// ─── 3. STAR / PIN ────────────────────────────────────────────────
+function uxGetPinned(tab){ try{return JSON.parse(localStorage.getItem('ux_pinned_'+tab)||'{}');}catch(e){return{};} }
+function uxSetPinned(tab,id,v){ var p=uxGetPinned(tab); if(v)p[id]=true; else delete p[id]; localStorage.setItem('ux_pinned_'+tab,JSON.stringify(p)); }
+function uxTogglePinNet(tab,id,btnEl){
+  var rows=netLoad(tab); var row=rows.find(function(r){return String(r.id)===String(id);});
+  if(!row) return;
+  row.pinned=!row.pinned; netSave(tab,rows);
+  if(btnEl){ btnEl.textContent=row.pinned?'★':'☆'; btnEl.classList.toggle('pinned',row.pinned); }
+  renderNetList(tab);
+}
+function uxStarBtn(tab,id,pinned){
+  return '<button class="ux-star'+(pinned?' pinned':'')+'" title="'+(pinned?'Unpin':'Pin')+'" onclick="event.stopPropagation();uxTogglePinNet(\''+tab+'\',\''+id+'\',this)">'+(pinned?'★':'☆')+'</button>';
+}
+// Patch renderNetList to sort pinned first + add star + pinned filter button
+var _uxNetFilterPinned={};
+function uxTogglePinnedFilter(tab,btn){
+  _uxNetFilterPinned[tab]=!_uxNetFilterPinned[tab];
+  if(btn){ btn.style.color=_uxNetFilterPinned[tab]?'#EF9F27':''; btn.title=_uxNetFilterPinned[tab]?'Show all':'Show pinned only'; }
+  renderNetList(tab);
+}
+
+// ─── 4. SHIFT+CLICK MULTI-SELECT + BULK ACTIONS ───────────────────
+var _uxNetSel={}; // {tab: Set of ids}
+var _uxLastChecked={}; // {tab: id}
+function uxNetSelected(tab){ return _uxNetSel[tab]||(_uxNetSel[tab]=new Set()); }
+function uxToggleNetRow(tab,id,shiftHeld,checkEl){
+  var sel=uxNetSelected(tab);
+  if(shiftHeld&&_uxLastChecked[tab]){
+    // Select range between _uxLastChecked and id in current rendered order
+    var ids=Array.from(document.querySelectorAll('#net-list-'+tab+' tbody tr')).map(function(tr){return tr.dataset.rowId;}).filter(Boolean);
+    var a=ids.indexOf(String(_uxLastChecked[tab])), b=ids.indexOf(String(id));
+    if(a>-1&&b>-1){
+      var lo=Math.min(a,b),hi=Math.max(a,b);
+      ids.slice(lo,hi+1).forEach(function(rid){ sel.add(rid); });
+    }
+  } else {
+    if(sel.has(String(id))) sel.delete(String(id)); else sel.add(String(id));
+  }
+  _uxLastChecked[tab]=id;
+  uxRenderNetBulkBar(tab);
+  // Sync checkbox visuals
+  document.querySelectorAll('#net-list-'+tab+' tbody tr').forEach(function(tr){
+    var cb=tr.querySelector('.ux-row-cb');
+    if(cb) cb.checked=sel.has(tr.dataset.rowId);
+    tr.classList.toggle('ux-row-sel',sel.has(tr.dataset.rowId));
+  });
+}
+function uxRenderNetBulkBar(tab){
+  var sel=uxNetSelected(tab); var n=sel.size;
+  var bar=document.getElementById('ux-bulk-bar-'+tab);
+  if(!bar) return;
+  bar.classList.toggle('visible',n>=2);
+  var cnt=bar.querySelector('.ux-bulk-cnt'); if(cnt)cnt.textContent=n+' contact'+(n===1?'':'s')+' selected';
+}
+function uxBulkEmail(tab){
+  var sel=uxNetSelected(tab); var rows=netLoad(tab);
+  var emails=Array.from(sel).map(function(id){ var r=rows.find(function(x){return String(x.id)===id;}); return r?(tab==='startups'?r.founderEmail:r.contactEmail):''; }).filter(Boolean);
+  if(!emails.length){uxToast('No emails found for selected contacts','warn');return;}
+  var url='https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(emails.join(','));
+  window.open(url,'_blank'); uxToast('Opening Gmail…','info');
+}
+function uxBulkExportCsv(tab){
+  var sel=uxNetSelected(tab); var rows=netLoad(tab);
+  var selected=rows.filter(function(r){return sel.has(String(r.id));});
+  if(!selected.length) return;
+  exportRowsAsCsv('log7-net-selected-'+tab+'.csv',selected);
+  uxToast('Exported '+selected.length+' rows','success');
+}
+function uxBulkAddPipeline(tab){
+  var sel=uxNetSelected(tab); var rows=netLoad(tab); var n=0;
+  rows.filter(function(r){return sel.has(String(r.id));}).forEach(function(row){
+    try{openNetPipelineModal(tab,row.id);n++;}catch(e){}
+  });
+  uxToast('Opened pipeline modal for '+n+' contact'+(n===1?'':'s'),'info');
+}
+function uxBulkDelete(tab){
+  var sel=uxNetSelected(tab); if(!sel.size) return;
+  if(!confirm('Delete '+sel.size+' contact'+(sel.size===1?'':'s')+'?')) return;
+  var remaining=netLoad(tab).filter(function(r){return!sel.has(String(r.id));});
+  netSave(tab,remaining);
+  sel.clear(); uxRenderNetBulkBar(tab); renderNetList(tab);
+  uxToast('Deleted','success');
+}
+function uxClearNetSel(tab){
+  uxNetSelected(tab).clear(); _uxLastChecked[tab]=null; uxRenderNetBulkBar(tab);
+  document.querySelectorAll('#net-list-'+tab+' tbody tr').forEach(function(tr){
+    var cb=tr.querySelector('.ux-row-cb'); if(cb)cb.checked=false; tr.classList.remove('ux-row-sel');
+  });
+}
+
+// ─── 5. STAGE COLOR PILLS ─────────────────────────────────────────
+var _uxStageMap={
+  'Sourcing':'sp-sourcing','First Call':'sp-first-call','Diligence':'sp-diligence',
+  'Term Sheet':'sp-term-sheet','Closed':'sp-closed','Money in the Bank':'sp-money',
+  'Passed':'sp-passed','Prospect':'sp-sourcing','Intro':'sp-first-call',
+  'Due Diligence':'sp-diligence','Closed Won':'sp-closed','Closed Lost':'sp-passed'
+};
+function uxStagePill(stage){
+  var cls=_uxStageMap[stage]||'sp-default';
+  return '<span class="stage-pill '+cls+'">'+escapeHtml(stage||'—')+'</span>';
+}
+
+// ─── 6. AVATAR COLOR FROM NAME ────────────────────────────────────
+var _uxAvatarPalette=[
+  {bg:'#E6F1FB',text:'#0C447C'},{bg:'#EAF3DE',text:'#27500A'},
+  {bg:'#EEEDFE',text:'#26215C'},{bg:'#FAEEDA',text:'#633806'},
+  {bg:'#FAECE7',text:'#4A1B0C'},{bg:'#FBEAF0',text:'#4B1528'},
+  {bg:'#E1F5EE',text:'#04342C'}
+];
+function uxAvatarColor(name){
+  var idx=(name||'?').charCodeAt(0)%_uxAvatarPalette.length;
+  return _uxAvatarPalette[idx];
+}
+function uxAvatarHtml(name,size){
+  var c=uxAvatarColor(name); size=size||36;
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:'+c.bg+';color:'+c.text+';font-weight:700;font-size:'+(size*0.33|0)+'px">'+escapeHtml(initials(name))+'</div>';
+}
+// Patch existing .avatar divs on home after render
+function uxRefreshAvatars(containerEl){
+  var root=containerEl||document;
+  root.querySelectorAll('.avatar').forEach(function(el){
+    var txt=el.textContent.trim(); if(!txt) return;
+    var c=uxAvatarColor(txt);
+    el.style.background=c.bg; el.style.color=c.text;
+  });
+}
+
+// ─── 8. QUICK NOTES (spec says log7_quick_notes; existing uses pinned_notes → keep both) ──
+// Existing pinned_notes already works; just add char count
+(function(){
+  function updateCharCount(){
+    var el=document.getElementById('pinned-notes');
+    var cc=document.getElementById('ux-notes-charcount');
+    if(el&&cc) cc.textContent=el.value.length+' chars';
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    var notes=document.getElementById('pinned-notes');
+    if(notes){
+      var hdr=notes.parentElement.querySelector('.card-header');
+      if(hdr&&!hdr.querySelector('#ux-notes-charcount')){
+        var span=document.createElement('span');
+        span.id='ux-notes-charcount';
+        span.style.cssText='font-size:11px;color:var(--muted)';
+        hdr.appendChild(span);
+      }
+      notes.addEventListener('input',updateCharCount);
+      updateCharCount();
+      // Sync to log7_quick_notes key as well
+      notes.addEventListener('input',function(){
+        setTimeout(function(){ localStorage.setItem('log7_quick_notes',notes.value); },0);
+      });
+      // Load from log7_quick_notes if pinned_notes empty
+      if(!notes.value){
+        var v2=localStorage.getItem('log7_quick_notes');
+        if(v2) notes.value=v2;
+      }
+      updateCharCount();
+    }
+  });
+})();
+
+// ─── 9. THIS WEEK SUMMARY ────────────────────────────────────────
+function uxWeekStart(){
+  var n=new Date(); var day=n.getDay(); var diff=(day===0?-6:1-day);
+  n.setDate(n.getDate()+diff); n.setHours(0,0,0,0); return n;
+}
+function uxRenderWeekBar(){
+  var el=document.getElementById('home-week-bar'); if(!el) return;
+  var ws=uxWeekStart().toISOString();
+  // Contacts added this week
+  var allContacts=[...netLoad('investors'),...netLoad('startups'),...netLoad('partnerships')];
+  var newContacts=allContacts.filter(function(r){ return r.dateAdded&&r.dateAdded>=ws; }).length;
+  // Emails sent this week
+  var log=[]; try{log=JSON.parse(localStorage.getItem('log7_outreach_log')||'[]');}catch(e){}
+  var emailsSent=log.filter(function(e){ return e.channel==='email'&&e.ts&&e.ts>=ws; }).length;
+  // Deals moved this week (lastUpdated field)
+  var pipeline=getPipeline();
+  var dealsMoved=pipeline.filter(function(i){ return i.lastUpdated&&i.lastUpdated>=ws; }).length;
+  el.innerHTML=
+    '<div class="ux-week-card"><div class="ux-week-val">'+newContacts+'</div><div class="ux-week-label">Contacts added</div><div class="ux-week-sub">this week</div></div>'+
+    '<div class="ux-week-card"><div class="ux-week-val">'+emailsSent+'</div><div class="ux-week-label">Emails sent</div><div class="ux-week-sub">this week</div></div>'+
+    '<div class="ux-week-card"><div class="ux-week-val">'+dealsMoved+'</div><div class="ux-week-label">Deals moved</div><div class="ux-week-sub">this week</div></div>';
+}
+
+// ─── 10. SORTABLE COLUMN HEADERS ─────────────────────────────────
+var _uxSortState={}; // key→{col, dir: 0=def,1=asc,2=desc}
+function uxSortTable(tableEl, colIdx, key){
+  if(!key) return;
+  var st=_uxSortState[key]||{col:-1,dir:0};
+  if(st.col===colIdx){ st.dir=(st.dir+1)%3; } else { st.col=colIdx; st.dir=1; }
+  _uxSortState[key]=st;
+  // Update arrow indicators
+  tableEl.querySelectorAll('th .ux-sort-arrow').forEach(function(a){a.textContent='↕';a.classList.remove('active');});
+  var ths=tableEl.querySelectorAll('thead th');
+  var arrow=ths[colIdx]&&ths[colIdx].querySelector('.ux-sort-arrow');
+  if(arrow){
+    arrow.textContent=st.dir===1?'↑':st.dir===2?'↓':'↕';
+    arrow.classList.toggle('active',st.dir>0);
+  }
+  if(st.dir===0){ uxRestoreTableOrder(tableEl); return; }
+  var tbody=tableEl.querySelector('tbody'); if(!tbody) return;
+  var rows=Array.from(tbody.querySelectorAll('tr')).filter(function(r){return r.cells[colIdx];});
+  rows.sort(function(a,b){
+    var av=a.cells[colIdx].innerText.trim().toLowerCase();
+    var bv=b.cells[colIdx].innerText.trim().toLowerCase();
+    var na=parseFloat(av),nb=parseFloat(bv);
+    if(!isNaN(na)&&!isNaN(nb)){ return st.dir===1?na-nb:nb-na; }
+    return st.dir===1?av.localeCompare(bv):bv.localeCompare(av);
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+}
+function uxRestoreTableOrder(tableEl){ /* reset handled by re-render */ }
+function uxMakeSortable(tableEl, key){
+  if(!tableEl||tableEl._uxSortable) return; tableEl._uxSortable=true;
+  tableEl.querySelectorAll('thead th').forEach(function(th,i){
+    if(!th.classList.contains('ux-no-sort')){
+      th.classList.add('ux-sortable');
+      var arrow=document.createElement('span'); arrow.className='ux-sort-arrow'; arrow.textContent='↕';
+      th.appendChild(arrow);
+      th.addEventListener('click',function(){ uxSortTable(tableEl,i,key); });
+    }
+  });
+}
+
+// ─── 11. ROW COUNT FOOTER ─────────────────────────────────────────
+function uxSetTableFooter(wrapEl, visible, total, noun){
+  var noun2=noun||'rows';
+  var f=wrapEl.querySelector('.ux-table-footer');
+  if(!f){ f=document.createElement('div'); f.className='ux-table-footer'; wrapEl.appendChild(f); }
+  f.textContent='Showing '+visible+' of '+total+' '+noun2;
+}
+
+// ─── 13. TOAST (replace top-right old one with bottom-right stacked) ──
+function uxToast(msg, type){
+  var icons={success:'✓',error:'✕',info:'ℹ',warn:'⚠'};
+  var colors={success:'var(--green)',error:'var(--red)',info:'#2c5fe8',warn:'var(--amber)'};
+  var ic=icons[type]||'✓'; var col=colors[type]||colors.success;
+  var c=document.getElementById('ux-toast-container');
+  if(!c){ c=document.createElement('div'); c.id='ux-toast-container'; document.body.appendChild(c); }
+  var t=document.createElement('div'); t.className='ux-toast';
+  t.innerHTML='<span class="ux-toast-icon" style="color:'+col+'">'+ic+'</span>'
+    +'<span class="ux-toast-msg">'+escapeHtml(msg)+'</span>'
+    +'<button class="ux-toast-x" onclick="uxDismissToast(this.parentElement)">✕</button>';
+  c.appendChild(t);
+  var tid=setTimeout(function(){ uxDismissToast(t); },3000);
+  t._uxTid=tid;
+}
+function uxDismissToast(t){
+  if(!t||!t.parentElement) return;
+  clearTimeout(t._uxTid); t.classList.add('removing');
+  setTimeout(function(){ if(t.parentElement) t.parentElement.removeChild(t); },210);
+}
+// Patch the existing showToast to also call uxToast for the new style
+var _origShowToast=window.showToast;
+window.showToast=function(msg,kind){
+  uxToast(msg, kind==='error'?'error':kind==='warn'?'warn':'success');
+};
+
+// ─── 14. UNSAVED CHANGES WARNING ──────────────────────────────────
+var _uxDirtyModal=false;
+function uxMarkDirty(){ _uxDirtyModal=true; }
+function uxResetDirty(){ _uxDirtyModal=false; }
+function uxCheckDirty(onConfirm, onSave){
+  if(!_uxDirtyModal){ onConfirm(); return; }
+  var existing=document.getElementById('ux-dirty-warn');
+  if(existing) return;
+  // Find deepest open modal card
+  var card=document.querySelector('.ux-modal-card, #network-modal > div, #followup-modal > div, #add-deal-modal > div');
+  if(!card){ onConfirm(); return; }
+  var warn=document.createElement('div'); warn.id='ux-dirty-warn';
+  warn.style.cssText='background:var(--s2);border:1px solid var(--amber);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:13px';
+  warn.innerHTML='You have unsaved changes.<div style="display:flex;gap:8px;margin-top:8px">'
+    +'<button onclick="uxDirtyDiscard()" class="action-btn secondary" style="font-size:12px">Discard</button>'
+    +(onSave?'<button onclick="uxDirtySave()" class="action-btn primary" style="font-size:12px">Save now</button>':'')
+    +'</div>';
+  card.appendChild(warn);
+  window._uxDirtyDiscard=function(){ warn.remove(); _uxDirtyModal=false; onConfirm(); };
+  window._uxDirtySave=function(){ warn.remove(); _uxDirtyModal=false; if(onSave)onSave(); };
+}
+window.uxDirtyDiscard=function(){ if(window._uxDirtyDiscard)window._uxDirtyDiscard(); };
+window.uxDirtySave=function(){ if(window._uxDirtySave)window._uxDirtySave(); };
+
+// Patch modal open/close to track dirty state
+var _origOpenNetworkModal=window.openNetworkModal;
+window.openNetworkModal=function(tab){
+  uxResetDirty(); if(_origOpenNetworkModal)_origOpenNetworkModal(tab);
+  setTimeout(function(){
+    var form=document.getElementById('net-modal-form');
+    if(form) form.querySelectorAll('input,textarea,select').forEach(function(el){
+      el.addEventListener('input',uxMarkDirty,{once:false});
+      el.addEventListener('change',uxMarkDirty,{once:false});
+    });
+    uxAttachPhoneFormatting();
+  },80);
+};
+var _origEditNetEntry=window.editNetEntry;
+window.editNetEntry=function(tab,id){
+  uxResetDirty(); if(_origEditNetEntry)_origEditNetEntry(tab,id);
+  setTimeout(function(){
+    var form=document.getElementById('net-modal-form');
+    if(form) form.querySelectorAll('input,textarea,select').forEach(function(el){
+      el.addEventListener('input',uxMarkDirty,{once:false});
+    });
+    uxAttachPhoneFormatting();
+  },80);
+};
+var _origCloseNetworkModal=window.closeNetworkModal;
+window.closeNetworkModal=function(){
+  if(_uxDirtyModal){
+    uxCheckDirty(function(){ uxResetDirty(); if(_origCloseNetworkModal)_origCloseNetworkModal(); },
+      function(){ if(typeof saveNetworkEntry==='function')saveNetworkEntry(); });
+    return;
+  }
+  if(_origCloseNetworkModal)_origCloseNetworkModal();
+};
+
+// Esc key closes modals
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape') return;
+  var ctx=document.getElementById('ux-ctx-menu'); if(ctx){ctx.remove();return;}
+  // Try close open modals
+  var modals=['followup-modal','network-modal','add-deal-modal'];
+  for(var i=0;i<modals.length;i++){
+    var m=document.getElementById(modals[i]);
+    if(m&&!m.classList.contains('hidden')&&m.style.display!=='none'){
+      if(modals[i]==='network-modal') window.closeNetworkModal&&window.closeNetworkModal();
+      else if(modals[i]==='followup-modal') window.closeFollowupModal&&window.closeFollowupModal();
+      else if(modals[i]==='add-deal-modal') window.closeAddDealModal&&window.closeAddDealModal();
+      return;
+    }
+  }
+});
+// Overlay background click
+document.addEventListener('click',function(e){
+  var ctx=document.getElementById('ux-ctx-menu');
+  if(ctx&&!ctx.contains(e.target)) ctx.remove();
+});
+
+// ─── 15. INLINE SINGLE-FIELD EDIT ────────────────────────────────
+var _uxInlineEditKeys={
+  investors: {investorName:true,fundName:true,sectorFocus:true,contactEmail:true,contactPhone:true,geography:true,checkSize:true},
+  startups:  {companyName:true,founderName:true,sector:true,founderEmail:true,founderPhone:true,referredBy:true},
+  partnerships:{partnerName:true,contactName:true,contactEmail:true,contactPhone:true}
+};
+function uxInlineEdit(tab, rowId, field, tdEl){
+  if(tdEl._uxEditing) return;
+  tdEl._uxEditing=true;
+  var rows=netLoad(tab); var row=rows.find(function(r){return String(r.id)===String(rowId);});
+  if(!row){tdEl._uxEditing=false;return;}
+  var orig=tdEl.innerHTML; var val=String(row[field]||'');
+  var inp=document.createElement('input'); inp.className='ux-inline-input';
+  inp.value=val; inp.placeholder=field;
+  tdEl.innerHTML=''; tdEl.appendChild(inp); inp.focus(); inp.select();
+  function doSave(){
+    var newVal=inp.value.trim();
+    row[field]=newVal; netSave(tab,rows);
+    tdEl.innerHTML=escapeHtml(newVal)||'—'; tdEl._uxEditing=false;
+    tdEl.style.color='var(--green)'; setTimeout(function(){tdEl.style.color='';},600);
+  }
+  function doCancel(){ tdEl.innerHTML=orig; tdEl._uxEditing=false; }
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();doSave();}
+    else if(e.key==='Escape'){e.preventDefault();doCancel();}
+  });
+  inp.addEventListener('blur',function(){ if(tdEl._uxEditing)doSave(); });
+}
+
+// ─── 16. RIGHT-CLICK CONTEXT MENU ────────────────────────────────
+function uxShowCtxMenu(e,tab,rowId){
+  e.preventDefault(); e.stopPropagation();
+  var old=document.getElementById('ux-ctx-menu'); if(old)old.remove();
+  var rows=netLoad(tab); var row=rows.find(function(r){return String(r.id)===String(rowId);});
+  if(!row) return;
+  var emailKey=tab==='startups'?'founderEmail':'contactEmail';
+  var phoneKey=tab==='startups'?'founderPhone':'contactPhone';
+  var email=row[emailKey]||''; var phone=row[phoneKey]||'';
+  var name=netPrimaryKey(tab,row);
+  var menu=document.createElement('div'); menu.id='ux-ctx-menu';
+  var items=[
+    {icon:'✏️',label:'Edit',fn:'editNetEntry(\''+tab+'\',\''+rowId+'\')'},
+    email?{icon:'📋',label:'Copy email',fn:'uxCopyValue(\''+escapeQ(email)+'\',null)'}:null,
+    phone?{icon:'📋',label:'Copy phone',fn:'uxCopyValue(\''+escapeQ(phone)+'\',null)'}:null,
+    email?{icon:'✉️',label:'Send email',fn:'netEmailContact(\''+escapeQ(email)+'\',\''+escapeQ(name)+'\')'}:null,
+    phone?{icon:'📱',label:'WhatsApp',fn:'window.open(\'https://wa.me/\'+outNormalizePhone(\''+escapeQ(phone)+'\')+\'?text=Hi\',\'_blank\')'}:null,
+    {icon:'➕',label:'Add to pipeline',fn:'openNetPipelineModal(\''+tab+'\',\''+rowId+'\')'},
+    {icon:'★',label:(row.pinned?'Unpin':'Pin'),fn:'uxTogglePinNet(\''+tab+'\',\''+rowId+'\',null)'},
+    {sep:true},
+    {icon:'🗑️',label:'Delete',fn:'deleteNetEntry(\''+tab+'\',\''+rowId+'\')',danger:true}
+  ].filter(Boolean);
+  items.forEach(function(item){
+    if(item.sep){ var sep=document.createElement('div'); sep.className='ux-ctx-sep'; menu.appendChild(sep); return; }
+    var d=document.createElement('div'); d.className='ux-ctx-item';
+    if(item.danger) d.style.color='var(--red)';
+    d.innerHTML='<span>'+item.icon+'</span><span>'+item.label+'</span>';
+    d.addEventListener('click',function(){ menu.remove(); try{eval(item.fn);}catch(ex){console.error(ex);} });
+    menu.appendChild(d);
+  });
+  var vw=window.innerWidth, vh=window.innerHeight;
+  var mx=e.clientX, my=e.clientY;
+  document.body.appendChild(menu);
+  var mw=menu.offsetWidth, mh=menu.offsetHeight;
+  menu.style.left=(mx+mw>vw?mx-mw:mx)+'px';
+  menu.style.top=(my+mh>vh?my-mh:my)+'px';
+}
+
+// ─── 17. LAST OUTREACH DATE ───────────────────────────────────────
+function uxLastOutreach(contactName){
+  var log=[]; try{log=JSON.parse(localStorage.getItem('log7_outreach_log')||'[]');}catch(e){}
+  var lc=String(contactName||'').toLowerCase();
+  var match=log.find(function(e){return String(e.recipient||'').toLowerCase()===lc;});
+  if(!match) return null;
+  return match.ts;
+}
+function uxLastOutreachHtml(contactName){
+  var ts=uxLastOutreach(contactName);
+  if(!ts) return '<span class="ux-outreach-never">Never</span>';
+  var diff=Date.now()-new Date(ts).getTime();
+  var days=Math.floor(diff/86400000);
+  var label=days===0?'Today':days===1?'Yesterday':days<7?days+'d ago':days<30?Math.round(days/7)+'w ago':Math.round(days/30)+'mo ago';
+  var cls=days<7?'ux-outreach-fresh':days<30?'ux-outreach-ok':'ux-outreach-old';
+  return '<span class="'+cls+'">'+label+'</span>';
+}
+
+// ─── PATCH renderNetList ──────────────────────────────────────────
+(function(){
+  var _orig=window.renderNetList;
+  window.renderNetList=function(tab){
+    _orig(tab);  // run original first
+    var el=document.getElementById('net-list-'+tab); if(!el) return;
+    var rows=netLoad(tab);
+    var today=todayStr?todayStr():new Date().toISOString().slice(0,10);
+
+    // Inject bulk bar if not present
+    var section=el.parentElement;
+    if(section&&!document.getElementById('ux-bulk-bar-'+tab)){
+      var bar=document.createElement('div'); bar.id='ux-bulk-bar-'+tab; bar.id='net-bulk-bar'; bar.className='';
+      // We use per-tab id for lookup
+      bar.id='ux-bulk-bar-'+tab;
+      bar.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--s1);border-top:1px solid var(--border2);box-shadow:0 -2px 12px rgba(0,0,0,.08);transform:translateY(100%);transition:transform 200ms ease;position:sticky;bottom:0;z-index:40';
+      bar.innerHTML='<span class="ux-bulk-cnt" style="font-size:12.5px;font-weight:600;color:var(--accent)">0 selected</span>'
+        +'<button class="action-btn secondary" style="font-size:11px;padding:4px 10px" onclick="uxBulkAddPipeline(\''+tab+'\')">Add to Pipeline</button>'
+        +'<button class="action-btn secondary" style="font-size:11px;padding:4px 10px" onclick="uxBulkEmail(\''+tab+'\')">Send Email</button>'
+        +'<button class="action-btn secondary" style="font-size:11px;padding:4px 10px" onclick="uxBulkExportCsv(\''+tab+'\')">Export CSV</button>'
+        +'<button class="action-btn danger"    style="font-size:11px;padding:4px 10px" onclick="uxBulkDelete(\''+tab+'\')">Delete</button>'
+        +'<button class="action-btn secondary" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="uxClearNetSel(\''+tab+'\')">✕ Clear</button>';
+      section.style.position='relative';
+      section.appendChild(bar);
+    }
+
+    // Rebuild table with enhancements: star, checkbox, copy icons, inline edit, context menu, zebra, last-outreach
+    var table=el.querySelector('table'); if(!table) return;
+    table.classList.add('ux-zebra');
+
+    // ── Add "Last Outreach" th ──
+    var thead=table.querySelector('thead tr');
+    if(thead&&!thead.querySelector('.ux-outreach-th')){
+      var th=document.createElement('th');
+      th.className='ux-outreach-th';
+      th.style.cssText='padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap';
+      th.textContent='Last Outreach';
+      // insert before last <th>
+      thead.insertBefore(th, thead.lastElementChild);
+    }
+
+    // ── Add star th ──
+    if(thead&&!thead.querySelector('.ux-star-th')){
+      var sth=document.createElement('th'); sth.className='ux-star-th ux-no-sort';
+      sth.style.cssText='padding:8px 4px;width:26px';
+      thead.prepend(sth);
+    }
+
+    // ── Add checkbox th ──
+    if(thead&&!thead.querySelector('.ux-cb-th')){
+      var cbth=document.createElement('th'); cbth.className='ux-cb-th ux-no-sort';
+      cbth.style.cssText='padding:8px 4px;width:26px';
+      thead.prepend(cbth);
+    }
+
+    // ── Make sortable ──
+    uxMakeSortable(table,'net-'+tab);
+
+    // ── Patch rows ──
+    var sel=uxNetSelected(tab);
+    table.querySelectorAll('tbody tr').forEach(function(tr, idx){
+      // Try to match row to data by primary name in first visible td
+      var allTds=tr.querySelectorAll('td');
+      if(!allTds.length) return;
+      // Find row id by matching primary key text
+      var pkText=''; allTds.forEach(function(td){ if(!pkText&&td.textContent.trim()&&td.textContent.trim()!=='—') pkText=td.textContent.trim().slice(0,40); });
+      var matchRow=rows.find(function(r){ return (netPrimaryKey(tab,r)||'').toLowerCase()===pkText.toLowerCase(); })||rows[idx];
+      if(!matchRow) return;
+      var rowId=String(matchRow.id);
+      tr.dataset.rowId=rowId;
+      tr.classList.toggle('ux-pinned',!!matchRow.pinned);
+      tr.classList.toggle('ux-row-sel',sel.has(rowId));
+
+      // Star td
+      if(!tr.querySelector('.ux-star-td')){
+        var std=document.createElement('td'); std.className='ux-star-td ux-no-sort';
+        std.style.cssText='padding:4px 2px;width:26px;vertical-align:middle';
+        std.innerHTML=uxStarBtn(tab,rowId,!!matchRow.pinned);
+        tr.prepend(std);
+      }
+
+      // Checkbox td
+      if(!tr.querySelector('.ux-cb-td')){
+        var cbtd=document.createElement('td'); cbtd.className='ux-cb-td';
+        cbtd.style.cssText='padding:4px 2px;width:26px;vertical-align:middle';
+        cbtd.innerHTML='<input type="checkbox" class="ux-row-cb" '+(sel.has(rowId)?'checked':'')+' onclick="event.stopPropagation();uxToggleNetRow(\''+tab+'\',\''+rowId+'\',event.shiftKey,this)">';
+        tr.prepend(cbtd);
+      }
+
+      // Last outreach td (insert before last td = actions)
+      if(!tr.querySelector('.ux-outreach-td')){
+        var otd=document.createElement('td'); otd.className='ux-outreach-td';
+        otd.style.cssText='padding:8px 10px;white-space:nowrap';
+        otd.innerHTML=uxLastOutreachHtml(netPrimaryKey(tab,matchRow));
+        tr.insertBefore(otd, tr.lastElementChild);
+      }
+
+      // Copy icons on email/phone tds
+      tr.querySelectorAll('td').forEach(function(td){
+        var a=td.querySelector('a[href^="mailto:"]'); if(a&&!td.querySelector('.ux-copy-btn')){ td.insertAdjacentHTML('beforeend',uxCopyBtn(matchRow[tab==='startups'?'founderEmail':'contactEmail']||'')); }
+        var p=td.querySelector('a[href^="tel:"]'); if(p&&!td.querySelector('.ux-copy-btn')){ td.insertAdjacentHTML('beforeend',uxCopyBtn(matchRow[tab==='startups'?'founderPhone':'contactPhone']||'')); }
+      });
+
+      // Inline edit on text cells
+      var editableKeys=_uxInlineEditKeys[tab]||{};
+      var fieldKeys=netFields(tab).map(function(f){return f.key;});
+      var tdList=tr.querySelectorAll('td');
+      fieldKeys.forEach(function(fkey,fi){
+        if(!editableKeys[fkey]) return;
+        var td=tdList[fi+2]; // offset by 2 for star+checkbox cols
+        if(!td||td._uxInlineWired) return;
+        td._uxInlineWired=true;
+        td.classList.add('ux-editable');
+        td.addEventListener('click',function(ev){
+          if(ev.detail<2&&!td._uxEditing) uxInlineEdit(tab,rowId,fkey,td);
+        });
+      });
+
+      // Context menu
+      if(!tr._uxCtxWired){
+        tr._uxCtxWired=true;
+        tr.addEventListener('contextmenu',function(ev){ uxShowCtxMenu(ev,tab,rowId); });
+      }
+    });
+
+    // ── Row count footer ──
+    var wrap=el.closest('.card')||el.parentElement;
+    var total=rows.length;
+    var visible=table.querySelectorAll('tbody tr').length;
+    uxSetTableFooter(wrap,visible,total,tab==='startups'?'startups':tab==='investors'?'investors':'partnerships');
+
+    // ── Apply avatar colors ──
+    uxRefreshAvatars(el);
+  };
+})();
+
+// ─── PATCH renderPipelineList ─────────────────────────────────────
+(function(){
+  var _orig=window.renderPipelineList;
+  window.renderPipelineList=function(){
+    _orig();
+    var el=document.getElementById('pipeline-list'); if(!el) return;
+    var table=el.querySelector('table'); if(!table) return;
+    table.classList.add('ux-zebra');
+    // Color-code stage cells
+    table.querySelectorAll('tbody tr td:nth-child(6)').forEach(function(td){
+      var stg=td.textContent.trim();
+      td.innerHTML=uxStagePill(stg);
+    });
+    // Sortable
+    uxMakeSortable(table,'pipeline-list');
+    // Footer
+    var total=getPipeline().length;
+    var visible=table.querySelectorAll('tbody tr').length;
+    var wrap=el.parentElement;
+    uxSetTableFooter(wrap,visible,total,'deals');
+  };
+})();
+
+// ─── PATCH renderAuditLog ─────────────────────────────────────────
+(function(){
+  var _orig=window.renderAuditLog;
+  window.renderAuditLog=function(){
+    _orig();
+    // Footer on audit
+    var el=document.getElementById('audit-log-list'); if(!el) return;
+    var rows=el.querySelectorAll('.audit-row'); if(!rows.length) return;
+    var total=getAuditLog().length;
+    uxSetTableFooter(el.parentElement||el, rows.length, total, 'entries');
+  };
+})();
+
+// ─── ADD WEEK BAR TO HOME DOM ─────────────────────────────────────
+(function(){
+  function injectWeekBar(){
+    if(document.getElementById('home-week-bar')) return;
+    var syncStatus=document.getElementById('home-sync-status');
+    if(!syncStatus) return;
+    var bar=document.createElement('div'); bar.id='home-week-bar';
+    bar.innerHTML='<div class="ux-week-card">—</div><div class="ux-week-card">—</div><div class="ux-week-card">—</div>';
+    syncStatus.parentElement.insertBefore(bar, syncStatus.nextSibling);
+  }
+  document.addEventListener('DOMContentLoaded', injectWeekBar);
+})();
+
+// ─── PATCH refreshHome ────────────────────────────────────────────
+(function(){
+  var _orig=window.refreshHome;
+  window.refreshHome=function(){
+    _orig();
+    uxRenderWeekBar();
+    uxRefreshAvatars(document.getElementById('page-home'));
+  };
+})();
+
+// ─── ADD MODAL ANIMATION CLASSES ─────────────────────────────────
+(function(){
+  var ids=['network-modal','followup-modal','add-deal-modal','net-entity-modal','tearsheet-modal','objection-modal','simulator-modal'];
+  document.addEventListener('DOMContentLoaded',function(){
+    ids.forEach(function(id){
+      var m=document.getElementById(id); if(!m) return;
+      m.classList.add('ux-modal-overlay');
+      var card=m.firstElementChild; if(card) card.classList.add('ux-modal-card');
+    });
+  });
+})();
+
+// ─── INIT PHONE FORMATTING ON DOM READY ──────────────────────────
+document.addEventListener('DOMContentLoaded', function(){
+  uxAttachPhoneFormatting();
+  // Apply avatar colors to home
+  setTimeout(function(){ uxRefreshAvatars(); },400);
+});
+</script>
+
+<script>
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('/sw.js')
