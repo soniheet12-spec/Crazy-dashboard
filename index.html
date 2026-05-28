@@ -2284,7 +2284,7 @@ function showTab(name,btn){
     refreshHome();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchAll(true).then(function(ok){if(ok)refreshHome();});
   }
-  if(name==='match') renderBulkOutreachPanel();
+  if(name==='match'){ renderStartupMatchList(); renderBulkOutreachPanel(); }
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
 function toggleSettings(){
@@ -2457,6 +2457,8 @@ function refreshHome(){
   }
   const prEl=document.getElementById('home-priority-list');
   if(prEl){const rows=pipeline.slice(0,6);if(!rows.length){prEl.innerHTML='<div class="empty">Save matches to pipeline to see priorities.</div>';}else prEl.innerHTML=rows.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="pipeline-row"><div class="avatar">'+initials(item.investor)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(item.investor)+' <span class="badge">'+escapeHtml(item.startup)+'</span></div><div class="row-meta">'+crm.status+' | Score: '+item.score+(crm.followUp?' | Due: '+crm.followUp:'')+'</div></div></div>';}).join('');}
+  const snapshotEl=document.getElementById('home-pipeline-snapshot');
+  if(snapshotEl){if(!pipeline.length){snapshotEl.innerHTML='<div class="empty" style="padding:18px">No pipeline deals yet.</div>';}else{snapshotEl.innerHTML=pipeline.slice(0,6).map(function(item){var crm=getInvestorCRM(item.startup,item.investor);var title=escapeHtml(item.investor||item.startup||'—');var sub=[item.startup&&item.investor?escapeHtml(item.startup):'',escapeHtml(item.stage||''),crm.followUp?'Due: '+escapeHtml(crm.followUp):''].filter(Boolean).join(' · ');return'<div class="pipeline-row" style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="row-main"><div class="row-title" style="font-size:13px;font-weight:600">'+title+'</div><div class="row-meta" style="font-size:11.5px;color:var(--muted)">'+sub+'</div></div></div>';}).join('');}}
   refreshCapitalDisplay();renderHomeActivity();refreshNetFollowups();
 }
 function renderHomeActivity(){
@@ -2975,31 +2977,66 @@ function closeNetPipelineModal(){
   m.classList.add('hidden'); m.style.display='none';
 }
 function saveNetPipelineEntry(sourceTab, sourceId){
-  var name = document.getElementById('npl-name').value;
+  var name    = document.getElementById('npl-name').value;
   var company = document.getElementById('npl-company').value;
-  var type = document.getElementById('npl-type').value;
-  var status = document.getElementById('npl-status').value;
-  var notes = document.getElementById('npl-notes').value.trim();
-  var data = getNetPipeline();
-  var now = new Date().toISOString();
+  var type    = document.getElementById('npl-type').value;
+  var status  = document.getElementById('npl-status').value;
+  var notes   = document.getElementById('npl-notes').value.trim();
+  var data    = getNetPipeline();
+  var now     = new Date().toISOString();
+  var isNew   = !_netPipelineEditId;
   if(_netPipelineEditId){
     var idx = data.findIndex(function(p){ return String(p.id)===String(_netPipelineEditId); });
-    if(idx>-1){ data[idx] = Object.assign(data[idx], {status:status, notes:notes, lastUpdated:now}); }
+    if(idx>-1){
+      data[idx] = Object.assign(data[idx], {status:status, notes:notes, lastUpdated:now});
+      // Sync stage to main pipeline
+      var mainPl = getPipeline();
+      var mainItem = mainPl.find(function(i){ return i._netSourceId === String(_netPipelineEditId); });
+      if(mainItem){ mainItem.stage = status; mainItem._crm = mainItem._crm||{}; mainItem._crm.notes = notes; setPipeline(mainPl); }
+    }
   } else {
-    data.push({id:'np_'+Date.now(), name:name, company:company, type:type, status:status, notes:notes, lastUpdated:now, sourceTab:sourceTab, sourceId:String(sourceId)});
+    var netId = 'np_'+Date.now();
+    var netEntry = {id:netId, name:name, company:company, type:type, status:status, notes:notes, lastUpdated:now, sourceTab:sourceTab, sourceId:String(sourceId)};
+    data.push(netEntry);
+    // Write to main pipeline (l7_pipeline) so Pipeline tab and Home pick it up
+    var mainPipeline = getPipeline();
+    var startup  = type==='Startup'  ? (company||name) : '';
+    var investor = type==='Investor' ? name : (type==='Partner' ? name : '');
+    if(!startup && !investor){ investor = name; } // fallback
+    var isDup = mainPipeline.find(function(i){ return i._netSourceId === netId; });
+    if(!isDup){
+      mainPipeline.unshift({
+        id:'pl_'+Date.now(), startup:startup, investor:investor,
+        score:0, verdict:'Network Entry', reasons:[], concerns:[],
+        savedAt:now, stage:status, hot:false, tags:[],
+        _crm:{status:'not contacted', notes:notes, tags:[], warmIntro:'', followUp:''},
+        _netSourceId:netId, _netType:type
+      });
+      setPipeline(mainPipeline.slice(0,500));
+    }
   }
   saveNetPipeline(data);
   closeNetPipelineModal();
   renderNetList(sourceTab);
   renderNetPipelineSection();
+  renderKanban(); renderPipelineList(); refreshHome(); updateStats();
+  addAuditEntry('pipeline', isNew?'Added to pipeline (Network)':'Updated pipeline entry', name+(company?' / '+company:''));
 }
 function removeNetPipelineEntry(sourceTab, sourceId){
   if(!confirm('Remove from pipeline?')) return;
-  var data = getNetPipeline().filter(function(p){ return !(p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId)); });
+  var removed = getNetPipeline().filter(function(p){ return p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId); });
+  var data    = getNetPipeline().filter(function(p){ return !(p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId)); });
   saveNetPipeline(data);
+  // Also remove linked entries from main pipeline
+  if(removed.length){
+    var mainPl = getPipeline();
+    removed.forEach(function(r){ mainPl = mainPl.filter(function(i){ return i._netSourceId !== r.id; }); });
+    setPipeline(mainPl);
+  }
   closeNetPipelineModal();
   renderNetList(sourceTab);
   renderNetPipelineSection();
+  renderKanban(); renderPipelineList(); refreshHome(); updateStats();
 }
 function renderNetPipelineSection(){
   var el = document.getElementById('net-pipeline-list');
@@ -4021,6 +4058,12 @@ function netPrimaryKey(tab, row){
 
 // ── RENDER TABLE ───────────────────────────────────────────────
 
+function netEmailContact(email, name){
+  if(!email){ alert('No email on file for this contact.'); return; }
+  var subject = encodeURIComponent('Log7 Capital – ' + name);
+  window.open('mailto:' + email + '?subject=' + subject, '_blank');
+}
+
 function renderNetList(tab){
   var el = document.getElementById('net-list-'+tab);
   if(!el) return;
@@ -4116,11 +4159,19 @@ function renderNetList(tab){
     var resetBtn = (tab==='investors'&&row._fromSheet&&row._localOverride)
       ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="netResetToSheet(\''+row.id+'\')">Reset</button>'
       : '';
+    var rowPrimaryName = tab==='investors'?(row.investorName||row.name||''):tab==='startups'?(row.companyName||row.name||''):(row.partnerName||row.name||'');
+    var rowEmail = row[emailKey]||'';
+    var emailBtn = '<button class="action-btn secondary" '
+      + 'style="padding:3px 8px;font-size:11px;margin-right:4px'+(rowEmail?'':';opacity:0.45;cursor:default')+'" '
+      + 'onclick="netEmailContact(\''+escapeQ(rowEmail)+'\',\''+escapeQ(rowPrimaryName)+'\')" '
+      + 'title="'+(rowEmail?'Email '+escapeHtml(rowEmail):'No email on file')+'"'
+      + '>&#x2709;</button>';
     html += '<td style="padding:8px 10px;white-space:nowrap">'
       + resetBtn
       + (isInNetPipeline(tab, row.id)
           ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px;color:var(--green);border-color:var(--green)" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">&#x2713; In Pipeline</button>'
           : '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">+ Pipeline</button>')
+      + emailBtn
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+row.id+'\')">Edit</button>'
       + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')">Delete</button>'
       + '</td></tr>';
