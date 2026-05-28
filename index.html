@@ -6237,13 +6237,21 @@ function outSendEmail(){
   var withEmail=sel.filter(function(c){ return c.email; });
   sel.filter(function(c){ return !c.email; }).forEach(function(c){ alert(c.name+' has no email on file — skipped'); });
   if(!withEmail.length) return;
-  var first=withEmail[0];
-  var to=withEmail.map(function(c){ return c.email; }).join(',');
-  var subject=outFillTemplate(subjTpl, first, note);
-  var body=outFillTemplate(bodyTpl, first, note);
-  if(outState.attachments.length){ body+='\n\n[Attachments to add manually in your email client: '+outState.attachments.map(function(a){ return a.name; }).join(', ')+']'; }
-  window.location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  withEmail.forEach(function(c){ outLog(c.name,'email','sent'); });
+  if(outState.attachments.length){
+    var nb=document.getElementById('out-attach-list');
+    if(nb){ nb.insertAdjacentHTML('afterend','<p id="out-attach-notice" style="font-size:12px;color:var(--muted);margin:6px 0">Gmail will open without attachments pre-loaded. Please attach files manually in the Gmail compose window.</p>'); setTimeout(function(){ var n=document.getElementById('out-attach-notice'); if(n) n.remove(); },8000); }
+  }
+  if(withEmail.length>5 && !confirm('Opening '+withEmail.length+' Gmail compose tabs. Continue?')) return;
+  withEmail.forEach(function(c,i){
+    setTimeout(function(){
+      var url='https://mail.google.com/mail/?view=cm'
+        +'&to='+encodeURIComponent(c.email)
+        +'&su='+encodeURIComponent(outFillTemplate(subjTpl,c,note))
+        +'&body='+encodeURIComponent(outFillTemplate(bodyTpl,c,note));
+      window.open(url,'_blank');
+      outLog(c.name,'email','sent');
+    }, i*600);
+  });
 }
 function outCopyAllEmail(){
   var sel=outGetSelectedContacts(); if(!sel.length){ alert('Select at least one contact.'); return; }
