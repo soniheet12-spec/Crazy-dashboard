@@ -1,4 +1,4 @@
-const CACHE = 'log7-v4';
+const CACHE = 'log7-v5';
 const SHELL = [
   '/',
   '/index.html',

@@ -647,8 +647,14 @@ function initTokenClient(){
     client_id:GOOGLE_CLIENT_ID,
     scope:'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
     callback:function(resp){
-      if(resp.error){_toast('Sign-in failed: '+resp.error,'error');return;}
+      if(resp.error){ if(window._driveSilentPending){window._driveSilentPending=false;return;} _toast('Sign-in failed: '+resp.error,'error');return;}
+      window._driveSilentPending=false;
       sessionStorage.setItem(TOKEN_KEY,resp.access_token);
+      try{
+        var ttl=(parseInt(resp.expires_in,10)||3600)*1000;
+        localStorage.setItem('log7_gdrive_token', JSON.stringify({access_token:resp.access_token, expires_at:Date.now()+ttl}));
+      }catch(e){}
+      if(typeof _refreshSettingsBackupStatus==='function'){try{_refreshSettingsBackupStatus();}catch(e){}}
       _toast('Google Drive connected ✓');
       renderPanel('backup-panel-container');
       startAuto();
@@ -680,6 +686,41 @@ function connectDrive(){
   }
   _tc.requestAccessToken({prompt:'consent'});
 }
+
+// ── Persistent Drive auth: restore from localStorage / silent refresh ──
+function driveStoredToken(){
+  try{ var t=JSON.parse(localStorage.getItem('log7_gdrive_token')||'null'); if(t&&t.access_token&&t.expires_at) return t; }catch(e){}
+  return null;
+}
+function driveTokenValid(){ var t=driveStoredToken(); return !!(t && t.expires_at > Date.now()+60000); }
+function driveSilentRefresh(){
+  initTokenClient();
+  if(!_tc){ setTimeout(driveSilentRefresh,800); return; }
+  window._driveSilentPending=true;
+  try{ _tc.requestAccessToken({prompt:''}); }catch(e){ window._driveSilentPending=false; }
+}
+function driveRestoreOnLoad(){
+  var t=driveStoredToken();
+  if(t && t.expires_at > Date.now()){
+    // Token still valid — rehydrate sessionStorage so all getToken() calls work
+    sessionStorage.setItem(TOKEN_KEY, t.access_token);
+    startAuto();
+  } else if(t){
+    // Expired but previously connected — attempt silent refresh
+    driveSilentRefresh();
+  }
+  if(typeof _refreshSettingsBackupStatus==='function'){ setTimeout(function(){try{_refreshSettingsBackupStatus();}catch(e){}},300); }
+}
+function driveDisconnect(){
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('log7_gdrive_token');
+  stopAuto();
+  if(typeof _refreshSettingsBackupStatus==='function'){try{_refreshSettingsBackupStatus();}catch(e){}}
+}
+window._driveRestoreOnLoad = driveRestoreOnLoad;
+window._driveSilentRefresh = driveSilentRefresh;
+window._driveTokenValid = driveTokenValid;
+window._driveDisconnect = driveDisconnect;
 
 // ── Toast ──────────────────────────────────────────────────────
 function _toast(msg,kind){
@@ -1399,6 +1440,11 @@ window.SettingsDB = (function(){
         <div class="settings-label">Fund Size (&#8377; Cr)</div>
         <input type="number" id="fund-size" placeholder="e.g. 100" oninput="saveCapitalSettings()">
       </div>
+      <div class="settings-section">
+        <div class="settings-label">&#128231; Reminder Email Address</div>
+        <input type="email" id="reminder-email" placeholder="heet@log7capital.com" oninput="saveReminderEmail()">
+        <div class="template-help">Daily 6pm follow-up summary is sent here (via Gmail compose).</div>
+      </div>
       <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
         <div class="settings-label">&#128190; Google Drive Backup &amp; Sheets Sync</div>
         <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
@@ -1967,6 +2013,19 @@ window.SettingsDB = (function(){
   </div>
 
   <!-- MODALS -->
+  <div id="followup-modal" class="hidden" style="position:fixed;inset:0;z-index:65;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:440px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:22px;max-height:90vh;overflow-y:auto">
+      <div class="card-header"><div class="card-title" id="followup-modal-title">Set Follow-up</div><button class="action-btn danger" onclick="closeFollowupModal()" style="padding:4px 10px">&#x2715;</button></div>
+      <div style="font-size:13px;font-weight:600;margin:6px 0 14px" id="followup-modal-contact">—</div>
+      <div class="field" style="margin-bottom:12px"><label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px">Follow-up Date</label><input type="date" id="followup-date" style="width:100%"></div>
+      <div class="field" style="margin-bottom:16px"><label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px">Note</label><textarea id="followup-note" style="width:100%;min-height:70px" placeholder="What is this follow-up about?"></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="action-btn secondary" onclick="clearFollowup()" style="margin-right:auto">Clear Follow-up</button>
+        <button class="action-btn secondary" onclick="closeFollowupModal()">Cancel</button>
+        <button class="action-btn primary" onclick="saveFollowupModal()">Save</button>
+      </div>
+    </div>
+  </div>
   <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
   <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
@@ -2277,6 +2336,8 @@ window.onload = async () => {
   if(key) setKeyStatus('Saved');
   netStartPolling();
   if(window.Log7Backup) Log7Backup.init();
+  // Restore persisted Google Drive token (silent reconnect) before checking auth
+  if(window._driveRestoreOnLoad) window._driveRestoreOnLoad();
   // If already authenticated from a previous session, migrate then fetch
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
     SheetsDB.migrateFromLocalStorage().then(function(){
@@ -2327,12 +2388,19 @@ function _refreshSettingsBackupStatus(){
   var nowBtn=document.getElementById('settings-backup-now-btn');
   if(!statusEl) return;
   var connected=!!sessionStorage.getItem('log7_gapi_token');
+  var hadToken=false; try{ hadToken=!!JSON.parse(localStorage.getItem('log7_gdrive_token')||'null'); }catch(e){}
+  var valid = window._driveTokenValid ? window._driveTokenValid() : connected;
   var s={};try{s=JSON.parse(localStorage.getItem('log7_backup_settings')||'{}');}catch(e){}
-  if(connected){
+  if(connected || valid){
     statusEl.style.color='var(--green)';
-    statusEl.textContent='&#10003; Connected'+(s.lastBackupAt?' · Last: '+_fmtAgoShort(s.lastBackupAt):'');
-    if(connectBtn){connectBtn.textContent='Disconnect';connectBtn.onclick=function(){sessionStorage.removeItem('log7_gapi_token');_refreshSettingsBackupStatus();};}
+    statusEl.textContent='✓ Google Drive connected'+(s.lastBackupAt?' · Last: '+_fmtAgoShort(s.lastBackupAt):'');
+    if(connectBtn){connectBtn.textContent='Disconnect';connectBtn.onclick=function(){ if(window._driveDisconnect)window._driveDisconnect(); else sessionStorage.removeItem('log7_gapi_token'); _refreshSettingsBackupStatus();};}
     if(nowBtn) nowBtn.style.opacity='1';
+  } else if(hadToken){
+    statusEl.style.color='var(--amber)';
+    statusEl.textContent='⚠ Reconnection required';
+    if(connectBtn){connectBtn.textContent='Reconnect';connectBtn.onclick=window._settingsBackupConnect;}
+    if(nowBtn) nowBtn.style.opacity='.4';
   } else {
     statusEl.style.color='var(--muted)';
     statusEl.textContent='Not connected';
@@ -2599,8 +2667,10 @@ function netMarkDone(tab, id){
   var rows = netLoad(tab);
   var row = rows.find(function(r){ return r.id===id; });
   if(row){ row.followUpDate = ''; netSave(tab, rows); }
+  if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
   refreshNetFollowups();
   renderNetList(tab);
+  if(typeof refreshHome==='function') refreshHome();
   addAuditEntry('network','Follow-up marked done',netPrimaryKey(tab, row||{}));
 }
 
@@ -2613,8 +2683,10 @@ function netSnooze(tab, id){
     row.followUpDate = d.toISOString().slice(0,10);
     netSave(tab, rows);
   }
+  if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
   refreshNetFollowups();
   renderNetList(tab);
+  if(typeof refreshHome==='function') refreshHome();
   addAuditEntry('network','Follow-up snoozed 1 day',netPrimaryKey(tab, row||{}));
 }
 
@@ -3200,7 +3272,7 @@ function renderKanban(){
     return'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+colItems.length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+colItems.map(item=>{
       const crm=getInvestorCRM(item.startup,item.investor);
       var tagChipsK=(item.tags||[]).map(function(t){return'<span style="display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:1px 6px;font-size:8.5px;margin:1px">'+escapeHtml(t)+'</span>';}).join('');
-      return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor||item.startup||'\u2014')+'</a></div><div class="kanban-card-meta">'+(item.startup&&item.investor?'<a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 ':'')+item.score+'</div>'+(tagChipsK?'<div style="margin-top:4px">'+tagChipsK+'</div>':'')+'<div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';
+      return'<div class="kanban-card" draggable="true" title="Double-click to open" ondblclick="openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor||item.startup||'\u2014')+'</a></div><div class="kanban-card-meta">'+(item.startup&&item.investor?'<a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 ':'')+item.score+'</div>'+(tagChipsK?'<div style="margin-top:4px">'+tagChipsK+'</div>':'')+'<div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';
     }).join('')+'</div>';
   }).join('')+'</div>';
   refreshTagFilter();
@@ -4152,8 +4224,8 @@ function renderNetList(tab){
     + '</tr></thead><tbody>';
 
   rows.forEach(function(row){
-    var isDue = row.followUpDate && row.followUpDate <= today;
-    html += '<tr style="border-bottom:1px solid var(--border)"'+(isDue?' class="net-row-due"':'')+' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    var isDue = row.followUpDate && normalizeDateStr(row.followUpDate) <= today;
+    html += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" title="Double-click to edit"'+(isDue?' class="net-row-due"':'')+' ondblclick="editNetEntry(\''+tab+'\',\''+row.id+'\')" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
     visibleFields.forEach(function(f){
       var val = row[f.key]||'—';
       var cell = '<td style="padding:8px 10px;white-space:nowrap">';
@@ -4181,9 +4253,10 @@ function renderNetList(tab){
       var notesTrunc = notesVal.slice(0,60)+(notesVal.length>60?'…':'');
       html += '<td style="padding:8px 10px;max-width:160px;color:var(--muted);font-size:11.5px" title="'+escapeHtml(notesVal)+'">'+escapeHtml(notesTrunc||'—')+'</td>';
     }
-    // Follow-up date cell
-    var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
-    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
+    // Follow-up date cell (normalized to YYYY-MM-DD on read)
+    var fuDate = row.followUpDate ? normalizeDateStr(row.followUpDate) : '';
+    var fuColor = !fuDate ? 'var(--muted)' : fuDate < today ? 'var(--red)' : fuDate === today ? 'var(--amber)' : 'var(--green)';
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(fuDate||'—')+(isDue?' ⚑':'')+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     if(tab==='investors'||tab==='startups'){
       var entType = tab==='investors' ? 'investor' : 'startup';
@@ -4229,6 +4302,7 @@ function renderNetList(tab){
           ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px;color:var(--green);border-color:var(--green)" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">&#x2713; In Pipeline</button>'
           : '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">+ Pipeline</button>')
       + emailBtn
+      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openFollowupModal(\''+tab+'\',\''+row.id+'\')">&#9873; Follow-up</button>'
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+row.id+'\')">Edit</button>'
       + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')">Delete</button>'
       + '</td></tr>';
@@ -4281,6 +4355,8 @@ function buildNetForm(tab, data){
       html += '</select>';
     } else if(f.type==='textarea'){
       html += '<textarea id="nf-'+f.key+'" style="width:100%;min-height:70px">'+escapeHtml(val)+'</textarea>';
+    } else if(f.type==='date'){
+      html += '<input type="date" id="nf-'+f.key+'" value="'+escapeHtml(normalizeDateStr(val))+'" style="width:100%">';
     } else {
       var extra = '';
       if(f.type==='email'){
@@ -4344,6 +4420,7 @@ function saveNetworkEntry(){
 
   closeNetworkModal();
   renderNetList(tab);
+  if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
   syncFollowupsToServer();
   refreshNetFollowups();
   addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
@@ -5069,7 +5146,7 @@ function renderBulkOutreachPanel() {
       var phone = (row[phoneKey] || '').replace(/\D/g, '');
       var name  = row.investorName || row.partnerName || row.companyName || row.name || '';
       var safe  = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      var isDue = row.followUpDate && row.followUpDate <= today;
+      var isDue = row.followUpDate && normalizeDateStr(row.followUpDate) <= today;
       var matchScore = scores[name];
       var matchData = matchScoreMap[name];
       var scoreTip = matchData ? (matchData.verdict||'')+(matchData.reasons&&matchData.reasons.length?'\nWhy: '+matchData.reasons.slice(0,2).join('; '):'')+(matchData.concerns&&matchData.concerns.length?'\nConcerns: '+matchData.concerns.slice(0,2).join('; '):'') : '';
@@ -5916,22 +5993,30 @@ var AUTH_PASSWORD = 'dealflow@11';
 var AUTH_DURATION = 8 * 60 * 60 * 1000; // 8 hours in ms
 
 function checkAuth(){
-  var unlocked = localStorage.getItem('auth_unlocked');
-  var unlockTime = parseInt(localStorage.getItem('auth_unlock_time')||'0', 10);
-  var expired = Date.now() - unlockTime > AUTH_DURATION;
-  if(unlocked === 'true' && !expired){
+  var unlockTime = parseInt(sessionStorage.getItem('log7_unlocked_at')||'0', 10);
+  var expired = !unlockTime || (Date.now() - unlockTime > AUTH_DURATION);
+  if(!expired){
     hideAuthOverlay();
+  } else {
+    // session never started or expired — clear flag (NOT app data) and show lock
+    sessionStorage.removeItem('log7_unlocked_at');
+    showAuthOverlay();
   }
-  // else: overlay stays visible (default)
+}
+
+function showAuthOverlay(){
+  var ov = document.getElementById('auth-overlay');
+  if(ov){ ov.style.display='flex'; ov.style.pointerEvents='auto'; }
 }
 
 function submitAuth(){
   var inp = document.getElementById('auth-input');
   var val = inp ? inp.value : '';
   if(val === AUTH_PASSWORD){
-    localStorage.setItem('auth_unlocked','true');
-    localStorage.setItem('auth_unlock_time', String(Date.now()));
+    sessionStorage.setItem('log7_unlocked_at', String(Date.now()));
     hideAuthOverlay();
+    if(inp) inp.value='';
+    if(typeof requestReminderPermission==='function') try{requestReminderPermission();}catch(e){}
   } else {
     var errEl = document.getElementById('auth-error');
     var card  = document.getElementById('auth-card');
@@ -5948,13 +6033,14 @@ function hideAuthOverlay(){
 }
 
 function lockApp(){
-  localStorage.removeItem('auth_unlocked');
-  localStorage.removeItem('auth_unlock_time');
+  sessionStorage.removeItem('log7_unlocked_at');
   location.reload();
 }
 
 // Check auth immediately on script load
 (function(){ checkAuth(); })();
+// Re-check every 60s: auto-lock after 8h of session
+setInterval(checkAuth, 60000);
 
 // ── Stage migration (IC Review → Diligence) ────────────────────────────────────
 function migrateIcReviewStage(){
@@ -6317,6 +6403,178 @@ function outInit(){
   outSwitchSub(outState.sub||'email');
   outPreview();
 }
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  FOLLOW-UPS · DATE NORMALIZE · 6PM REMINDER  (additive — no data keys renamed)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Date normalization → YYYY-MM-DD ──────────────────────────────
+function normalizeDateStr(v){
+  if(!v) return '';
+  var s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);            // already ISO
+  var dm=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);    // DD/MM/YYYY or D-M-YY
+  if(dm){
+    var d=dm[1].padStart(2,'0'), m=dm[2].padStart(2,'0'), y=dm[3];
+    if(y.length===2) y='20'+y;
+    return y+'-'+m+'-'+d;
+  }
+  var t=new Date(s);
+  if(!isNaN(t.getTime())){
+    return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  }
+  return s;
+}
+function todayStr(){
+  var n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+}
+function netTabContactType(tab){ return tab==='investors'?'Investor':tab==='startups'?'Startup':'Partner'; }
+function netRowEmail(tab,row){ return (tab==='startups'?row.founderEmail:row.contactEmail)||''; }
+
+// ── log7_followups store (mirror of contact followUpDate + notes) ──
+function getFollowupsStore(){ try{ var a=JSON.parse(localStorage.getItem('log7_followups')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function rebuildFollowupsStore(){
+  var prev=getFollowupsStore();
+  var prevByKey={}; prev.forEach(function(f){ prevByKey[f.contactType+'::'+f.contactId]=f; });
+  var out=[];
+  ['investors','startups','partnerships'].forEach(function(tab){
+    netLoad(tab).forEach(function(row){
+      var due=normalizeDateStr(row.followUpDate);
+      if(!due) return;
+      var type=netTabContactType(tab);
+      var existing=prevByKey[type+'::'+row.id];
+      out.push({
+        id: existing&&existing.id ? existing.id : 'fu_'+type+'_'+row.id,
+        contactId: String(row.id),
+        contactName: netPrimaryKey(tab,row),
+        contactType: type,
+        contactEmail: netRowEmail(tab,row),
+        dueDate: due,
+        note: existing&&existing.note!=null ? existing.note : (row.followUpNote||''),
+        status: existing&&existing.status ? existing.status : 'pending',
+        createdAt: existing&&existing.createdAt ? existing.createdAt : new Date().toISOString()
+      });
+    });
+  });
+  localStorage.setItem('log7_followups', JSON.stringify(out));
+  return out;
+}
+function getPendingDueFollowups(){
+  var t=todayStr();
+  return rebuildFollowupsStore().filter(function(f){ return f.status==='pending' && f.dueDate<=t; });
+}
+
+// ── "Set Follow-up" modal ────────────────────────────────────────
+var _fuTab=null, _fuId=null;
+function openFollowupModal(tab,id){
+  var rows=netLoad(tab); var row=rows.find(function(r){return String(r.id)===String(id);});
+  if(!row) return;
+  _fuTab=tab; _fuId=id;
+  var store=getFollowupsStore();
+  var existing=store.find(function(f){ return f.contactType===netTabContactType(tab) && String(f.contactId)===String(id); });
+  document.getElementById('followup-modal-contact').textContent=netPrimaryKey(tab,row)+' · '+netTabContactType(tab);
+  document.getElementById('followup-date').value=normalizeDateStr(row.followUpDate);
+  document.getElementById('followup-note').value=existing?existing.note:(row.followUpNote||'');
+  var m=document.getElementById('followup-modal'); m.classList.remove('hidden'); m.style.display='flex';
+}
+function closeFollowupModal(){ var m=document.getElementById('followup-modal'); m.classList.add('hidden'); m.style.display='none'; _fuTab=null; _fuId=null; }
+function saveFollowupModal(){
+  if(_fuTab===null) return;
+  var date=normalizeDateStr(document.getElementById('followup-date').value);
+  var note=document.getElementById('followup-note').value.trim();
+  var rows=netLoad(_fuTab); var row=rows.find(function(r){return String(r.id)===String(_fuId);});
+  if(row){ row.followUpDate=date; row.followUpNote=note; netSave(_fuTab,rows); }
+  rebuildFollowupsStore();
+  var tab=_fuTab;
+  closeFollowupModal();
+  renderNetList(tab);
+  if(typeof refreshNetFollowups==='function') refreshNetFollowups();
+  if(typeof refreshHome==='function') refreshHome();
+  if(typeof syncFollowupsToServer==='function') try{syncFollowupsToServer();}catch(e){}
+  addAuditEntry('network', date?'Follow-up set for '+date:'Follow-up cleared', netPrimaryKey(tab,row||{}));
+}
+function clearFollowup(){
+  document.getElementById('followup-date').value='';
+  document.getElementById('followup-note').value='';
+  saveFollowupModal();
+}
+
+// ── Reminder email (Settings) ────────────────────────────────────
+function getReminderEmail(){ return localStorage.getItem('log7_reminder_email') || 'heet@log7capital.com'; }
+function saveReminderEmail(){
+  var el=document.getElementById('reminder-email'); if(!el) return;
+  var v=el.value.trim();
+  localStorage.setItem('log7_reminder_email', v || 'heet@log7capital.com');
+  if(typeof _markSettingsSaved==='function') try{_markSettingsSaved('Reminder email');}catch(e){}
+}
+function loadReminderEmail(){ var el=document.getElementById('reminder-email'); if(el && !el.value) el.value=getReminderEmail(); }
+
+// ── 6PM daily reminder (Notification + Gmail summary) ────────────
+function requestReminderPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='default'){
+    showReminderBanner('Allow notifications to receive daily follow-up reminders.', null, function(){ Notification.requestPermission(); });
+  }
+}
+function buildReminderSummary(due){
+  var lines=due.map(function(f){ return '• '+f.contactName+' ('+f.contactType+') — Due: '+f.dueDate+(f.note?' — Note: '+f.note:''); });
+  return lines.join('\n');
+}
+function checkDailyReminder(){
+  var now=new Date();
+  if(now.getHours()!==18 || now.getMinutes()>5) return;          // 18:00–18:05 window
+  var today=todayStr();
+  var due=getPendingDueFollowups();
+  if(!due.length){ localStorage.setItem('log7_last_notif_date', today); localStorage.setItem('log7_last_email_date', today); return; }
+  // Browser notification (once/day)
+  if(localStorage.getItem('log7_last_notif_date')!==today){
+    if(('Notification' in window) && Notification.permission==='granted'){
+      try{
+        new Notification('Log7 Capital — Follow-up Reminder', {
+          body:'You have '+due.length+' follow-up(s) due today: '+due.slice(0,5).map(function(f){return f.contactName;}).join(', ')+(due.length>5?'…':'')
+        });
+      }catch(e){}
+    }
+    localStorage.setItem('log7_last_notif_date', today);
+  }
+  // Gmail summary tab (once/day)
+  if(localStorage.getItem('log7_last_email_date')!==today){
+    var to=getReminderEmail();
+    var subject='Log7 Follow-up Reminder — '+today;
+    var body='Daily Follow-up Summary — '+today+'\n\nPending follow-ups:\n'+buildReminderSummary(due)+'\n\nLog into Log7 Capital to take action.';
+    var url='https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(to)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    var w=window.open(url,'_blank');
+    if(!w){ showReminderBanner('Your daily follow-up summary is ready.', url, null); }
+    localStorage.setItem('log7_last_email_date', today);
+  }
+}
+function showReminderBanner(msg, url, onClick){
+  var b=document.getElementById('reminder-banner');
+  if(!b){
+    b=document.createElement('div'); b.id='reminder-banner';
+    b.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9998;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,0.3);display:flex;align-items:center;gap:12px;max-width:90vw';
+    document.body.appendChild(b);
+  }
+  b.innerHTML='<span>'+msg+'</span>';
+  if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.textContent='Click to open Gmail →'; a.style.cssText='color:#2c5fe8;font-weight:500;text-decoration:none;white-space:nowrap'; b.appendChild(a); }
+  if(onClick){ var btn=document.createElement('button'); btn.textContent='Allow'; btn.style.cssText='background:#2c5fe8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit'; btn.onclick=function(){onClick();b.remove();}; b.appendChild(btn); }
+  var x=document.createElement('span'); x.textContent='✕'; x.style.cssText='cursor:pointer;color:var(--muted);margin-left:4px'; x.onclick=function(){b.remove();}; b.appendChild(x);
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+(function(){
+  function boot(){
+    loadReminderEmail();
+    try{ rebuildFollowupsStore(); }catch(e){}
+    setTimeout(requestReminderPermission, 3000);
+    setInterval(checkDailyReminder, 60000);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
 </script>
 
 <script>
