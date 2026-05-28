@@ -1337,7 +1337,7 @@ window.SettingsDB = (function(){
     <button class="nav-tab" id="nav-tab-network" data-tab="network" onclick="showTab('network',this)"><span class="tab-icon">&#127760;</span><span class="tab-label">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></span></button>
     <div class="sb-section-label">Deal Flow</div>
     <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon">&#128200;</span><span class="tab-label">Pipeline</span></button>
-    <button class="nav-tab" data-tab="match" onclick="showTab('match',this)"><span class="tab-icon">&#10024;</span><span class="tab-label">Match Studio</span></button>
+    <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon">&#128228;</span><span class="tab-label">Outreach</span></button>
     <div class="sb-section-label">Research</div>
     <button class="nav-tab" data-tab="deck" onclick="showTab('deck',this)"><span class="tab-icon">&#128196;</span><span class="tab-label">Deck Insights</span></button>
     <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon">&#128269;</span><span class="tab-label">Diligence</span></button>
@@ -1478,7 +1478,7 @@ window.SettingsDB = (function(){
           <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
           <div style="display:grid;gap:6px">
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('network')">&#127760; Network</button>
-            <button class="action-btn primary" style="width:100%" onclick="goToTab('match')">&#9889; Match Studio</button>
+            <button class="action-btn primary" style="width:100%" onclick="goToTab('outreach')">&#128228; Outreach</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
@@ -1510,124 +1510,122 @@ window.SettingsDB = (function(){
     <span id="home-priority-list" style="display:none"></span>
   </div>
 
-    <!-- ═══ MATCH STUDIO ═══ -->
-  <div id="page-match" class="page">
+    <!-- ═══ OUTREACH ═══ -->
+  <div id="page-outreach" class="page">
+   <div id="section-outreach">
     <div class="section-bar">
-      <div class="section-title">Startup Match Studio</div>
-      <button class="ghost-btn" onclick="loadData()">Refresh Sheets</button>
-      <button class="ghost-btn" onclick="resetWorkflow()">Reset Workspace</button>
+      <div class="section-title">Outreach</div>
+      <button class="ghost-btn" onclick="outRefreshContacts()">&#8635; Refresh Contacts</button>
     </div>
-    <div class="stat-grid">
-      <div class="stat"><div class="stat-value" id="stat-startups">0</div><div class="stat-label">Startups</div></div>
-      <div class="stat"><div class="stat-value" id="stat-investors">0</div><div class="stat-label">Investors</div></div>
-      <div class="stat"><div class="stat-value" id="stat-matches">0</div><div class="stat-label">Ranked Matches</div></div>
-      <div class="stat"><div class="stat-value" id="stat-pipeline">0</div><div class="stat-label">Pipeline Rows</div></div>
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button class="action-btn primary" id="out-subtab-email" onclick="outSwitchSub('email')" style="padding:8px 20px">✉️ Email</button>
+      <button class="action-btn secondary" id="out-subtab-wa" onclick="outSwitchSub('whatsapp')" style="padding:8px 20px">📱 WhatsApp</button>
     </div>
     <div class="grid-main">
+      <!-- ── CONTACTS SELECTOR (shared) ── -->
       <div>
         <div class="card flush">
           <div class="card-header" style="padding:16px 16px 0">
-            <div class="card-title">Select Startup</div>
-            <span class="badge" id="st-count">0</span>
+            <div class="card-title">Contacts</div>
+            <span class="badge" id="out-selected-count">0 selected</span>
           </div>
-          <div id="startup-list-match"><div class="empty">Load data from Google Sheets to begin</div></div>
-        </div>
-        <div id="startup-detail" class="card hidden">
-          <div class="card-header">
-            <div class="card-title">Startup Snapshot</div>
+          <div style="padding:12px 16px">
+            <input id="out-contact-search" placeholder="Search name, company, type…" oninput="outRenderContacts()" style="width:100%;font-size:12.5px;padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--s2);color:var(--text);box-sizing:border-box">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+              <button class="action-btn secondary" style="padding:4px 9px;font-size:11px" onclick="outSelectAll('Investor')">Select All Investors</button>
+              <button class="action-btn secondary" style="padding:4px 9px;font-size:11px" onclick="outSelectAll('Startup')">Select All Startups</button>
+              <button class="action-btn secondary" style="padding:4px 9px;font-size:11px" onclick="outSelectAll('Partner')">Select All Partners</button>
+              <button class="action-btn secondary" style="padding:4px 9px;font-size:11px" onclick="outClearSelection()">Clear</button>
+            </div>
           </div>
-          <div id="startup-detail-content"></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Pitch Deck Input</div></div>
-          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()"
-            ondragover="event.preventDefault();this.classList.add('over')"
-            ondragleave="this.classList.remove('over')"
-            ondrop="handleDrop(event)">
-            <p>Drag &amp; drop pitch deck — all slides, charts &amp; images captured</p>
-            <div id="pdf-name" class="file-ok"></div>
-            <div id="pdf-slide-preview" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;justify-content:center"></div>
-            <div id="drive-link-wrap" class="template-help"></div>
-          </div>
-          <input id="pdf-input" type="file" accept=".pdf" class="hidden" onchange="handlePdfSelect(event)">
-          <div class="subtle" style="margin-top:10px">Uploaded deck text improves match reasons, readiness scoring, and objection prediction.</div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Match Investors</div></div>
-          <div class="template-help" style="margin-bottom:10px">Reads all investors from your Network tab and scores each one against the selected startup using AI.</div>
-          <button class="action-btn primary" id="match-btn" onclick="runMatch()" disabled style="width:100%">Run Match</button>
-        </div>
-        <div class="card template-card">
-          <div class="card-header"><div class="card-title">Outreach Templates</div></div>
-          <div class="field">
-            <label>Email Subject</label>
-            <input id="email-subject-template" oninput="saveTemplates()" value="Log7 Capital intro: {{startup_company}} ({{startup_sector}})">
-          </div>
-          <div class="field">
-            <label>Email Template</label>
-            <textarea id="email-template" oninput="saveTemplates()"></textarea>
-          </div>
-          <div class="field">
-            <label>WhatsApp Template</label>
-            <textarea id="whatsapp-template" oninput="saveTemplates()"></textarea>
-          </div>
-          <div class="template-help">Placeholders: {{investor_name}}, {{startup_company}}, {{startup_founder}}, {{startup_sector}}, {{startup_stage}}, {{startup_round}}, {{startup_round_size}}, {{startup_location}}, {{match_score}}, {{match_verdict}}, {{match_reasons}}, {{match_concerns}}, {{pitch_deck_link}}, {{warm_intro}}, {{likely_objections}}</div>
+          <div id="out-contact-list" style="max-height:520px;overflow-y:auto"></div>
         </div>
       </div>
+
+      <!-- ── COMPOSER ── -->
       <div>
+        <!-- EMAIL SUB-SECTION -->
+        <div id="out-panel-email">
+          <div class="card template-card">
+            <div class="card-header"><div class="card-title">Email Template</div></div>
+            <div class="field">
+              <label>Subject</label>
+              <input id="out-email-subject" oninput="outPreview()" placeholder="Email subject">
+            </div>
+            <div class="field">
+              <label>Body</label>
+              <textarea id="out-email-body" rows="9" oninput="outPreview()" placeholder="Email body" style="resize:vertical"></textarea>
+            </div>
+            <div class="field">
+              <label>Custom Note <span style="color:var(--muted);font-weight:400">(fills {{custom_note}})</span></label>
+              <input id="out-custom-note" oninput="outPreview()" placeholder="Optional personal note added to every message">
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Insert placeholder at cursor:</div>
+            <div id="out-email-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px"></div>
+            <div class="inline-actions">
+              <button class="action-btn secondary" onclick="outSaveEmailTemplate()">Save Template</button>
+              <button class="action-btn secondary" onclick="outResetEmailTemplate()">Reset to Default</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">📎 Attachments</div></div>
+            <input id="out-attach-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp" class="hidden" onchange="outAttachFiles(event)">
+            <button class="action-btn secondary" onclick="document.getElementById('out-attach-input').click()" style="width:100%;margin-bottom:8px">📎 Attach Files</button>
+            <div id="out-attach-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <div class="template-help" style="margin-top:8px">Attachments will be added to your default email client. Large files may not send via all clients.</div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Live Preview</div><span class="badge" id="out-email-preview-name">—</span></div>
+            <div style="font-size:12.5px"><strong>Subject:</strong> <span id="out-email-preview-subject"></span></div>
+            <div id="out-email-preview-body" style="font-size:12.5px;white-space:pre-wrap;line-height:1.6;margin-top:8px;color:var(--text)"></div>
+          </div>
+          <div class="card">
+            <div class="inline-actions">
+              <button class="action-btn primary" onclick="outSendEmail()">✉️ Send to Selected</button>
+              <button class="action-btn secondary" onclick="outCopyAllEmail()">📋 Copy All</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WHATSAPP SUB-SECTION -->
+        <div id="out-panel-whatsapp" style="display:none">
+          <div class="card template-card">
+            <div class="card-header"><div class="card-title">WhatsApp Template</div></div>
+            <div class="field">
+              <label>Message</label>
+              <textarea id="out-wa-body" rows="9" oninput="outPreview()" placeholder="WhatsApp message" style="resize:vertical"></textarea>
+            </div>
+            <div class="field">
+              <label>Custom Note <span style="color:var(--muted);font-weight:400">(fills {{custom_note}})</span></label>
+              <input id="out-wa-custom-note" oninput="outPreview()" placeholder="Optional personal note added to every message">
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Insert placeholder at cursor:</div>
+            <div id="out-wa-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px"></div>
+            <div class="inline-actions">
+              <button class="action-btn secondary" onclick="outSaveWaTemplate()">Save Template</button>
+              <button class="action-btn secondary" onclick="outResetWaTemplate()">Reset to Default</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Live Preview</div><span class="badge" id="out-wa-preview-name">—</span></div>
+            <div id="out-wa-preview-body" style="font-size:12.5px;white-space:pre-wrap;line-height:1.6;color:var(--text)"></div>
+          </div>
+          <div class="card">
+            <div class="inline-actions">
+              <button class="action-btn primary" onclick="outSendWhatsApp()">📱 Send to Selected</button>
+              <button class="action-btn secondary" onclick="outCopyAllWhatsApp()">📋 Copy All Messages</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- OUTREACH LOG -->
         <div class="card">
-          <div class="card-header"><div class="card-title">Bulk Actions</div></div>
-          <div class="inline-actions">
-            <button class="action-btn primary" onclick="bulkEmail(5)">Email Top 5</button>
-            <button class="action-btn secondary" onclick="bulkWhatsapp(3)">WhatsApp Top 3</button>
-            <button class="action-btn secondary" onclick="copyAllIntros()">Copy All Intros</button>
-            <button class="action-btn secondary" onclick="runScoreSimulator()">Score Simulator</button>
-            <button class="action-btn secondary" onclick="runObjectionSimulator()">Objection Q&A</button>
-            <button class="action-btn secondary" onclick="exportPipelineCsv()">Export Pipeline CSV</button>
-          </div>
-        </div>
-        <div id="match-results" style="display:none"></div>
-
-        <!-- ═══ WHATSAPP OUTREACH PANEL ═══ -->
-        <div id="whatsapp-outreach-panel" style="margin-top:20px;padding:16px;border:1px solid #444;border-radius:8px;">
-          <h3 style="margin:0 0 12px">📲 WhatsApp Outreach</h3>
-
-          <!-- Template editor (collapsed by default) -->
-          <div style="margin-bottom:14px">
-            <button onclick="waToggleTemplateEditor()" style="padding:5px 12px;font-size:12px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:5px;cursor:pointer">✏️ Edit Message Template</button>
-          </div>
-          <div id="wa-template-editor" style="display:none;margin-bottom:16px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:14px">
-            <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Message Template</div>
-            <textarea id="wa-template-input" rows="7" style="width:100%;box-sizing:border-box;background:var(--surface,var(--s1));border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;font-family:inherit;resize:vertical"></textarea>
-            <div style="font-size:11px;color:var(--muted);margin:8px 0 10px;line-height:1.7">
-              <strong>Placeholders:</strong>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{investor_name}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{startup_name}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{founder_name}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{sector}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{stage}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{round_size}}</code>
-              <code style="background:var(--s1);padding:1px 4px;border-radius:3px">{{pitch_deck_link}}</code>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button onclick="waTemplateSave()" style="padding:5px 14px;font-size:12px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer">Save</button>
-              <button onclick="waTemplateReset()" style="padding:5px 14px;font-size:12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer">Reset to Default</button>
-            </div>
-            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px">Live Preview</div>
-            <div id="wa-template-preview" style="font-size:12px;background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:var(--text);line-height:1.6"></div>
-          </div>
-
-          <div id="outreach-body">Loading...</div>
-        </div>
-
-        <div class="mobile-sticky-actions">
-          <div class="action-row" style="margin-top:0">
-            <button class="action-btn primary" onclick="runMatch()">Run Match</button>
-            <button class="action-btn secondary" onclick="goToTab('pipeline')">Open Pipeline</button>
-          </div>
+          <div class="card-header"><div class="card-title">Outreach Log</div></div>
+          <div id="out-log-list"><div class="empty" style="padding:14px">No outreach yet.</div></div>
         </div>
       </div>
     </div>
+   </div>
   </div>
 
   <!-- ═══ PIPELINE (KANBAN) ═══ -->
@@ -2284,7 +2282,7 @@ function showTab(name,btn){
     refreshHome();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchAll(true).then(function(ok){if(ok)refreshHome();});
   }
-  if(name==='match'){ renderStartupMatchList(); renderBulkOutreachPanel(); }
+  if(name==='outreach'){ outInit(); }
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
 function toggleSettings(){
@@ -3334,8 +3332,8 @@ function bulkWhatsapp(count){const top=lastMatches.slice(0,count).filter(m=>find
 function copyAllIntros(){if(!lastMatches.length)return showError('Run a match first.');const text=lastMatches.map(m=>{const inv=findInvestorByName(m.name),s=buildEmailSubject(m,inv),b=fillTemplate(document.getElementById('email-template').value,buildMessageContext(m,inv));return m.name+'\nSubject: '+s+'\n'+b;}).join('\n\n===========\n\n');navigator.clipboard.writeText(text);addAuditEntry('outreach','All intros copied',selectedStartup?.company||'');}
 
 // ═══ TEMPLATES ═══
-function loadTemplates(){document.getElementById('email-subject-template').value=SettingsDB.get('l7_email_subject_template')||DEFAULT_EMAIL_SUBJECT;document.getElementById('email-template').value=SettingsDB.get('l7_email_template')||DEFAULT_EMAIL_TEMPLATE;document.getElementById('whatsapp-template').value=SettingsDB.get('l7_whatsapp_template')||DEFAULT_WHATSAPP_TEMPLATE;}
-function saveTemplates(){var s=document.getElementById('email-subject-template').value,e=document.getElementById('email-template').value,w=document.getElementById('whatsapp-template').value;localStorage.setItem('l7_email_subject_template',s);localStorage.setItem('l7_email_template',e);localStorage.setItem('l7_whatsapp_template',w);SettingsDB.set('l7_email_subject_template',s);SettingsDB.set('l7_email_template',e);SettingsDB.set('l7_whatsapp_template',w);}
+function loadTemplates(){var st=document.getElementById('email-subject-template');if(st)st.value=SettingsDB.get('l7_email_subject_template')||DEFAULT_EMAIL_SUBJECT;var et=document.getElementById('email-template');if(et)et.value=SettingsDB.get('l7_email_template')||DEFAULT_EMAIL_TEMPLATE;var wt=document.getElementById('whatsapp-template');if(wt)wt.value=SettingsDB.get('l7_whatsapp_template')||DEFAULT_WHATSAPP_TEMPLATE;}
+function saveTemplates(){var se=document.getElementById('email-subject-template'),ee=document.getElementById('email-template'),we=document.getElementById('whatsapp-template');if(!se||!ee||!we)return;var s=se.value,e=ee.value,w=we.value;localStorage.setItem('l7_email_subject_template',s);localStorage.setItem('l7_email_template',e);localStorage.setItem('l7_whatsapp_template',w);SettingsDB.set('l7_email_subject_template',s);SettingsDB.set('l7_email_template',e);SettingsDB.set('l7_whatsapp_template',w);}
 
 // ═══ IC MEMO ═══
 function generateICMemo(){
@@ -5268,7 +5266,7 @@ document.addEventListener('keydown', function(e){
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   if(key==='?'||e.key==='/'){ e.preventDefault(); openShortcutsModal(); return; }
   if(key==='n'){ e.preventDefault(); openAddDealModal(); return; }
-  var map={h:'home',p:'pipeline',d:'diligence',s:'match',m:'mandate'};
+  var map={h:'home',p:'pipeline',d:'diligence',o:'outreach',m:'mandate'};
   if(map[key]){e.preventDefault();goToTab(map[key]);}
 });
 </script>
@@ -5754,7 +5752,7 @@ function mandSelectStartup(idx){
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">H</kbd></td><td style="padding:8px 10px">Go to Home</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">N</kbd></td><td style="padding:8px 10px">New Deal</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">P</kbd></td><td style="padding:8px 10px">Go to Pipeline</td></tr>
-        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">S</kbd></td><td style="padding:8px 10px">Go to Match Studio</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">O</kbd></td><td style="padding:8px 10px">Go to Outreach</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">M</kbd></td><td style="padding:8px 10px">Go to Mandate</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">D</kbd></td><td style="padding:8px 10px">Go to Diligence</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Ctrl+K</kbd></td><td style="padding:8px 10px">Focus global search</td></tr>
@@ -6048,6 +6046,215 @@ function printPipelineReport(){
   if(!win){showToast('Allow pop-ups to print report.');return;}
   win.document.write(html); win.document.close();
   win.onload=function(){win.print();};
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// OUTREACH TAB — Email + WhatsApp bulk outreach to Network contacts
+// localStorage keys: log7_outreach_email_template, log7_outreach_wa_template,
+//                    log7_outreach_log  (reads contacts from NET_KEYS via netLoad)
+// ═══════════════════════════════════════════════════════════════════
+var OUT_DEFAULT_EMAIL_SUBJECT = "Introduction — Log7 Capital & {{company}}";
+var OUT_DEFAULT_EMAIL_BODY = "Hi {{name}},\n\nI'm reaching out from Log7 Capital. We work with early-stage companies across sectors and felt there could be a strong fit with {{company}}.\n\nWould love to connect and share more.\n\nBest,\nLog7 Capital Team";
+var OUT_DEFAULT_WA = "Hi {{name}}, this is Log7 Capital. We've been following {{company}}'s journey and would love to explore a potential connection. Would you be open to a quick call?";
+var OUT_EMAIL_PLACEHOLDERS = ['name','company','sector','stage','round_size','founder_name','investor_name','custom_note'];
+var OUT_WA_PLACEHOLDERS = ['name','company','sector','stage','round_size','founder_name','custom_note'];
+var outState = { sub:'email', selected:{}, attachments:[], contacts:[], _inited:false };
+var outEmailLastFocus = 'out-email-body';
+
+function outMapContact(tab, row){
+  if(tab==='investors') return {
+    type:'Investor', name:row.investorName||row.name||'', email:row.contactEmail||'', phone:row.contactPhone||'',
+    company:row.fundName||'', sector:row.sectorFocus||'', stage:row.stageFocus||'', round_size:'',
+    founder_name:'', investor_name:row.investorName||row.name||''
+  };
+  if(tab==='startups') return {
+    type:'Startup', name:row.companyName||row.name||'', email:row.founderEmail||'', phone:row.founderPhone||'',
+    company:row.companyName||row.name||'', sector:row.sector||'', stage:row.stage||'',
+    round_size:row.roundSize||row.roundSizeCr||row.fundraise||'', founder_name:row.founderName||'', investor_name:''
+  };
+  return {
+    type:'Partner', name:row.partnerName||row.name||'', email:row.contactEmail||'', phone:row.contactPhone||'',
+    company:row.partnerName||row.name||'', sector:'', stage:'', round_size:'', founder_name:'', investor_name:''
+  };
+}
+function outGetContacts(){
+  var list=[];
+  try{ netLoad('investors').forEach(function(r){ list.push(outMapContact('investors',r)); }); }catch(e){}
+  try{ netLoad('startups').forEach(function(r){ list.push(outMapContact('startups',r)); }); }catch(e){}
+  try{ netLoad('partnerships').forEach(function(r){ list.push(outMapContact('partnerships',r)); }); }catch(e){}
+  return list.filter(function(c){ return c.name; }).map(function(c,i){ c.uid=c.type+'::'+c.name+'::'+i; return c; });
+}
+function outUpdateCount(){ var el=document.getElementById('out-selected-count'); if(el) el.textContent=Object.keys(outState.selected).length+' selected'; }
+function outRenderContacts(){
+  var el=document.getElementById('out-contact-list'); if(!el) return;
+  var all=outGetContacts(); outState.contacts=all;
+  if(!all.length){ el.innerHTML='<div class="empty" style="padding:18px">No contacts. Add them in the Network tab.</div>'; outUpdateCount(); return; }
+  var sb=document.getElementById('out-contact-search'); var q=((sb&&sb.value)||'').toLowerCase().trim();
+  var shown=all.filter(function(c){ return !q || (c.name+' '+c.company+' '+c.type).toLowerCase().indexOf(q)>-1; });
+  if(!shown.length){ el.innerHTML='<div class="empty" style="padding:18px">No contacts match "'+escapeHtml(q)+'".</div>'; outUpdateCount(); return; }
+  el.innerHTML=shown.map(function(c){
+    var checked=outState.selected[c.uid]?'checked':'';
+    var meta=escapeHtml(c.company||'—')+' · '+(c.email?escapeHtml(c.email):'no email');
+    return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 16px;border-bottom:1px solid var(--border);cursor:pointer">'
+      +'<input type="checkbox" '+checked+' onchange="outToggleContact(\''+escapeQ(c.uid)+'\')" style="margin-top:3px">'
+      +'<span style="flex:1;min-width:0"><span style="font-size:12.5px;font-weight:600">'+escapeHtml(c.name)+'</span> '
+      +'<span class="badge" style="font-size:9px">'+c.type+'</span>'
+      +'<br><span style="font-size:11px;color:var(--muted)">'+meta+'</span></span></label>';
+  }).join('');
+  outUpdateCount();
+}
+function outToggleContact(uid){ if(outState.selected[uid]) delete outState.selected[uid]; else outState.selected[uid]=true; outUpdateCount(); outPreview(); }
+function outSelectAll(type){ outState.contacts=outGetContacts(); outState.contacts.forEach(function(c){ if(c.type===type) outState.selected[c.uid]=true; }); outRenderContacts(); outPreview(); }
+function outClearSelection(){ outState.selected={}; outRenderContacts(); outPreview(); }
+function outRefreshContacts(){ outState.contacts=outGetContacts(); outRenderContacts(); outPreview(); outToast('Contacts reloaded'); }
+function outGetSelectedContacts(){ var all=(outState.contacts&&outState.contacts.length)?outState.contacts:outGetContacts(); return all.filter(function(c){ return outState.selected[c.uid]; }); }
+
+function outFillTemplate(tpl, c, note){
+  var ctx={ name:c.name||'', company:c.company||'', sector:c.sector||'', stage:c.stage||'', round_size:c.round_size||'', founder_name:c.founder_name||'', investor_name:c.investor_name||'', custom_note:note||'' };
+  return String(tpl||'').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, function(_,k){ return ctx[k]!=null?ctx[k]:''; });
+}
+function outInsertPlaceholder(id, ph){
+  var el=document.getElementById(id); if(!el) return;
+  var token='{{'+ph+'}}';
+  var start=el.selectionStart!=null?el.selectionStart:el.value.length;
+  var end=el.selectionEnd!=null?el.selectionEnd:el.value.length;
+  el.value=el.value.slice(0,start)+token+el.value.slice(end);
+  el.focus(); var pos=start+token.length; try{ el.setSelectionRange(pos,pos); }catch(e){}
+  outPreview();
+}
+function outRenderChips(){
+  var e=document.getElementById('out-email-chips');
+  if(e) e.innerHTML=OUT_EMAIL_PLACEHOLDERS.map(function(p){ return '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px" onclick="outInsertPlaceholder(outEmailLastFocus,\''+p+'\')">{{'+p+'}}</button>'; }).join('');
+  var w=document.getElementById('out-wa-chips');
+  if(w) w.innerHTML=OUT_WA_PLACEHOLDERS.map(function(p){ return '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px" onclick="outInsertPlaceholder(\'out-wa-body\',\''+p+'\')">{{'+p+'}}</button>'; }).join('');
+}
+function outAttachListeners(){ ['out-email-subject','out-email-body'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('focus', function(){ outEmailLastFocus=id; }); }); }
+
+function outGetEmailTemplate(){
+  try{ var t=JSON.parse(localStorage.getItem('log7_outreach_email_template')||'null'); if(t&&typeof t==='object') return { subject:t.subject||OUT_DEFAULT_EMAIL_SUBJECT, body:t.body||OUT_DEFAULT_EMAIL_BODY }; }catch(e){}
+  return { subject:OUT_DEFAULT_EMAIL_SUBJECT, body:OUT_DEFAULT_EMAIL_BODY };
+}
+function outSaveEmailTemplate(){ var s=document.getElementById('out-email-subject'),b=document.getElementById('out-email-body'); if(!s||!b) return; localStorage.setItem('log7_outreach_email_template', JSON.stringify({subject:s.value, body:b.value})); outToast('Email template saved'); }
+function outResetEmailTemplate(){ var s=document.getElementById('out-email-subject'),b=document.getElementById('out-email-body'); if(s)s.value=OUT_DEFAULT_EMAIL_SUBJECT; if(b)b.value=OUT_DEFAULT_EMAIL_BODY; outSaveEmailTemplate(); outPreview(); }
+function outGetWaTemplate(){ return localStorage.getItem('log7_outreach_wa_template')||OUT_DEFAULT_WA; }
+function outSaveWaTemplate(){ var b=document.getElementById('out-wa-body'); if(!b) return; localStorage.setItem('log7_outreach_wa_template', b.value); outToast('WhatsApp template saved'); }
+function outResetWaTemplate(){ var b=document.getElementById('out-wa-body'); if(b)b.value=OUT_DEFAULT_WA; outSaveWaTemplate(); outPreview(); }
+
+function outPreview(){
+  var sel=outGetSelectedContacts();
+  var c=sel[0]||(outState.contacts&&outState.contacts[0])||null;
+  if(outState.sub==='email'){
+    var note=(document.getElementById('out-custom-note')||{}).value||'';
+    var subj=(document.getElementById('out-email-subject')||{}).value||'';
+    var body=(document.getElementById('out-email-body')||{}).value||'';
+    var nm=document.getElementById('out-email-preview-name'); if(nm) nm.textContent=c?c.name:'—';
+    var ps=document.getElementById('out-email-preview-subject'); if(ps) ps.textContent=outFillTemplate(subj,c||{},note);
+    var pb=document.getElementById('out-email-preview-body'); if(pb) pb.textContent=outFillTemplate(body,c||{},note);
+  } else {
+    var note2=(document.getElementById('out-wa-custom-note')||{}).value||'';
+    var msg=(document.getElementById('out-wa-body')||{}).value||'';
+    var wn=document.getElementById('out-wa-preview-name'); if(wn) wn.textContent=c?c.name:'—';
+    var wb2=document.getElementById('out-wa-preview-body'); if(wb2) wb2.textContent=outFillTemplate(msg,c||{},note2);
+  }
+}
+function outSwitchSub(sub){
+  outState.sub=sub;
+  var pe=document.getElementById('out-panel-email'); if(pe) pe.style.display=sub==='email'?'':'none';
+  var pw=document.getElementById('out-panel-whatsapp'); if(pw) pw.style.display=sub==='whatsapp'?'':'none';
+  var be=document.getElementById('out-subtab-email'); if(be){ be.className='action-btn '+(sub==='email'?'primary':'secondary'); be.style.padding='8px 20px'; }
+  var bw=document.getElementById('out-subtab-wa'); if(bw){ bw.className='action-btn '+(sub==='whatsapp'?'primary':'secondary'); bw.style.padding='8px 20px'; }
+  outPreview();
+}
+
+function outAttachFiles(e){ var files=Array.prototype.slice.call(e.target.files||[]); files.forEach(function(f){ outState.attachments.push({name:f.name, size:f.size}); }); e.target.value=''; outRenderAttachments(); }
+function outRemoveAttachment(i){ outState.attachments.splice(i,1); outRenderAttachments(); }
+function outRenderAttachments(){
+  var el=document.getElementById('out-attach-list'); if(!el) return;
+  if(!outState.attachments.length){ el.innerHTML='<span style="font-size:11px;color:var(--muted)">No files attached.</span>'; return; }
+  el.innerHTML=outState.attachments.map(function(a,i){ return '<span class="badge" style="display:inline-flex;align-items:center;gap:6px">📎 '+escapeHtml(a.name)+' <span style="cursor:pointer;color:var(--red)" onclick="outRemoveAttachment('+i+')">✕</span></span>'; }).join('');
+}
+
+function outSendEmail(){
+  var sel=outGetSelectedContacts(); if(!sel.length){ alert('Select at least one contact.'); return; }
+  var note=(document.getElementById('out-custom-note')||{}).value||'';
+  var subjTpl=(document.getElementById('out-email-subject')||{}).value||'';
+  var bodyTpl=(document.getElementById('out-email-body')||{}).value||'';
+  var withEmail=sel.filter(function(c){ return c.email; });
+  sel.filter(function(c){ return !c.email; }).forEach(function(c){ alert(c.name+' has no email on file — skipped'); });
+  if(!withEmail.length) return;
+  var first=withEmail[0];
+  var to=withEmail.map(function(c){ return c.email; }).join(',');
+  var subject=outFillTemplate(subjTpl, first, note);
+  var body=outFillTemplate(bodyTpl, first, note);
+  if(outState.attachments.length){ body+='\n\n[Attachments to add manually in your email client: '+outState.attachments.map(function(a){ return a.name; }).join(', ')+']'; }
+  window.location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  withEmail.forEach(function(c){ outLog(c.name,'email','sent'); });
+}
+function outCopyAllEmail(){
+  var sel=outGetSelectedContacts(); if(!sel.length){ alert('Select at least one contact.'); return; }
+  var note=(document.getElementById('out-custom-note')||{}).value||'';
+  var subjTpl=(document.getElementById('out-email-subject')||{}).value||'';
+  var bodyTpl=(document.getElementById('out-email-body')||{}).value||'';
+  var text=sel.map(function(c){ return 'To: '+(c.email||'(no email)')+'\nSubject: '+outFillTemplate(subjTpl,c,note)+'\n\n'+outFillTemplate(bodyTpl,c,note); }).join('\n\n----\n\n');
+  outClipboard(text); sel.forEach(function(c){ outLog(c.name,'email','copied'); });
+}
+function outNormalizePhone(p){ return String(p||'').replace(/[^\d]/g,''); }
+function outSendWhatsApp(){
+  var sel=outGetSelectedContacts(); if(!sel.length){ alert('Select at least one contact.'); return; }
+  var note=(document.getElementById('out-wa-custom-note')||{}).value||'';
+  var msgTpl=(document.getElementById('out-wa-body')||{}).value||'';
+  var withPhone=sel.filter(function(c){ return c.phone; });
+  sel.filter(function(c){ return !c.phone; }).forEach(function(c){ alert(c.name+' has no phone on file — skipped'); });
+  if(!withPhone.length) return;
+  if(withPhone.length>5 && !confirm('You are about to open '+withPhone.length+' WhatsApp tabs. Continue?')) return;
+  withPhone.forEach(function(c,i){ setTimeout(function(){ window.open('https://wa.me/'+outNormalizePhone(c.phone)+'?text='+encodeURIComponent(outFillTemplate(msgTpl,c,note)),'_blank'); outLog(c.name,'whatsapp','sent'); }, i*500); });
+}
+function outCopyAllWhatsApp(){
+  var sel=outGetSelectedContacts(); if(!sel.length){ alert('Select at least one contact.'); return; }
+  var note=(document.getElementById('out-wa-custom-note')||{}).value||'';
+  var msgTpl=(document.getElementById('out-wa-body')||{}).value||'';
+  var text=sel.map(function(c){ return c.name+(c.phone?' ('+c.phone+')':' (no phone)')+'\n'+outFillTemplate(msgTpl,c,note); }).join('\n\n----\n\n');
+  outClipboard(text); sel.forEach(function(c){ outLog(c.name,'whatsapp','copied'); });
+}
+
+function outLog(name, channel, status){
+  var log=[]; try{ log=JSON.parse(localStorage.getItem('log7_outreach_log')||'[]'); }catch(e){}
+  if(!Array.isArray(log)) log=[];
+  var user=(typeof getCurrentUser==='function')?getCurrentUser():{role:'analyst'};
+  log.unshift({ ts:new Date().toISOString(), recipient:name, channel:channel, template:(channel==='email'?'Email Template':'WhatsApp Template'), status:status, role:user.role });
+  localStorage.setItem('log7_outreach_log', JSON.stringify(log.slice(0,500)));
+  try{ addAuditEntry('outreach', (channel==='email'?'Email':'WhatsApp')+' '+status+(name?' — '+name:''), ''); }catch(e){}
+  outRenderLog();
+}
+function outFmtTime(ts){ try{ var d=new Date(ts); return d.toLocaleDateString('en-IN',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(ts||''); } }
+function outRenderLog(){
+  var el=document.getElementById('out-log-list'); if(!el) return;
+  var log=[]; try{ log=JSON.parse(localStorage.getItem('log7_outreach_log')||'[]'); }catch(e){}
+  if(!Array.isArray(log)||!log.length){ el.innerHTML='<div class="empty" style="padding:14px">No outreach yet.</div>'; return; }
+  var rows=log.slice(0,20).map(function(e){ return '<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 10px;white-space:nowrap;color:var(--muted)">'+outFmtTime(e.ts)+'</td><td style="padding:7px 10px">'+escapeHtml(e.recipient||'')+'</td><td style="padding:7px 10px">'+(e.channel==='email'?'✉️ Email':'📱 WhatsApp')+'</td><td style="padding:7px 10px">'+escapeHtml(e.status||'')+'</td></tr>'; }).join('');
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--border)"><th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:600">Time</th><th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:600">Recipient</th><th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:600">Channel</th><th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:600">Status</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function outClipboard(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ outToast('Copied to clipboard'); }).catch(function(){ outToast('Copy failed'); }); return; }
+  var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); outToast('Copied to clipboard'); }catch(e){} document.body.removeChild(ta);
+}
+function outToast(m){ if(typeof showToast==='function'){ try{ showToast(m); return; }catch(e){} } }
+
+function outInit(){
+  if(!outState._inited){
+    var em=outGetEmailTemplate();
+    var es=document.getElementById('out-email-subject'); if(es) es.value=em.subject;
+    var eb=document.getElementById('out-email-body'); if(eb) eb.value=em.body;
+    var wb=document.getElementById('out-wa-body'); if(wb) wb.value=outGetWaTemplate();
+    outRenderChips(); outAttachListeners();
+    outState._inited=true;
+  }
+  outState.contacts=outGetContacts();
+  outRenderContacts(); outRenderAttachments(); outRenderLog();
+  outSwitchSub(outState.sub||'email');
+  outPreview();
 }
 </script>
 
