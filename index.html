@@ -349,6 +349,20 @@
     .print-only { display:block; }
   }
 @keyframes netLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.4)}}
+/* Lock screen */
+#lock-screen{position:fixed;inset:0;z-index:99999;background:radial-gradient(ellipse at 30% 0%,rgba(59,111,212,0.18),transparent 55%),var(--bg,#080c12);display:flex;align-items:center;justify-content:center;padding:20px;}
+.lock-card{background:var(--s1,#0e1420);border:1px solid var(--border2,rgba(255,255,255,0.13));border-radius:14px;padding:32px 28px;width:100%;max-width:380px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.6);}
+.lock-logo{font-family:'Poppins',sans-serif;font-size:1.2rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text,#e8edf5);margin-bottom:6px;}
+.lock-sub{color:var(--muted,#6b7a96);font-size:12px;margin-bottom:24px;}
+.lock-error{color:var(--red,#f06565);font-size:12px;margin-bottom:10px;display:none;}
+/* Overdue banner */
+#overdue-banner{display:none;position:sticky;top:0;z-index:19;background:rgba(240,101,101,0.12);border-bottom:1px solid rgba(240,101,101,0.28);padding:10px 16px;font-size:13px;align-items:center;gap:10px;}
+/* Mandate page */
+.mandate-log-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:flex-start;}
+.fee-error{color:var(--red,#f06565);font-size:11px;margin-top:4px;display:none;}
+/* CSV mapping table */
+#csv-map-table th,#csv-map-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:12px;}
+#csv-map-table th{color:var(--muted);font-weight:600;font-size:11px;}
 </style>
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1035,7 +1049,26 @@ window.SheetsDB = (function(){
 </script>
 </head>
 <body>
-<nav>
+<!-- ═══ LOCK SCREEN ═══ -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-logo">Log7 Capital</div>
+    <div class="lock-sub">Enter your password to continue</div>
+    <div class="lock-error" id="lock-error">Incorrect password. Please try again.</div>
+    <div class="field" style="margin-bottom:14px;text-align:left">
+      <input type="password" id="lock-password" placeholder="Password" style="width:100%" onkeydown="if(event.key==='Enter')tryUnlock()">
+    </div>
+    <button class="action-btn primary" style="width:100%;padding:10px" onclick="tryUnlock()">Unlock</button>
+  </div>
+</div>
+<!-- ═══ OVERDUE BANNER ═══ -->
+<div id="overdue-banner">
+  <span>⚠️</span>
+  <span id="overdue-banner-text"></span>
+  <button onclick="goToTab('network');document.getElementById('overdue-banner').style.display='none'" style="background:var(--red);color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'Poppins',sans-serif">View →</button>
+  <button onclick="document.getElementById('overdue-banner').style.display='none'" style="margin-left:auto;background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>
+</div>
+<nav id="main-nav" style="display:none">
   <div class="logo">Log7 Capital</div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showTab('home',this)">Home</button>
@@ -1049,6 +1082,7 @@ window.SheetsDB = (function(){
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
     <button class="nav-tab" onclick="showTab('backup',this)">&#128190; Backup</button>
+    <button class="nav-tab" onclick="showTab('mandate',this)">&#128221; Mandate</button>
   </div>
   <div class="nav-right">
     <div id="global-search-wrap" style="position:relative;margin-right:10px">
@@ -1092,7 +1126,18 @@ window.SheetsDB = (function(){
         <div class="settings-section">
           <div class="settings-label">Anthropic API Key</div>
           <input type="password" id="api-key" placeholder="Paste your Anthropic API key here" oninput="saveKey()">
+          <div class="template-help" style="color:var(--amber)">&#9888; Stored for this session only. Re-enter after closing the tab.</div>
           <div class="template-help"><span id="key-status"></span></div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Partner PIN</div>
+          <input type="password" id="partner-pin-input" placeholder="Set 4-digit Partner PIN" maxlength="4" oninput="savePartnerPin()">
+          <div class="template-help">Required to switch to Partner role.</div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Dashboard Password</div>
+          <input type="password" id="dashboard-password-input" placeholder="Set login password" oninput="saveDashboardPassword()">
+          <div class="template-help">Password required on every page load.</div>
         </div>
         <div class="settings-section">
           <div class="settings-label">Matching Mode</div>
@@ -1131,7 +1176,7 @@ window.SheetsDB = (function(){
   </div>
 </nav>
 
-<div class="container">
+<div class="container" id="main-app" style="display:none">
   <div id="error-box" class="error-box hidden"></div>
   <div id="loading-box" class="loading-box hidden"></div>
 
@@ -1311,7 +1356,7 @@ window.SheetsDB = (function(){
             <div id="wa-template-preview" style="font-size:12px;background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:var(--text);line-height:1.6"></div>
           </div>
 
-          <div id="outreach-body">Loading...</div>
+          <div id="outreach-body"><div class="empty" style="padding:18px">Select a startup and investor to preview outreach message.</div></div>
         </div>
 
         <div class="mobile-sticky-actions">
@@ -1327,6 +1372,7 @@ window.SheetsDB = (function(){
   <!-- ═══ PIPELINE (KANBAN) ═══ -->
   <div id="page-pipeline" class="page">
     <div class="section-bar">
+      <button class="ghost-btn" onclick="goToTab('home')" style="font-size:12px">&#8592; Home</button>
       <div class="section-title">Deal Pipeline</div>
       <button class="ghost-btn" onclick="openAddDealModal()">+ Add Deal</button>
       <button class="ghost-btn" onclick="exportPipelineCsv()">Export CSV</button>
@@ -1562,6 +1608,7 @@ window.SheetsDB = (function(){
       <div class="section-title">Network</div>
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
       <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
+      <button class="ghost-btn" onclick="openImportCsvModal()">&#8679; Import CSV</button>
     </div>
     <div class="subtabs" style="margin-bottom:18px">
       <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
@@ -1624,9 +1671,195 @@ window.SheetsDB = (function(){
     </div>
   </div>
 
+  <!-- ═══ MANDATE ═══ -->
+  <div id="page-mandate" class="page">
+    <div class="section-bar">
+      <div class="section-title">Mandate Agreement</div>
+      <button class="ghost-btn" onclick="generateMandatePdf()">&#128196; Generate PDF</button>
+    </div>
+    <div class="module-banner">
+      <strong>Mandate management.</strong>
+      Create, track, and send mandate agreements to startup founders.
+    </div>
+    <div class="grid-two">
+      <div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Mandate Details</div><span class="badge" id="mandate-id-display"></span></div>
+          <div class="field-row">
+            <div class="field">
+              <label>Company Name *</label>
+              <input id="mandate-company" placeholder="Startup company name" oninput="updateMandateId()">
+            </div>
+            <div class="field">
+              <label>Founder Name</label>
+              <input id="mandate-founder" placeholder="Founder full name">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Founder Email</label>
+              <input type="email" id="mandate-email" placeholder="founder@company.com">
+            </div>
+            <div class="field">
+              <label>Founder Phone</label>
+              <input type="tel" id="mandate-phone" placeholder="+91 XXXXXXXXXX">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Success Fee % *</label>
+              <input type="number" id="mandate-fee" min="0" max="100" step="0.1" placeholder="e.g. 2.5" oninput="validateFee(this)">
+              <div class="fee-error" id="fee-error">Success fee must be between 0% and 100%.</div>
+            </div>
+            <div class="field">
+              <label>Mandate Date</label>
+              <input type="date" id="mandate-date">
+            </div>
+          </div>
+          <div class="field">
+            <label>Engagement Terms</label>
+            <textarea id="mandate-terms" placeholder="Describe scope of engagement, exclusivity, duration..." style="min-height:80px"></textarea>
+          </div>
+          <div class="action-row" style="margin-top:14px">
+            <button class="action-btn primary" onclick="saveMandateEntry()">Save Mandate</button>
+            <a id="mandate-whatsapp-btn" class="action-btn secondary" href="#" onclick="sendMandateWhatsApp(event)" style="text-decoration:none;display:inline-flex;align-items:center">&#128241; Send via WhatsApp</a>
+            <a id="mandate-email-btn" class="action-btn secondary" href="#" onclick="sendMandateEmail(event)" style="text-decoration:none;display:inline-flex;align-items:center">&#128231; Send via Email</a>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Mandate Log</div><span class="badge" id="mandate-log-count">0</span></div>
+          <div id="mandate-log-list"><div class="empty">No mandates saved yet.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CSV IMPORT MODAL ═══ -->
+  <div id="csv-import-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:700px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header" style="margin-bottom:16px">
+        <div class="card-title">Import CSV</div>
+        <button class="action-btn danger" onclick="closeImportCsvModal()" style="padding:4px 10px">&#x2715;</button>
+      </div>
+      <div class="field">
+        <label>Record Type</label>
+        <select id="csv-import-type">
+          <option value="startups">Startups</option>
+          <option value="investors">Investors</option>
+          <option value="partnerships">Partnerships</option>
+        </select>
+      </div>
+      <div class="drop-zone" onclick="document.getElementById('csv-file-input').click()" style="margin-bottom:14px">
+        <p>Click to select a CSV file</p>
+        <div id="csv-file-name" class="file-ok"></div>
+      </div>
+      <input id="csv-file-input" type="file" accept=".csv,.tsv" class="hidden" onchange="handleCsvUpload(event)">
+      <div id="csv-mapping-area" style="display:none">
+        <div class="card-title" style="margin-bottom:10px">Map CSV columns to fields</div>
+        <div style="overflow-x:auto">
+          <table id="csv-map-table" class="table" style="min-width:400px">
+            <thead><tr><th>CSV Column</th><th>Maps to field</th><th>Sample value</th></tr></thead>
+            <tbody id="csv-map-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="action-btn primary" style="flex:1" onclick="confirmCsvImport()">Import</button>
+          <button class="action-btn secondary" onclick="closeImportCsvModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end container -->
 
 <script>
+// ═══════════════════════════════════════════════════════════════
+// FIX 1 & 2: PASSWORD GATE + SESSION EXPIRY
+// ═══════════════════════════════════════════════════════════════
+var SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+var DEFAULT_PASSWORD = 'log7capital';
+var _appUnlocked = false;
+
+function getStoredPassword(){
+  return localStorage.getItem('log7_dashboard_password') || DEFAULT_PASSWORD;
+}
+
+function saveDashboardPassword(){
+  var val = document.getElementById('dashboard-password-input');
+  if(val && val.value.trim()) {
+    localStorage.setItem('log7_dashboard_password', val.value.trim());
+    showToast('Dashboard password updated');
+  }
+}
+
+function tryUnlock(){
+  var pw = (document.getElementById('lock-password') || {}).value || '';
+  var errEl = document.getElementById('lock-error');
+  if(pw === getStoredPassword()){
+    sessionStorage.setItem('log7_session_ts', String(Date.now()));
+    revealApp();
+  } else {
+    if(errEl){ errEl.style.display='block'; }
+    var inp = document.getElementById('lock-password');
+    if(inp){ inp.value=''; inp.focus(); }
+  }
+}
+
+function isSessionValid(){
+  var ts = sessionStorage.getItem('log7_session_ts');
+  if(!ts) return false;
+  return (Date.now() - parseInt(ts, 10)) < SESSION_DURATION_MS;
+}
+
+function revealApp(){
+  _appUnlocked = true;
+  var lockEl = document.getElementById('lock-screen');
+  if(lockEl) lockEl.style.display = 'none';
+  var navEl = document.getElementById('main-nav');
+  if(navEl) navEl.style.display = '';
+  var appEl = document.getElementById('main-app');
+  if(appEl) appEl.style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  // nav is already hidden via inline style; no action needed
+
+  if(isSessionValid()){
+    revealApp();
+  } else {
+    // Show lock screen (already visible by default)
+    var inp = document.getElementById('lock-password');
+    if(inp) setTimeout(function(){ inp.focus(); }, 100);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FIX 3: API KEY — sessionStorage instead of localStorage
+// ═══════════════════════════════════════════════════════════════
+// Shim: wrap access so the rest of the code calls these helpers
+function getApiKey(){ return sessionStorage.getItem('l7_key') || ''; }
+function setApiKey(k){ sessionStorage.setItem('l7_key', k); }
+
+// ═══════════════════════════════════════════════════════════════
+// FIX 4: PARTNER PIN GATE
+// ═══════════════════════════════════════════════════════════════
+function savePartnerPin(){
+  var el = document.getElementById('partner-pin-input');
+  if(!el) return;
+  var val = el.value.trim();
+  if(val && /^\d{4}$/.test(val)){
+    localStorage.setItem('log7_partner_pin', val);
+    showToast('Partner PIN updated');
+  }
+}
+
+function getPartnerPin(){
+  return localStorage.getItem('log7_partner_pin') || '1234';
+}
+
+// ═══════════════════════════════════════════════════════════════
 const NET_KEYS = {
   partnerships: 'l7_net_partnerships',
   investors:    'l7_net_investors',
@@ -1770,7 +2003,7 @@ let dragStartup='',dragInvestor='';
 
 // ═══ INIT ═══
 window.onload = async () => {
-  const key=localStorage.getItem('l7_key')||'';
+  const key=getApiKey();
   document.getElementById('api-key').value=key;
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
@@ -1779,7 +2012,14 @@ window.onload = async () => {
   refreshDiligence();renderKanban();renderPipelineList();
   renderAuditLog();renderICVotes();
   refreshCapitalDisplay();
-  if(key) setKeyStatus('Saved');
+  if(key) setKeyStatus('Saved (session only)');
+  // Init mandate date
+  var mandateDateEl=document.getElementById('mandate-date');
+  if(mandateDateEl && !mandateDateEl.value) mandateDateEl.value=new Date().toISOString().slice(0,10);
+  renderMandateLog();
+  updateMandateId();
+  // Check overdue follow-ups on unlock
+  setTimeout(refreshHome, 500);
   netStartPolling();
   if(window.Log7Backup) Log7Backup.init();
   // If already authenticated from a previous session, migrate then fetch
@@ -1818,6 +2058,7 @@ function showTab(name,btn){
   }
   if(name==='match') renderBulkOutreachPanel();
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
+  if(name==='mandate'){ renderMandateLog(); updateMandateId(); }
 }
 function toggleSettings(){
   document.getElementById('settings-wrap').classList.toggle('open');
@@ -1887,12 +2128,37 @@ function applyTheme(name){
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
 function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
-function loadPreferences(){applyTheme(localStorage.getItem('l7_theme')||'midnight');document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';var ts=localStorage.getItem('l7_settings_last_saved');var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();}
+function loadPreferences(){
+  applyTheme(localStorage.getItem('l7_theme')||'midnight');
+  document.getElementById('matching-mode').value=localStorage.getItem('l7_matching_mode')||'auto';
+  var ts=localStorage.getItem('l7_settings_last_saved');
+  var el=document.getElementById('settings-last-saved');
+  if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+  // Pre-populate PIN & password fields
+  var pinEl=document.getElementById('partner-pin-input');
+  if(pinEl && localStorage.getItem('log7_partner_pin')) pinEl.placeholder='PIN set (enter to change)';
+  var pwEl=document.getElementById('dashboard-password-input');
+  if(pwEl && localStorage.getItem('log7_dashboard_password')) pwEl.placeholder='Password set (enter to change)';
+}
 function savePreferences(){localStorage.setItem('l7_matching_mode',document.getElementById('matching-mode').value);}
 
 // ═══ USER PROFILE ═══
 function loadUserProfile(){const p=JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');document.getElementById('user-name').value=p.name||'';document.getElementById('user-role').value=p.role||'analyst';}
-function saveUserProfile(){localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:document.getElementById('user-role').value}));_markSettingsSaved('Profile');}
+function saveUserProfile(){
+  var roleEl=document.getElementById('user-role');
+  var newRole=roleEl.value;
+  var prev=getCurrentUser().role;
+  if(newRole==='partner' && prev!=='partner'){
+    var pin=prompt('Enter 4-digit Partner PIN to switch roles:');
+    if(pin!==getPartnerPin()){
+      alert('Incorrect PIN. Role not changed.');
+      roleEl.value=prev;
+      return;
+    }
+  }
+  localStorage.setItem('l7_user',JSON.stringify({name:document.getElementById('user-name').value.trim()||'Team',role:newRole}));
+  _markSettingsSaved('Profile');
+}
 function getCurrentUser(){return JSON.parse(localStorage.getItem('l7_user')||'{"name":"Team","role":"analyst"}');}
 
 // ═══ CAPITAL SETTINGS ═══
@@ -1931,7 +2197,15 @@ function renderAuditLog(){
   if(!log.length){el.innerHTML='<div class="empty">No activity recorded yet.</div>';return;}
   el.innerHTML=log.map(e=>'<div class="audit-row"><div class="audit-dot"></div><div class="audit-ts">'+formatDate(e.ts)+'</div><div class="audit-who">'+escapeHtml(e.user)+' <span class="role-badge '+e.role+'">'+e.role+'</span></div><div class="audit-action"><strong>'+escapeHtml(e.action)+'</strong>'+(e.entity?' \u2014 '+escapeHtml(e.entity):'')+'</div></div>').join('');
 }
-function clearAuditLog(){if(!confirm('Clear entire audit log?'))return;localStorage.removeItem('l7_audit');renderAuditLog();}
+function clearAuditLog(){
+  var user=getCurrentUser();
+  if(user.role!=='partner'){alert('Only Partners can clear the audit log.');return;}
+  var conf=prompt('Type CLEAR to confirm clearing the entire audit log:');
+  if(conf!=='CLEAR')return;
+  localStorage.removeItem('l7_audit');
+  renderAuditLog();
+  showToast('Audit log cleared');
+}
 function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>({timestamp:e.ts,user:e.user,role:e.role,type:e.type,action:e.action,entity:e.entity})));}
 
 // ═══ HOME ═══
@@ -1955,7 +2229,18 @@ function refreshHome(){
   const contactedCount=contactedInv.length+contactedSt.length+contactedPa.length||pipeline.filter(i=>getInvestorCRM(i.startup,i.investor).status!=='not contacted').length;
   [['home-followups',due.length],['home-hot-deals',hot.length],['home-stat-startups',startupCount],['home-stat-investors',netInvestors.length],['home-stat-pipeline',pipeline.length],['home-stat-contacted',contactedCount]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v;});
   const notifEl=document.getElementById('home-notifications');
-  if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'pipeline\',document.querySelectorAll(\'.nav-tab\')[2])">Review Pipeline</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
+  if(notifEl){let n='';if(due.length)n+='<div class="notif-banner urgent"><div class="notif-icon">\u26a0\ufe0f</div><div>'+due.length+' follow-up'+(due.length>1?'s':'')+' overdue \u2014 <button class="action-btn secondary" style="padding:3px 10px;font-size:10px" onclick="showTab(\'network\',document.querySelectorAll(\'.nav-tab\')[1])">View \u2192</button></div></div>';if(hot.length)n+='<div class="notif-banner"><div class="notif-icon">\ud83d\udd25</div><div>'+hot.length+' hot deal'+(hot.length>1?'s':'')+' with active status.</div></div>';notifEl.innerHTML=n;}
+  // Fix 20: sticky overdue banner at top of page
+  var overdueBanner=document.getElementById('overdue-banner');
+  var overdueText=document.getElementById('overdue-banner-text');
+  if(overdueBanner&&overdueText){
+    if(due.length>0){
+      overdueText.textContent='\u26a0\ufe0f You have '+due.length+' overdue follow-up'+(due.length>1?'s':'')+'.';
+      overdueBanner.style.display='flex';
+    }else{
+      overdueBanner.style.display='none';
+    }
+  }
   const prEl=document.getElementById('home-priority-list');
   if(prEl){const rows=pipeline.slice(0,6);if(!rows.length){prEl.innerHTML='<div class="empty">Save matches to pipeline to see priorities.</div>';}else prEl.innerHTML=rows.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="pipeline-row"><div class="avatar">'+initials(item.investor)+'</div><div class="row-main"><div class="row-title">'+escapeHtml(item.investor)+' <span class="badge">'+escapeHtml(item.startup)+'</span></div><div class="row-meta">'+crm.status+' | Score: '+item.score+(crm.followUp?' | Due: '+crm.followUp:'')+'</div></div></div>';}).join('');}
   refreshCapitalDisplay();renderHomeActivity();refreshNetFollowups();
@@ -2115,7 +2400,7 @@ function netSnooze(tab, id){
 // ═══ NEWS MONITOR ═══
 async function fetchNewsMonitor(){
   const el=document.getElementById('home-news-feed');if(!el)return;
-  const apiKey=localStorage.getItem('l7_key');
+  const apiKey=getApiKey();
   if(!apiKey){el.innerHTML='<div class="notif-banner news"><div class="notif-icon">\ud83d\udcf0</div><div>Set an API key in Settings to fetch sector news signals.</div></div>';return;}
   const sectors=uniqueList(startups.map(s=>s.sector).filter(Boolean)).slice(0,4);
   if(!sectors.length){el.innerHTML='<div class="notif-banner news"><div class="notif-icon">\ud83d\udcf0</div><div>Load startup data first to enable news monitoring.</div></div>';return;}
@@ -2132,7 +2417,7 @@ async function fetchNewsMonitor(){
 // ═══ DATA LOADING ═══
 function saveKey(){const k=document.getElementById('api-key').value.trim();
   if(k && !/^sk-[A-Za-z0-9_\-]{10,}/.test(k)){showToast('Invalid API key format','error');setKeyStatus('Invalid');return;}
-  localStorage.setItem('l7_key',k);setKeyStatus(k?'Saved':'');if(k)_markSettingsSaved('API key');}
+  setApiKey(k);setKeyStatus(k?'Saved (session only)':'');if(k)_markSettingsSaved('API key');}
 function setKeyStatus(text){const el=document.getElementById('key-status');if(el)el.textContent=text?'API key '+text:'';}
 function buildFreshUrl(url){const u=new URL(url);u.searchParams.set('_ts',Date.now());return u.toString();}
 async function fetchSheetJson(url){const res=await fetch(buildFreshUrl(url),{method:'GET',cache:'no-store'});if(!res.ok)throw new Error('Request failed ('+res.status+')');return res.json();}
@@ -2191,8 +2476,40 @@ function renderStartups(){
 }
 function renderStartupMatchList(){
   const el=document.getElementById('startup-list-match');if(!el)return;
-  if(!startups.length){el.innerHTML='<div class="empty">Load data from Google Sheets to begin.</div>';return;}
-  el.innerHTML=startups.map((s,i)=>'<div class="startup-option" onclick="selectStartup('+i+')"><div class="row-title">'+escapeHtml(s.company)+'</div><div class="row-meta">'+escapeHtml(s.founder||'n/a')+' | '+escapeHtml(s.sector||'n/a')+' | '+escapeHtml(s.stage||'n/a')+'</div></div>').join('');
+  // Merge sheet-loaded startups with locally-added Network tab startups
+  var netSts=netLoad('startups');
+  var localMapped=netSts.map(function(s){
+    return{company:s.companyName||s.name||'',founder:s.founderName||'',phone:s.founderPhone||'',email:s.founderEmail||'',sector:s.sector||'',stage:s.stage||'',status:s.status||'',notes:s.notes||'',_fromNetwork:true};
+  }).filter(function(s){return s.company;});
+  var combined=startups.slice();
+  // Add local-only entries (not already in sheet list by name)
+  var sheetNames=new Set(startups.map(function(s){return(s.company||'').toLowerCase();}));
+  localMapped.forEach(function(s){if(!sheetNames.has(s.company.toLowerCase()))combined.push(s);});
+  if(!combined.length){el.innerHTML='<div class="empty">No startups found. Add startups in the Network tab or load from Google Sheets.</div>';return;}
+  el.innerHTML=combined.map(function(s,i){return'<div class="startup-option" onclick="selectStartupFromList('+i+',combined_startups)"><div class="row-title">'+escapeHtml(s.company)+(s._fromNetwork?'<span class="badge" style="margin-left:6px;font-size:9px">Local</span>':'')+'</div><div class="row-meta">'+escapeHtml(s.founder||'n/a')+' | '+escapeHtml(s.sector||'n/a')+' | '+escapeHtml(s.stage||'n/a')+'</div></div>';}).join('');
+  // Store merged list for selection
+  window._matchStudiStartups=combined;
+  // Fix onclick to use correct index from merged list
+  el.querySelectorAll('.startup-option').forEach(function(opt,i){opt.onclick=function(){selectStartupFromList(i);};});
+}
+function selectStartupFromList(i){
+  var combined=window._matchStudiStartups||startups;
+  var s=combined[i];if(!s)return;
+  // If it's a sheet startup, use the original index; if local, treat specially
+  var sheetIdx=startups.findIndex(function(x){return x.company===s.company;});
+  if(sheetIdx>=0){selectStartup(sheetIdx);}else{
+    // Select local startup
+    selectedStartup=s;pdfText='';uploadedPdfName='';deckInsightsCache=null;
+    localStorage.removeItem('l7_match_scores');window._lastMatchScores={};
+    var mr=document.getElementById('match-results');if(mr)mr.style.display='none';
+    document.querySelectorAll('.startup-option').forEach(function(e,j){e.classList.toggle('selected',j===i);});
+    var mb=document.getElementById('match-btn');if(mb)mb.disabled=false;
+    var sd=document.getElementById('startup-detail');if(sd)sd.classList.remove('hidden');
+    var sdc=document.getElementById('startup-detail-content');
+    if(sdc)sdc.innerHTML='<div style="font-size:15px;font-weight:600;margin-bottom:4px">'+escapeHtml(s.company)+'</div><div class="row-meta">'+escapeHtml(s.founder||'n/a')+' | '+escapeHtml(s.sector||'n/a')+'</div>';
+    refreshDiligence();
+    addAuditEntry('match','Startup selected (local)',s.company);
+  }
 }
 function clearStartupSelection(){
   selectedStartup=null;deckInsightsCache=null;
@@ -2238,8 +2555,12 @@ async function runMatch(){
   var netInvs=netLoad('investors');
   if(!netInvs.length){showError('No investors in Network tab — add investors first.');return;}
   showError('');
+  var apiKey=getApiKey();
+  var matchMode=localStorage.getItem('l7_matching_mode')||'auto';
+  if(matchMode==='ai'&&!apiKey){
+    return showError('AI-only mode requires an Anthropic API key. Add it in Settings or switch to No-API fallback mode.');
+  }
   var btn=document.getElementById('match-btn');btn.disabled=true;btn.textContent='Matching '+netInvs.length+'...';
-  var apiKey=localStorage.getItem('l7_key');
   if(!apiKey){btn.disabled=false;btn.textContent='Run Match';return showError('Add a Claude API key in Settings first.');}
   try{
     var startupJson=JSON.stringify(selectedStartup);
@@ -2349,7 +2670,7 @@ async function runObjectionSimulatorFor(investorName){
   modal.classList.remove('hidden');modal.style.display='flex';
   content.innerHTML='<div class="loading-box">Generating Q&A for '+escapeHtml(investorName)+'...</div>';
   const inv=findInvestorByName(investorName),match=lastMatches.find(m=>m.name===investorName)||{name:investorName,concerns:[],objections:[]};
-  const apiKey=localStorage.getItem('l7_key');
+  const apiKey=getApiKey();
   if(!apiKey){content.innerHTML=buildRulesObjections(match,inv);return;}
   try{
     const prompt='You are a VC preparation coach for Log7 Capital.\n\nInvestor: '+investorName+'\nThesis: '+(inv?.thesis||'General VC')+'\nStage: '+(inv?.stage||'n/a')+'\nSectors: '+(inv?.sectors||'n/a')+'\nHard nos: '+(inv?.hardNos||'none stated')+'\n\nStartup: '+buildStartupInfo()+'\n\nGenerate 5 tough questions this specific investor would ask in a first meeting, and a strong founder-ready answer for each. Format as JSON array: [{"question":"...","answer":"..."}]. Return only JSON.';
@@ -2430,7 +2751,11 @@ function renderPipelineList(){
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
   el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
-function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;setPipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
+function clearPipeline(){
+  var conf=prompt('Type DELETE to confirm clearing the entire pipeline. This cannot be undone.');
+  if(conf!=='DELETE'){if(conf!==null)alert('Confirmation text did not match. Pipeline not cleared.');return;}
+  setPipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');
+}
 
 // ═══ NETWORK ENTITY LOOKUPS & MODAL ═══
 function findNetEntity(type,name){
@@ -2599,7 +2924,15 @@ function refreshDiligence(){
       : '';
   }
   const el=document.getElementById('diligence-checklist'),sumEl=document.getElementById('diligence-summary'),badge=document.getElementById('diligence-progress-badge');if(!el)return;
-  if(!selectedStartup){el.innerHTML='<div class="empty">Select a startup to begin diligence tracking.</div>';if(sumEl)sumEl.innerHTML='<div class="empty">Select a startup first.</div>';return;}
+  if(!selectedStartup){
+    var netStsD=netLoad('startups');
+    var emptyMsg=netStsD.length
+      ? '<div class="empty">Select a startup in Match Studio to begin diligence tracking.</div>'
+      : '<div class="empty">No startups found. <a href="#" onclick="event.preventDefault();goToTab(\'network\');setTimeout(function(){switchNetTab(\'startups\',document.getElementById(\'net-tab-startups\'));},100)" style="color:var(--accent)">Add startups in the Network tab first.</a></div>';
+    el.innerHTML=emptyMsg;
+    if(sumEl)sumEl.innerHTML='<div class="empty">Select a startup first.</div>';
+    return;
+  }
   const state=getDiligenceState(),sections={};
   DILIGENCE_TEMPLATE.forEach(item=>{if(!sections[item.section])sections[item.section]=[];sections[item.section].push(item);});
   el.innerHTML=Object.entries(sections).map(([section,items])=>'<div style="margin-bottom:14px"><div class="card-title" style="margin-bottom:8px">'+section+'</div><div class="checklist">'+items.map(item=>'<label class="check-item '+(state[item.id]?'done':'')+'"><input type="checkbox" '+(state[item.id]?'checked':'')+' onchange="toggleDiligenceItem(\''+item.id+'\',this.checked)"><div><div class="check-label">'+item.label+'</div></div></label>').join('')+'</div></div>').join('');
@@ -2714,7 +3047,7 @@ async function runFullDeckAnalysis() {
   if (!pdfPageImages || !pdfPageImages.length) {
     return showError('Upload a pitch deck first in Match Studio.');
   }
-  var apiKey = localStorage.getItem('l7_key');
+  var apiKey = getApiKey();
   if (!apiKey) return showError('Add an API key in Settings.');
 
   var el = document.getElementById('deck-tab-content');
@@ -2828,7 +3161,7 @@ function setResearchCache(company, data) { localStorage.setItem(researchKey(comp
 
 async function runFounderResearch() {
   if (!selectedStartup) return showError('Select a startup first.');
-  var apiKey = localStorage.getItem('l7_key');
+  var apiKey = getApiKey();
   if (!apiKey) return showError('Add an API key in Settings.');
 
   var el = document.getElementById('founder-research-output');
@@ -3215,7 +3548,7 @@ async function handleExtraDocsUpload(event){
 function handleExtraDocsDrop(e){e.preventDefault();e.currentTarget.classList.remove('over');if(!selectedStartup){showError('Select a startup first.');return;}var dt=new DataTransfer();Array.from(e.dataTransfer.files||[]).forEach(function(f){dt.items.add(f);});var inp=document.getElementById('extra-docs-input');if(inp){inp.files=dt.files;handleExtraDocsUpload({target:inp});}}
 async function renderExtraDocs(){var el=document.getElementById('extra-docs-list');if(!el||!selectedStartup)return;var allDocs=await getAllDocuments();var docs=allDocs.filter(function(d){return d.entityType==='startup_extra'&&d.entityName===selectedStartup.company;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});if(!docs.length){el.innerHTML='<div class="empty" style="padding:14px">No documents uploaded yet.</div>';return;}el.innerHTML=docs.map(function(doc){return'<div style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--border)"><div style="width:34px;height:34px;border-radius:6px;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--accent);flex-shrink:0">'+getDocIcon(doc.mimeType)+'</div><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:500">'+escapeHtml(doc.fileName)+'</div><div style="font-size:10.5px;color:var(--muted);margin-top:2px">'+escapeHtml(doc.category)+' · '+doc.sizeKb+' KB · '+formatDate(doc.createdAt)+'</div>'+(doc.extractedText?'<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;background:var(--s3);padding:5px 7px;border-radius:4px">'+escapeHtml(doc.extractedText.slice(0,140))+'...</div>':'')+'<div style="display:flex;gap:6px;margin-top:6px"><button class="action-btn primary" style="padding:3px 9px;font-size:10px" onclick="downloadStoredDoc('+doc.id+')">Download</button>'+(doc.extractedText?'<button class="action-btn secondary" style="padding:3px 9px;font-size:10px" onclick="analyseExtraDoc('+doc.id+')">Analyse</button>':'')+'<button class="action-btn danger" style="padding:3px 9px;font-size:10px" onclick="deleteExtraDoc('+doc.id+')">Delete</button></div></div></div>';}).join('');}
 async function deleteExtraDoc(id){await deleteDocumentRecord(id);addAuditEntry('doc','Supporting document deleted',selectedStartup?selectedStartup.company:'');renderExtraDocs();}
-async function analyseExtraDoc(id){var apiKey=localStorage.getItem('l7_key');if(!apiKey){showError('Add an API key for AI document analysis.');return;}var docs=await getAllDocuments();var doc=docs.find(function(d){return d.id===id;});if(!doc||!doc.extractedText)return;var modal=document.getElementById('objection-modal'),content=document.getElementById('objection-content');if(modal){modal.classList.remove('hidden');modal.style.display='flex';}if(content)content.innerHTML='<div class="loading-box">Analysing '+escapeHtml(doc.fileName)+'...</div>';try{var lines=['You are a VC analyst at Log7 Capital. Analyse this data room document.','Document: '+doc.fileName+' ('+doc.category+')','Startup: '+(selectedStartup?selectedStartup.company:'Unknown'),'Text:',doc.extractedText,'','Provide: 1. What this reveals 2. Key metrics/figures 3. Positive signals 4. Risk flags 5. Follow-up questions. Be specific.'];var result=await callClaude(apiKey,lines.join('\n'),1200);if(content)content.innerHTML='<div class="row-meta" style="margin-bottom:14px">Analysis: '+escapeHtml(doc.fileName)+'</div><div style="font-size:13px;line-height:1.8;white-space:pre-wrap">'+escapeHtml(result)+'</div>';addAuditEntry('doc','AI analysis: '+doc.fileName,selectedStartup?selectedStartup.company:'');}catch(err){if(content)content.innerHTML='<div class="error-box">Analysis failed: '+escapeHtml(err.message)+'</div>';}}
+async function analyseExtraDoc(id){var apiKey=getApiKey();if(!apiKey){showError('Add an API key for AI document analysis.');return;}var docs=await getAllDocuments();var doc=docs.find(function(d){return d.id===id;});if(!doc||!doc.extractedText)return;var modal=document.getElementById('objection-modal'),content=document.getElementById('objection-content');if(modal){modal.classList.remove('hidden');modal.style.display='flex';}if(content)content.innerHTML='<div class="loading-box">Analysing '+escapeHtml(doc.fileName)+'...</div>';try{var lines=['You are a VC analyst at Log7 Capital. Analyse this data room document.','Document: '+doc.fileName+' ('+doc.category+')','Startup: '+(selectedStartup?selectedStartup.company:'Unknown'),'Text:',doc.extractedText,'','Provide: 1. What this reveals 2. Key metrics/figures 3. Positive signals 4. Risk flags 5. Follow-up questions. Be specific.'];var result=await callClaude(apiKey,lines.join('\n'),1200);if(content)content.innerHTML='<div class="row-meta" style="margin-bottom:14px">Analysis: '+escapeHtml(doc.fileName)+'</div><div style="font-size:13px;line-height:1.8;white-space:pre-wrap">'+escapeHtml(result)+'</div>';addAuditEntry('doc','AI analysis: '+doc.fileName,selectedStartup?selectedStartup.company:'');}catch(err){if(content)content.innerHTML='<div class="error-box">Analysis failed: '+escapeHtml(err.message)+'</div>';}}
 
 
 // ═══ NETWORK MODULE (see showTab for trigger) ═══
@@ -3471,6 +3804,15 @@ function saveNetworkEntry(){
       rows[idx] = entry;
     }
   } else {
+    // Fix 19: Duplicate detection (case-insensitive name check)
+    var newName = netPrimaryKey(tab, entry).toLowerCase();
+    var dup = rows.find(function(r){ return netPrimaryKey(tab,r).toLowerCase()===newName; });
+    if(dup){
+      var typeLabel = tab==='partnerships'?'partnership':tab==='investors'?'investor':'startup';
+      if(!confirm('A '+typeLabel+' named "'+netPrimaryKey(tab,entry)+'" already exists. Save anyway?')){
+        return;
+      }
+    }
     entry.id = netNextId(rows);
     entry.dateAdded = new Date().toISOString();
     rows.push(entry);
@@ -3548,6 +3890,13 @@ async function netFetchInvestors(){
   _netInvFetching = true;
   var syncEl = document.getElementById('net-inv-sync-time');
   if(syncEl) syncEl.innerHTML = 'Fetching…';
+
+  // Check if the sheet URL is reachable — inform user if Drive not connected for Sheets sync
+  var driveConnected = !!sessionStorage.getItem('log7_gapi_token');
+  if(!driveConnected && window.SheetsDB && !SheetsDB.isAuthenticated()){
+    // Still attempt the public GViz fetch, but notify user about full sync
+    if(syncEl) syncEl.innerHTML = '<span style="color:var(--amber)">&#9888; Google Drive not connected. Connect Drive in Settings to sync from Sheets.</span>';
+  }
 
   try {
     var rawRows = await fetchGvizSheet(NET_INVESTOR_URL);
@@ -4066,7 +4415,7 @@ document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
 
 // ═══ GLOBAL SEARCH ═══
 function goToTab(name){
-  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9,backup:10,mandate:11};
   var idx=map[name];if(idx==null)return;
   var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
 }
@@ -4147,6 +4496,210 @@ document.addEventListener('keydown', function(e){
   var key=String(e.key||'').toLowerCase();
   if(map[key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();goToTab(map[key]);}
 });
+
+// ═══════════════════════════════════════════════════════════════
+// FIX 10-12: MANDATE PAGE
+// ═══════════════════════════════════════════════════════════════
+function getMandates(){ return JSON.parse(localStorage.getItem('l7_mandates')||'[]'); }
+function saveMandates(arr){ localStorage.setItem('l7_mandates', JSON.stringify(arr)); }
+
+function getMandateCounter(){
+  var c = parseInt(localStorage.getItem('log7_mandate_counter')||'0', 10);
+  return c;
+}
+function nextMandateCounter(){
+  var c = getMandateCounter() + 1;
+  localStorage.setItem('log7_mandate_counter', String(c));
+  return c;
+}
+function generateMandateId(){
+  var now = new Date();
+  var d = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  var counter = getMandateCounter() > 0 ? getMandateCounter() : 1;
+  return 'MND-' + d + '-' + String(counter).padStart(3,'0');
+}
+function updateMandateId(){
+  var el = document.getElementById('mandate-id-display');
+  if(!el) return;
+  el.textContent = generateMandateId();
+}
+
+function validateFee(input){
+  var val = parseFloat(input.value);
+  var errEl = document.getElementById('fee-error');
+  if(isNaN(val) || val < 0 || val > 100){
+    if(errEl) errEl.style.display='block';
+    input.style.borderColor = 'var(--red)';
+    return false;
+  }
+  if(errEl) errEl.style.display='none';
+  input.style.borderColor = '';
+  return true;
+}
+
+function saveMandateEntry(){
+  var company = (document.getElementById('mandate-company').value||'').trim();
+  if(!company){ alert('Company name is required.'); return; }
+  var feeInput = document.getElementById('mandate-fee');
+  if(!validateFee(feeInput)){ alert('Success fee must be between 0% and 100%.'); return; }
+  var fee = parseFloat(feeInput.value);
+  var mandateId = 'MND-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(nextMandateCounter()).padStart(3,'0');
+  var entry = {
+    id: mandateId,
+    company:  company,
+    founder:  (document.getElementById('mandate-founder').value||'').trim(),
+    email:    (document.getElementById('mandate-email').value||'').trim(),
+    phone:    (document.getElementById('mandate-phone').value||'').trim(),
+    fee:      fee,
+    terms:    (document.getElementById('mandate-terms').value||'').trim(),
+    date:     document.getElementById('mandate-date').value || new Date().toISOString().slice(0,10),
+    createdAt:new Date().toISOString(),
+  };
+  var list = getMandates();
+  list.unshift(entry);
+  saveMandates(list);
+  renderMandateLog();
+  showToast('Mandate ' + mandateId + ' saved');
+  addAuditEntry('doc','Mandate saved',company+' — '+mandateId);
+}
+
+function renderMandateLog(){
+  var el = document.getElementById('mandate-log-list');
+  var cnt = document.getElementById('mandate-log-count');
+  var list = getMandates();
+  if(cnt) cnt.textContent = list.length;
+  if(!list.length){ if(el) el.innerHTML='<div class="empty">No mandates saved yet.</div>'; return; }
+  if(!el) return;
+  el.innerHTML = list.map(function(m){
+    return '<div class="mandate-log-row">'
+      + '<div class="avatar" style="width:32px;height:32px;font-size:10px">'+initials(m.company)+'</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:600">'+escapeHtml(m.company)+' <span class="badge">'+escapeHtml(m.id)+'</span></div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+escapeHtml(m.founder||'')+(m.fee?' · '+m.fee+'% fee':'')+(m.date?' · '+m.date:'')+'</div>'
+      + '</div></div>';
+  }).join('');
+}
+
+function sendMandateWhatsApp(e){
+  e.preventDefault();
+  var company = (document.getElementById('mandate-company').value||'').trim();
+  if(!company){ alert('Please enter a company name first.'); return; }
+  var founder = (document.getElementById('mandate-founder').value||'').trim();
+  var fee = (document.getElementById('mandate-fee').value||'').trim();
+  var phone = (document.getElementById('mandate-phone').value||'').trim().replace(/\D/g,'');
+  var msg = 'Dear '+(founder||'Founder')+',\n\nThis is to confirm our mandate agreement with '+company+' for fundraising advisory services'+(fee?' at a success fee of '+fee+'%':'')+'.\n\nPlease revert with your confirmation or queries.\n\nRegards,\nLog7 Capital';
+  if(!phone){ window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); return; }
+  if(phone.length===10) phone='91'+phone;
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function sendMandateEmail(e){
+  e.preventDefault();
+  var company = (document.getElementById('mandate-company').value||'').trim();
+  if(!company){ alert('Please enter a company name first.'); return; }
+  var email = (document.getElementById('mandate-email').value||'').trim();
+  var founder = (document.getElementById('mandate-founder').value||'').trim();
+  var fee = (document.getElementById('mandate-fee').value||'').trim();
+  var subject = 'Mandate Agreement – ' + company;
+  var body = 'Dear '+(founder||'Founder')+',\n\nThis is to confirm our mandate agreement with '+company+' for fundraising advisory services'+(fee?' at a success fee of '+fee+'%':'')+'.\n\nPlease revert with your confirmation or any queries.\n\nRegards,\nLog7 Capital';
+  var href = 'mailto:'+(email||'')+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  window.open(href);
+}
+
+function generateMandatePdf(){
+  var company = (document.getElementById('mandate-company').value||'').trim();
+  if(!company){ alert('Please enter company name and details before generating PDF.'); return; }
+  var feeInput = document.getElementById('mandate-fee');
+  if(!validateFee(feeInput)){ alert('Please fix the success fee before generating PDF.'); return; }
+  window.print();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIX 14: CSV IMPORT WITH FIELD MAPPING
+// ═══════════════════════════════════════════════════════════════
+var _csvImportRows = [];
+var _csvImportHeaders = [];
+
+var NET_FIELD_OPTIONS = {
+  startups:     ['companyName','founderName','founderEmail','founderPhone','sector','stage','status','referredBy','notes','followUpDate','Ignore'],
+  investors:    ['investorName','fundName','stageFocus','checkSize','geography','sectorFocus','contactPhone','status','notes','followUpDate','Ignore'],
+  partnerships: ['partnerName','type','contactName','contactEmail','contactPhone','status','notes','followUpDate','Ignore'],
+};
+
+function openImportCsvModal(){
+  document.getElementById('csv-import-modal').classList.remove('hidden');
+  document.getElementById('csv-import-modal').style.display='flex';
+  document.getElementById('csv-mapping-area').style.display='none';
+  document.getElementById('csv-file-name').textContent='';
+  document.getElementById('csv-file-input').value='';
+}
+function closeImportCsvModal(){
+  document.getElementById('csv-import-modal').classList.add('hidden');
+  document.getElementById('csv-import-modal').style.display='none';
+  _csvImportRows=[];_csvImportHeaders=[];
+}
+
+function handleCsvUpload(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  document.getElementById('csv-file-name').textContent = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var text = e.target.result;
+    var lines = text.split(/\r?\n/).filter(function(l){return l.trim();});
+    if(!lines.length){ alert('CSV file appears empty.'); return; }
+    var sep = lines[0].includes('\t') ? '\t' : ',';
+    function parseLine(line){
+      var result=[],cur='',inQ=false;
+      for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'&&!inQ){inQ=true;}else if(c==='"'&&inQ&&line[i+1]==='"'){cur+='"';i++;}else if(c==='"'&&inQ){inQ=false;}else if(c===sep&&!inQ){result.push(cur.trim());cur='';}else{cur+=c;}}
+      result.push(cur.trim());return result;
+    }
+    _csvImportHeaders = parseLine(lines[0]).map(function(h){return h.replace(/^"|"$/g,'');});
+    _csvImportRows = lines.slice(1).map(parseLine);
+    buildCsvMappingUI();
+  };
+  reader.readAsText(file);
+}
+
+function buildCsvMappingUI(){
+  var tab = document.getElementById('csv-import-type').value;
+  var fieldOpts = NET_FIELD_OPTIONS[tab] || ['Ignore'];
+  var body = document.getElementById('csv-map-body');
+  body.innerHTML = _csvImportHeaders.map(function(col, i){
+    var sample = _csvImportRows[0] ? escapeHtml(_csvImportRows[0][i]||'') : '';
+    var opts = fieldOpts.map(function(f){
+      var sel = (f.toLowerCase().replace(/[^a-z0-9]/g,'')===col.toLowerCase().replace(/[^a-z0-9]/g,'')) ? ' selected' : '';
+      return '<option value="'+f+'"'+sel+'>'+f+'</option>';
+    }).join('');
+    return '<tr><td><strong>'+escapeHtml(col)+'</strong></td><td><select id="csv-map-'+i+'" style="width:100%">'+opts+'</select></td><td style="color:var(--muted)">'+sample+'</td></tr>';
+  }).join('');
+  document.getElementById('csv-mapping-area').style.display='block';
+}
+
+function confirmCsvImport(){
+  var tab = document.getElementById('csv-import-type').value;
+  var mapping = _csvImportHeaders.map(function(col,i){
+    var sel = document.getElementById('csv-map-'+i);
+    return sel ? sel.value : 'Ignore';
+  });
+  var rows = netLoad(tab);
+  var nextId = rows.length ? Math.max.apply(null,rows.map(function(r){return r.id||0;}))+1 : 1;
+  var added = 0;
+  _csvImportRows.forEach(function(cols){
+    var entry={id:nextId++,dateAdded:new Date().toISOString()};
+    mapping.forEach(function(field,i){
+      if(field!=='Ignore') entry[field]=(cols[i]||'').trim();
+    });
+    // Require at least a primary key field
+    var pk=netPrimaryKey(tab,entry);
+    if(pk&&pk!=='—') rows.push(entry), added++;
+  });
+  netSave(tab,rows);
+  closeImportCsvModal();
+  renderNetList(tab);
+  showToast('Imported '+added+' '+tab+' entries');
+  addAuditEntry('network','CSV imported: '+added+' '+tab,tab);
+}
 </script>
 </body>
 </html>
