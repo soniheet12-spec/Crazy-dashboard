@@ -2898,26 +2898,55 @@ function mergeNetPipelineToMain(){
 }
 
 // ═══ PIPELINE ═══
+// Debug helper — call window._debugPipeline() in the console.
+window._debugPipeline = function(){
+  console.log('=== ALL LOCALSTORAGE KEYS ===');
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i); var v=localStorage.getItem(k)||'';
+    console.log(k,'→',v.substring(0,200));
+  }
+  console.log('=== PIPELINE KEYS ===');
+  console.log('l7_pipeline (canonical board/home):', localStorage.getItem('l7_pipeline'));
+  console.log('l7_net_pipeline (Network +Pipeline index):', localStorage.getItem('l7_net_pipeline'));
+  console.log('SheetsDB authed:', !!(window.SheetsDB&&SheetsDB.isAuthenticated()));
+  try{ console.log('SheetsDB.cache.pipeline:', window.SheetsDB?SheetsDB.cache.pipeline:'n/a'); }catch(e){ console.log('cache read error', e); }
+  console.log('getPipeline() merged result:', getPipeline());
+};
+
+// l7_pipeline is the canonical durable key. Sheets cache is an overlay merged on read.
 function getPipeline(){
+  var local = [];
+  try { local = JSON.parse(localStorage.getItem('l7_pipeline')||'[]'); } catch(e){ local = []; }
+  if(!Array.isArray(local)) local = [];
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var cached = SheetsDB.cache.pipeline||[];
-    // Only use SheetsDB cache when it actually has data; otherwise fall through to localStorage
-    // (cache is empty on first auth before background sync completes)
+    var cached = (window.SheetsDB.cache && SheetsDB.cache.pipeline) || [];
     if(cached.length){
-      return cached.map(function(item){
-        return { id:item.id, startup:item.startup, investor:item.investor, score:item.score, verdict:item.verdict, stage:item.stage, hot:item.hot, savedAt:item.savedAt };
-      });
+      var seen = {};
+      local.forEach(function(it){ if(it && it.id) seen[it.id] = 1; });
+      // Local items keep their order (newest first); append Sheets-only items.
+      var extra = cached.filter(function(it){ return it && it.id && !seen[it.id]; });
+      return local.concat(extra);
     }
   }
-  return JSON.parse(localStorage.getItem('l7_pipeline')||'[]');
+  return local;
 }
 function setPipeline(data){
+  // Always persist to localStorage so additions are durable and immediately visible.
+  try { localStorage.setItem('l7_pipeline', JSON.stringify(data)); } catch(e){ console.error('[setPipeline]', e); }
+  // Mirror to Google Sheets when connected (background, non-blocking).
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
     SheetsDB.cache.pipeline = data;
-    SheetsDB.pushTab('pipeline', data).catch(function(e){ console.error('[setPipeline]', e); });
-    return;
+    SheetsDB.pushTab('pipeline', data).catch(function(e){ console.error('[setPipeline push]', e); });
   }
-  localStorage.setItem('l7_pipeline', JSON.stringify(data));
+}
+// Re-render every surface that shows pipeline data, after any write.
+function refreshPipelineUI(){
+  try { renderKanban(); } catch(e){}
+  try { renderPipelineList(); } catch(e){}
+  try { renderNetPipelineSection(); } catch(e){}
+  try { refreshHome(); } catch(e){}
+  try { updateStats(); } catch(e){}
+  try { window.dispatchEvent(new Event('storage')); } catch(e){}
 }
 function getNetPipeline(){
   if(window.SheetsDB && SheetsDB.isAuthenticated()) return (SheetsDB.cache.net_pipeline||[]);
@@ -3018,8 +3047,7 @@ function saveNetPipelineEntry(sourceTab, sourceId){
   saveNetPipeline(data);
   closeNetPipelineModal();
   renderNetList(sourceTab);
-  renderNetPipelineSection();
-  renderKanban(); renderPipelineList(); refreshHome(); updateStats();
+  refreshPipelineUI();
   addAuditEntry('pipeline', isNew?'Added to pipeline (Network)':'Updated pipeline entry', name+(company?' / '+company:''));
 }
 function removeNetPipelineEntry(sourceTab, sourceId){
@@ -3035,8 +3063,7 @@ function removeNetPipelineEntry(sourceTab, sourceId){
   }
   closeNetPipelineModal();
   renderNetList(sourceTab);
-  renderNetPipelineSection();
-  renderKanban(); renderPipelineList(); refreshHome(); updateStats();
+  refreshPipelineUI();
 }
 function renderNetPipelineSection(){
   var el = document.getElementById('net-pipeline-list');
@@ -3099,17 +3126,17 @@ function deleteNetPipelineById(id){
 }
 function saveToPipeline(name){
   const match=(lastPayload?.matches||[]).find(m=>m.name===name);if(!match||!selectedStartup)return;
-  const raw = window.SheetsDB && SheetsDB.isAuthenticated() ? (SheetsDB.cache.pipeline||[]) : getPipeline();
+  const raw = getPipeline();
   if(!raw.find(item=>item.startup===selectedStartup.company&&item.investor===name)){
     const newItem={id:'pl_'+Date.now(),startup:selectedStartup.company,investor:name,score:match.score,verdict:match.verdict,reasons:match.reasons||[],concerns:match.concerns||[],savedAt:new Date().toISOString(),stage:PIPELINE_STAGES[0],hot:false,_crm:{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}};
     raw.unshift(newItem);
     setPipeline(raw.slice(0,500));
     addAuditEntry('pipeline','Deal saved to pipeline',selectedStartup.company+' \u2194 '+name);
   }
-  renderKanban();renderPipelineList();refreshHome();updateStats();
+  refreshPipelineUI();
 }
 function movePipelineStage(startup,investor,stage){
-  const raw = window.SheetsDB && SheetsDB.isAuthenticated() ? (SheetsDB.cache.pipeline||[]) : getPipeline();
+  const raw = getPipeline();
   const item=raw.find(i=>i.startup===startup&&i.investor===investor);if(!item)return;
   const prev=item.stage;item.stage=stage;
   setPipeline(raw);
@@ -3118,13 +3145,13 @@ function movePipelineStage(startup,investor,stage){
     var dKey='l7_diligence_'+startup;
     if(!localStorage.getItem(dKey)){ localStorage.setItem(dKey,JSON.stringify({})); addAuditEntry('diligence','Diligence checklist created (IC Ready trigger)',startup); showToast('Diligence checklist created for '+startup); }
   }
-  renderKanban();renderPipelineList();updateStats();refreshHome();
+  refreshPipelineUI();
 }
 function removePipelineItem(startup,investor){
-  const raw = window.SheetsDB && SheetsDB.isAuthenticated() ? (SheetsDB.cache.pipeline||[]) : getPipeline();
+  const raw = getPipeline();
   setPipeline(raw.filter(i=>!(i.startup===startup&&i.investor===investor)));
   addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);
-  renderKanban();renderPipelineList();updateStats();refreshHome();
+  refreshPipelineUI();
 }
 function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
@@ -3264,7 +3291,7 @@ function submitAddDeal(){
   setPipeline(pipeline.slice(0,500));
   addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
   closeAddDealModal();
-  renderKanban();renderPipelineList();refreshHome();updateStats();
+  refreshPipelineUI();
 }
 
 // ═══ ANALYTICS ═══
@@ -3273,7 +3300,7 @@ function submitAddDeal(){
 function crmKey(startup,investor){return'l7_crm_'+(startup||'global')+'_'+investor;}
 function getInvestorCRM(startup,investor){
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var item=(SheetsDB.cache.pipeline||[]).find(function(i){return i.startup===startup&&i.investor===investor;});
+    var item=getPipeline().find(function(i){return i.startup===startup&&i.investor===investor;});
     if(item&&item._crm) return Object.assign({pipelineStage:PIPELINE_STAGES[0]},item._crm);
     return {status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:'',pipelineStage:PIPELINE_STAGES[0]};
   }
@@ -3283,13 +3310,13 @@ function getInvestorCRM(startup,investor){
 function updateInvestorCRM(investor,field,value){
   const startup=selectedStartup?.company||'';
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var raw=SheetsDB.cache.pipeline||[];
+    var raw=getPipeline();
     var item=raw.find(function(i){return i.startup===startup&&i.investor===investor;});
     if(item){ item._crm=item._crm||{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}; item._crm[field]=value; setPipeline(raw); }
   } else {
     const record=getInvestorCRM(startup,investor);record[field]=value;localStorage.setItem(crmKey(startup,investor),JSON.stringify(record));
   }
-  addAuditEntry('pipeline','CRM updated: '+field+' \u2192 '+value,startup+' \u2194 '+investor);renderKanban();renderPipelineList();refreshHome();
+  addAuditEntry('pipeline','CRM updated: '+field+' \u2192 '+value,startup+' \u2194 '+investor);refreshPipelineUI();
 }
 function updateInvestorTags(investor,value){updateInvestorCRM(investor,'tags',value.split(',').map(t=>t.trim()).filter(Boolean));}
 
@@ -5140,7 +5167,12 @@ document.addEventListener('DOMContentLoaded', function(){
   loadPinnedNotes();
   // Storage event → update home count reactively from other tabs
   window.addEventListener('storage', function(e){
-    if(e.key==='l7_pipeline'){ refreshHome(); updateStats(); }
+    // Cross-tab change to pipeline, or our own synthetic dispatch (e.key is null).
+    if(!e.key || e.key==='l7_pipeline'){
+      refreshHome(); updateStats();
+      var pp=document.getElementById('page-pipeline');
+      if(pp && pp.classList.contains('active')){ try{renderKanban();renderPipelineList();}catch(_){} }
+    }
   });
 });
 
