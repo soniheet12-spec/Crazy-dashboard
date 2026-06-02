@@ -1380,9 +1380,7 @@ window.SettingsDB = (function(){
     <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon">&#128200;</span><span class="tab-label">Pipeline</span></button>
     <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon">&#128228;</span><span class="tab-label">Outreach</span></button>
     <div class="sb-section-label">Research</div>
-    <button class="nav-tab" data-tab="deck" onclick="showTab('deck',this)"><span class="tab-icon">&#128196;</span><span class="tab-label">Deck Insights</span></button>
     <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon">&#128269;</span><span class="tab-label">Diligence</span></button>
-    <button class="nav-tab" data-tab="memo" onclick="showTab('memo',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">IC Memo</span></button>
     <div class="sb-section-label">Admin</div>
     <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon">&#128193;</span><span class="tab-label">Docs</span></button>
     <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">Audit Log</span></button>
@@ -1527,7 +1525,6 @@ window.SettingsDB = (function(){
             <button class="action-btn primary" style="width:100%" onclick="goToTab('outreach')">&#128228; Outreach</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
           </div>
         </div>
@@ -1750,63 +1747,6 @@ window.SettingsDB = (function(){
     </div>
   </div>
 
-  <!-- ═══ DECK INSIGHTS ═══ -->
-  <div id="page-deck" class="page">
-    <div class="section-bar">
-      <div class="section-title">Deck Insights &amp; Founder Research</div>
-      <button class="ghost-btn" onclick="runFullDeckAnalysis()">&#128196; Full Deck Analysis</button>
-      <button class="ghost-btn" onclick="runFounderResearch()">&#128269; Research Founders</button>
-      <button class="ghost-btn" onclick="window.print()">Print</button>
-    </div>
-    <div class="module-banner"><strong>Upload a deck in Match Studio</strong> — Claude reads every slide including charts, graphs, and images. Research Founders uses AI web search to check MCA, SEBI, LinkedIn, and news.</div>
-    <div class="grid-two">
-      <div id="deck-tab-content"><div class="empty">Upload a deck and run a match or click Full Deck Analysis.</div></div>
-      <div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Founder Background Research</div><div style="display:flex;gap:6px;align-items:center"><span class="badge" id="research-status-badge">Not run</span><button class="mini-btn" onclick="runFounderResearch()">Run</button></div></div>
-          <div id="founder-research-output"><div class="empty">Click Run to check founders via AI with web search.</div></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Supporting Documents</div><button class="mini-btn" onclick="document.getElementById('extra-docs-input').click()">+ Upload</button></div>
-          <div class="drop-zone" onclick="document.getElementById('extra-docs-input').click()" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="handleExtraDocsDrop(event)" style="padding:14px"><p style="font-size:12px">PDF, DOCX, XLSX, CSV, TXT, Images</p></div>
-          <input id="extra-docs-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" onchange="handleExtraDocsUpload(event)">
-          <div id="extra-docs-list" style="margin-top:8px"><div class="empty" style="padding:14px">No documents uploaded yet.</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ IC MEMO ═══ -->
-  <div id="page-memo" class="page">
-    <div class="section-bar">
-      <div class="section-title">Investment Committee Memo</div>
-      <button class="ghost-btn" onclick="generateICMemo()">Generate Memo</button>
-      <button class="ghost-btn" onclick="copyICMemo()">Copy Text</button>
-      <button class="ghost-btn" onclick="printICMemo()">Print / PDF</button>
-    </div>
-    <div class="module-banner">
-      <strong>Institutional memo output for internal review.</strong>
-      Generates a decision-ready memo using startup profile, deck intelligence, top investor-fit themes, diligence status, and IC votes.
-    </div>
-    <div class="grid-two">
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-header">
-          <div class="card-title">IC Memo Draft</div>
-          <span class="badge" id="memo-badge"></span>
-        </div>
-        <div id="memo-content"><div class="empty">Select a startup and generate the memo.</div></div>
-      </div>
-    </div>
-    <!-- IC Voting -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">IC Partner Votes</div>
-        <button class="mini-btn" onclick="addVoter()">+ Add Voter</button>
-      </div>
-      <div id="ic-votes-list"><div class="empty">Add IC members and record votes.</div></div>
-      <div id="ic-vote-summary" style="margin-top:14px"></div>
-    </div>
-  </div>
 
   <!-- ═══ DILIGENCE ═══ -->
   <div id="page-diligence" class="page">
@@ -1944,6 +1884,7 @@ window.SettingsDB = (function(){
   <div id="page-network" class="page">
     <div class="section-bar">
       <div class="section-title">Network</div>
+      <input type="text" id="net-search" placeholder="Search..." style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--s2);color:var(--text);width:180px" oninput="renderNetworkTab()">
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
       <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
       <button class="ghost-btn" onclick="openCsvImport()">Import CSV</button>
@@ -2020,7 +1961,8 @@ window.SettingsDB = (function(){
       <div class="field" style="margin-bottom:12px"><label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px">Follow-up Date</label><input type="date" id="followup-date" style="width:100%"></div>
       <div class="field" style="margin-bottom:16px"><label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px">Note</label><textarea id="followup-note" style="width:100%;min-height:70px" placeholder="What is this follow-up about?"></textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="action-btn secondary" onclick="clearFollowup()" style="margin-right:auto">Clear Follow-up</button>
+        <button class="action-btn secondary" onclick="clearFollowup()" style="margin-right:auto">Clear</button>
+        <button class="action-btn secondary" onclick="markFollowupDone()" style="color:var(--green);border-color:var(--green)">&#10003; Mark as Done</button>
         <button class="action-btn secondary" onclick="closeFollowupModal()">Cancel</button>
         <button class="action-btn primary" onclick="saveFollowupModal()">Save</button>
       </div>
@@ -2180,42 +2122,38 @@ const NET_KEYS = {
 };
 
 function netLoad(tab){
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var sheetsData = SheetsDB.cache[tab] || [];
-    if(tab === 'investors'){
-      // Merge SheetsDB-managed investors with Linked Sheets cache (_fromSheet entries)
-      var sheet = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
-      var manualNames = new Set(sheetsData.map(function(r){ return (r.investorName||'').toLowerCase(); }));
-      var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
-      return sheetsData.concat(sheetOnly);
-    }
-    return sheetsData;
-  }
-  // localStorage fallback when not connected to Sheets
-  var manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+  // Always read localStorage first so local-only entries survive token expiry
+  var manual = [];
+  try { manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]'); } catch(e){ manual=[]; }
   if(tab === 'investors'){
-    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var sheet = [];
+    try { sheet = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]'); } catch(e){ sheet=[]; }
     var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
     var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
-    return manual.concat(sheetOnly);
+    manual = manual.concat(sheetOnly);
+  }
+  if(window.SheetsDB && SheetsDB.isAuthenticated()){
+    // Merge: remote rows + any local-only rows not yet in Sheets
+    var sheetsData = SheetsDB.cache[tab] || [];
+    var remoteIds = new Set(sheetsData.map(function(r){ return String(r.id||''); }).filter(Boolean));
+    var localOnly = manual.filter(function(r){ return r.id && !remoteIds.has(String(r.id)); });
+    return sheetsData.concat(localOnly);
   }
   return manual;
 }
 function netSave(tab, data){
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    // Update cache synchronously so re-renders are instant
-    SheetsDB.cache[tab] = data;
-    // Write to Sheets in background — errors shown as toasts
-    SheetsDB.pushTab(tab, data).catch(function(e){ console.error('[netSave]', e); });
-    return;
-  }
-  // localStorage fallback
+  // Always persist to localStorage immediately for durability
   if(tab === 'investors'){
     var manualOnly = data.filter(function(r){ return !r._fromSheet; });
     localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
-    return;
+  } else {
+    localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
   }
-  localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
+  if(window.SheetsDB && SheetsDB.isAuthenticated()){
+    // Also update in-memory cache and push to Sheets in background
+    SheetsDB.cache[tab] = data;
+    SheetsDB.pushTab(tab, data).catch(function(e){ console.error('[netSave]', e); });
+  }
 }
 
 
@@ -2357,14 +2295,13 @@ window.onload = async () => {
 function showTab(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  var _pg=document.getElementById('page-'+name); if(!_pg) return; _pg.classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='pipeline'){
     renderKanban();renderPipelineList();renderNetPipelineSection();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchTabInto('pipeline').then(function(){renderKanban();renderPipelineList();renderNetPipelineSection();});
   }
   if(name==='audit') renderAuditLog();
-  if(name==='memo') generateICMemo();
   if(name==='network'){
     renderNetworkTab();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()){
@@ -3259,6 +3196,8 @@ function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
+  // Build investor\u2192fundName lookup for display
+  var _kInvs=netLoad('investors');var _fundByInv={};_kInvs.forEach(function(r){var n=(r.investorName||r.name||'').toLowerCase();if(n)_fundByInv[n]=r.fundName||'';});
   // Build startup\u2192roundSize lookup from Network startups for \u20b9 totals
   var netSt=netLoad('startups');
   var sizeBy={};netSt.forEach(function(s){var n=s.companyName||s.name||'';if(n)sizeBy[n.toLowerCase()]=s.roundSize||s.roundSizeCr||s.fundraise||'';});
@@ -3272,7 +3211,8 @@ function renderKanban(){
     return'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+colItems.length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+colItems.map(item=>{
       const crm=getInvestorCRM(item.startup,item.investor);
       var tagChipsK=(item.tags||[]).map(function(t){return'<span style="display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:1px 6px;font-size:8.5px;margin:1px">'+escapeHtml(t)+'</span>';}).join('');
-      return'<div class="kanban-card" draggable="true" title="Double-click to open" ondblclick="openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor||item.startup||'\u2014')+'</a></div><div class="kanban-card-meta">'+(item.startup&&item.investor?'<a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 ':'')+item.score+'</div>'+(tagChipsK?'<div style="margin-top:4px">'+tagChipsK+'</div>':'')+'<div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';
+      var _kFund=item.investor?(_fundByInv[(item.investor||'').toLowerCase()]||''):'';var _kTitle=escapeHtml(item.investor||item.startup||'\u2014')+(_kFund?'<span style="color:var(--muted);font-size:10px;font-weight:400"> / '+escapeHtml(_kFund)+'</span>':'');
+      return'<div class="kanban-card" draggable="true" title="Double-click to open" ondblclick="openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\''+(item.investor?'investor':'startup')+'\',\''+escapeQ(item.investor||item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+_kTitle+'</a></div><div class="kanban-card-meta">'+(item.startup&&item.investor?'<a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 ':'')+item.score+'</div>'+(tagChipsK?'<div style="margin-top:4px">'+tagChipsK+'</div>':'')+'<div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';
     }).join('')+'</div>';
   }).join('')+'</div>';
   refreshTagFilter();
@@ -3287,12 +3227,14 @@ function renderPipelineList(){
   var tagFilter=document.getElementById('pipeline-tag-filter')?document.getElementById('pipeline-tag-filter').value:'';
   var displayed=tagFilter?pipeline.filter(function(item){return(item.tags||[]).includes(tagFilter);}):pipeline;
   var stageOpts=PIPELINE_STAGES.map(function(s){return'<option value="'+s+'">'+s+'</option>';}).join('');
+  var _plInvs=netLoad('investors');var _plFundByInv={};_plInvs.forEach(function(r){var n=(r.investorName||r.name||'').toLowerCase();if(n)_plFundByInv[n]=r.fundName||'';});
   var rows=displayed.map(function(item){
     var crm=getInvestorCRM(item.startup,item.investor);
     var tagChips=(item.tags||[]).map(function(t){return'<span style="display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;margin:1px">'+escapeHtml(t)+'</span>';}).join('');
+    var _plFund=item.investor?(_plFundByInv[(item.investor||'').toLowerCase()]||''):'';
     return'<tr>'
       +'<td style="width:32px"><input type="checkbox" class="deal-checkbox" data-startup="'+escapeHtml(item.startup)+'" data-investor="'+escapeHtml(item.investor)+'" onchange="updateBulkBar()"></td>'
-      +'<td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td>'
+      +'<td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+(_plFund?'<br><span style="color:var(--muted);font-size:10.5px;font-weight:400">'+escapeHtml(_plFund)+'</span>':'')+'</a></td>'
       +'<td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td>'
       +'<td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td>'
       +'<td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td>'
@@ -4197,6 +4139,13 @@ function renderNetList(tab){
   var el = document.getElementById('net-list-'+tab);
   if(!el) return;
   var rows = netLoad(tab);
+  var _srch = (document.getElementById('net-search')||{}).value||'';
+  if(_srch.trim()){
+    var _q = _srch.trim().toLowerCase();
+    rows = rows.filter(function(r){
+      return Object.values(r).some(function(v){ return String(v||'').toLowerCase().indexOf(_q)!==-1; });
+    });
+  }
   if(!rows.length){
     el.innerHTML = '<div class="empty" style="padding:20px">No entries yet. Click + Add New to get started.</div>';
     return;
@@ -4256,7 +4205,10 @@ function renderNetList(tab){
     // Follow-up date cell (normalized to YYYY-MM-DD on read)
     var fuDate = row.followUpDate ? normalizeDateStr(row.followUpDate) : '';
     var fuColor = !fuDate ? 'var(--muted)' : fuDate < today ? 'var(--red)' : fuDate === today ? 'var(--amber)' : 'var(--green)';
-    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(fuDate||'—')+(isDue?' ⚑':'')+'</td>';
+    var fuCell = row.followUpDone
+      ? '<span style="color:var(--green);font-weight:600;font-size:11px">&#10003; Done</span>'
+      : (fuDate||'—')+(isDue?' ⚑':'');
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+fuCell+'</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     if(tab==='investors'||tab==='startups'){
       var entType = tab==='investors' ? 'investor' : 'startup';
@@ -4383,11 +4335,8 @@ function saveNetworkEntry(){
   });
   if(!ok){ showError('Please fill in required fields.'); return; }
 
-  // Belt-and-suspenders: explicitly read followUpDate in case loop missed it
   var fuEl = document.getElementById('nf-followUpDate');
   if(fuEl){ entry.followUpDate = fuEl.value || ''; }
-  console.log('[Save] tab:', tab, '| followUpDate input el:', fuEl, '| value:', fuEl ? fuEl.value : 'NOT FOUND');
-  console.log('[Save] full entry before persist:', JSON.stringify(entry));
 
   var rows = netLoad(tab);
   if(_netEditId === null){
@@ -4412,12 +4361,7 @@ function saveNetworkEntry(){
     rows.push(entry);
   }
   netSave(tab, rows);
-
-  // Verify what was actually written to localStorage
-  var savedRows = netLoad(tab);
-  var savedEntry = savedRows.find(function(r){ return r.id === entry.id; });
-  console.log('[Save] verified from localStorage:', JSON.stringify(savedEntry));
-
+  if(typeof uxResetDirty==='function') uxResetDirty();
   closeNetworkModal();
   renderNetList(tab);
   if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
@@ -6500,6 +6444,18 @@ function clearFollowup(){
   document.getElementById('followup-date').value='';
   document.getElementById('followup-note').value='';
   saveFollowupModal();
+}
+function markFollowupDone(){
+  if(_fuTab===null) return;
+  var rows=netLoad(_fuTab); var row=rows.find(function(r){return String(r.id)===String(_fuId);});
+  if(row){ row.followUpDate=''; row.followUpDone=true; netSave(_fuTab,rows); }
+  try{ rebuildFollowupsStore(); }catch(e){}
+  var tab=_fuTab;
+  closeFollowupModal();
+  renderNetList(tab);
+  if(typeof refreshNetFollowups==='function') refreshNetFollowups();
+  if(typeof refreshHome==='function') refreshHome();
+  addAuditEntry('network','Follow-up marked as done', netPrimaryKey(tab,row||{}));
 }
 
 // ── Reminder email (Settings) ────────────────────────────────────
