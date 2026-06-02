@@ -377,12 +377,15 @@ function collectSnapshot(){
 }
 
 // ── Token ─────────────────────────────────────────────────────
-function getToken(){return sessionStorage.getItem(TOKEN_KEY)||null;}
+function getToken(){return localStorage.getItem('log7_drive_token')||sessionStorage.getItem(TOKEN_KEY)||null;}
+function setToken(tok){localStorage.setItem('log7_drive_token',tok);sessionStorage.setItem(TOKEN_KEY,tok);}
 
 // ── Drive upload ──────────────────────────────────────────────
 async function uploadToDrive(snap){
   var token=getToken();
   if(!token)throw new Error('Not connected to Google Drive. Click "Connect Google Drive" first.');
+  // Validate token
+  try{var chk=await fetch('https://www.googleapis.com/drive/v3/about?fields=user',{headers:{Authorization:'Bearer '+token}});if(chk.status===401){localStorage.removeItem('log7_drive_token');sessionStorage.removeItem(TOKEN_KEY);throw new Error('Drive token expired — please reconnect.');}}catch(e){if(e.message.includes('expired'))throw e;}
   var filename=BACKUP_PREFIX+snap.timestamp.replace(/[:.]/g,'-')+'.json';
   var body=JSON.stringify(snap,null,2);
   var boundary='l7bk';
@@ -407,7 +410,7 @@ async function listBackups(){
   var q=encodeURIComponent("'"+DRIVE_FOLDER_ID+"' in parents and name contains '"+BACKUP_PREFIX+"' and trashed=false");
   var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime+desc&pageSize=30&fields=files(id,name,createdTime,description,size)',
     {headers:{Authorization:'Bearer '+token}});
-  if(!r.ok){if(r.status===401)sessionStorage.removeItem(TOKEN_KEY);return[];}
+  if(!r.ok){if(r.status===401){localStorage.removeItem('log7_drive_token');sessionStorage.removeItem(TOKEN_KEY);}return[];}
   var d=await r.json();return d.files||[];
 }
 
@@ -416,7 +419,7 @@ async function restoreFromDrive(fileId,filename){
   var token=getToken();if(!token)throw new Error('Not connected to Google Drive.');
   var r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
     {headers:{Authorization:'Bearer '+token}});
-  if(!r.ok)throw new Error('Download failed: '+r.status);
+  if(!r.ok){if(r.status===401){localStorage.removeItem('log7_drive_token');sessionStorage.removeItem(TOKEN_KEY);}throw new Error('Download failed: '+r.status);}
   var snap=await r.json();
   if(!snap||!snap.data)throw new Error('Invalid backup format.');
   localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(collectSnapshot()));
@@ -469,7 +472,7 @@ function initTokenClient(){
     scope:'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
     callback:function(resp){
       if(resp.error){_toast('Sign-in failed: '+resp.error,'error');return;}
-      sessionStorage.setItem(TOKEN_KEY,resp.access_token);
+      setToken(resp.access_token);
       _toast('Google Drive connected ✓');
       renderPanel('backup-panel-container');
       startAuto();
@@ -681,7 +684,7 @@ window.SheetsDB = (function(){
   var _pollInterval = null;
   var _initialized = false;
 
-  function getToken(){ return sessionStorage.getItem(TOKEN_KEY); }
+  function getToken(){ return localStorage.getItem('log7_drive_token')||sessionStorage.getItem(TOKEN_KEY)||null; }
   function isAuthenticated(){ return !!getToken(); }
 
   function _toast(msg, type){
@@ -821,7 +824,20 @@ window.SheetsDB = (function(){
       if(!_initialized){ await ensureTabs(); _initialized=true; }
       var tabs = ['investors','startups','partnerships','pipeline'];
       var results = await Promise.all(tabs.map(fetchTab));
-      tabs.forEach(function(t,i){ _cache[t] = results[i].map(_tabMap[t].toObj); });
+      tabs.forEach(function(t,i){
+        var remote = results[i].map(_tabMap[t].toObj);
+        // MERGE: local entries (from localStorage) that aren't in remote survive
+        var NET_KEY_MAP = {investors:'l7_net_investors',startups:'l7_net_startups',partnerships:'l7_net_partnerships',pipeline:'l7_pipeline'};
+        var localRaw = [];
+        try { localRaw = JSON.parse(localStorage.getItem(NET_KEY_MAP[t])||'[]'); } catch(e){ localRaw=[]; }
+        if(localRaw.length && t !== 'pipeline'){
+          var remoteIds = new Set(remote.map(function(r){return r.id;}));
+          var localOnly = localRaw.filter(function(r){return !remoteIds.has(r.id);});
+          _cache[t] = remote.concat(localOnly);
+        } else {
+          _cache[t] = remote;
+        }
+      });
       _lastSync = new Date();
       updateSyncEl(false);
       return true;
@@ -1043,8 +1059,6 @@ window.SheetsDB = (function(){
     <button class="nav-tab" onclick="showTab('match',this)">Match Studio</button>
     <button class="nav-tab" onclick="showTab('pipeline',this)">Pipeline</button>
     <button class="nav-tab" onclick="showTab('startups',this)">Startups</button>
-    <button class="nav-tab" onclick="showTab('deck',this)">Deck Insights</button>
-    <button class="nav-tab" onclick="showTab('memo',this)">IC Memo</button>
     <button class="nav-tab" onclick="showTab('diligence',this)">Diligence</button>
     <button class="nav-tab" onclick="showTab('audit',this)">Audit Log</button>
     <button class="nav-tab" onclick="showTab('docs',this)">Docs</button>
@@ -1166,7 +1180,6 @@ window.SheetsDB = (function(){
             <button class="action-btn primary" style="width:100%" onclick="goToTab('match')">&#9889; Match Studio</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('memo')">&#128221; IC Memo</button>
             <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
           </div>
         </div>
@@ -1366,63 +1379,6 @@ window.SheetsDB = (function(){
     </div>
   </div>
 
-  <!-- ═══ DECK INSIGHTS ═══ -->
-  <div id="page-deck" class="page">
-    <div class="section-bar">
-      <div class="section-title">Deck Insights &amp; Founder Research</div>
-      <button class="ghost-btn" onclick="runFullDeckAnalysis()">&#128196; Full Deck Analysis</button>
-      <button class="ghost-btn" onclick="runFounderResearch()">&#128269; Research Founders</button>
-      <button class="ghost-btn" onclick="window.print()">Print</button>
-    </div>
-    <div class="module-banner"><strong>Upload a deck in Match Studio</strong> — Claude reads every slide including charts, graphs, and images. Research Founders uses AI web search to check MCA, SEBI, LinkedIn, and news.</div>
-    <div class="grid-two">
-      <div id="deck-tab-content"><div class="empty">Upload a deck and run a match or click Full Deck Analysis.</div></div>
-      <div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Founder Background Research</div><div style="display:flex;gap:6px;align-items:center"><span class="badge" id="research-status-badge">Not run</span><button class="mini-btn" onclick="runFounderResearch()">Run</button></div></div>
-          <div id="founder-research-output"><div class="empty">Click Run to check founders via AI with web search.</div></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Supporting Documents</div><button class="mini-btn" onclick="document.getElementById('extra-docs-input').click()">+ Upload</button></div>
-          <div class="drop-zone" onclick="document.getElementById('extra-docs-input').click()" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="handleExtraDocsDrop(event)" style="padding:14px"><p style="font-size:12px">PDF, DOCX, XLSX, CSV, TXT, Images</p></div>
-          <input id="extra-docs-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" onchange="handleExtraDocsUpload(event)">
-          <div id="extra-docs-list" style="margin-top:8px"><div class="empty" style="padding:14px">No documents uploaded yet.</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ IC MEMO ═══ -->
-  <div id="page-memo" class="page">
-    <div class="section-bar">
-      <div class="section-title">Investment Committee Memo</div>
-      <button class="ghost-btn" onclick="generateICMemo()">Generate Memo</button>
-      <button class="ghost-btn" onclick="copyICMemo()">Copy Text</button>
-      <button class="ghost-btn" onclick="printICMemo()">Print / PDF</button>
-    </div>
-    <div class="module-banner">
-      <strong>Institutional memo output for internal review.</strong>
-      Generates a decision-ready memo using startup profile, deck intelligence, top investor-fit themes, diligence status, and IC votes.
-    </div>
-    <div class="grid-two">
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-header">
-          <div class="card-title">IC Memo Draft</div>
-          <span class="badge" id="memo-badge"></span>
-        </div>
-        <div id="memo-content"><div class="empty">Select a startup and generate the memo.</div></div>
-      </div>
-    </div>
-    <!-- IC Voting -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">IC Partner Votes</div>
-        <button class="mini-btn" onclick="addVoter()">+ Add Voter</button>
-      </div>
-      <div id="ic-votes-list"><div class="empty">Add IC members and record votes.</div></div>
-      <div id="ic-vote-summary" style="margin-top:14px"></div>
-    </div>
-  </div>
 
   <!-- ═══ DILIGENCE ═══ -->
   <div id="page-diligence" class="page">
@@ -1568,6 +1524,9 @@ window.SheetsDB = (function(){
       <button class="subtab" id="net-tab-investors" onclick="switchNetTab('investors',this)">Investors</button>
       <button class="subtab" id="net-tab-startups" onclick="switchNetTab('startups',this)">Startups</button>
     </div>
+    <div style="margin-bottom:14px">
+      <input id="net-search" type="text" placeholder="Search name, phone, notes, status…" oninput="renderNetworkTab()" style="max-width:400px">
+    </div>
     <div id="net-panel-partnerships" class="net-panel">
       <div class="card" style="overflow-x:auto">
         <div id="net-list-partnerships"><div class="empty">No partnerships yet. Click + Add New to get started.</div></div>
@@ -1606,6 +1565,7 @@ window.SheetsDB = (function(){
 
   <!-- MODALS -->
   <div id="net-entity-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:600px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title" id="net-entity-title">Record</div><button class="action-btn danger" onclick="closeNetEntityModal()" style="padding:4px 10px">&#x2715;</button></div><div id="net-entity-content"></div></div></div>
+  <div id="net-followup-modal" class="hidden" style="position:fixed;inset:0;z-index:70;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:420px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px"><div class="card-header" style="margin-bottom:16px"><div class="card-title" id="fu-modal-title">Set Follow-up</div><button class="action-btn danger" onclick="closeFuModal()" style="padding:4px 10px">&#x2715;</button></div><div class="field"><label>Follow-up Date</label><input type="date" id="fu-modal-date" style="width:100%"></div><div class="field"><label>Note</label><textarea id="fu-modal-note" style="width:100%;min-height:70px" placeholder="Add a note…"></textarea></div><div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="action-btn primary" style="flex:1" onclick="saveFuModal()">Save</button><button class="action-btn" style="flex:1;background:var(--green);color:#fff;border-color:transparent" onclick="markFuDone()">&#10003; Mark as Done</button><button class="action-btn secondary" onclick="closeFuModal()">Cancel</button></div></div></div>
   <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
@@ -1634,34 +1594,48 @@ const NET_KEYS = {
 };
 
 function netLoad(tab){
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    return SheetsDB.cache[tab] || [];
-  }
-  // localStorage fallback when not connected to Sheets
-  var manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]');
+  var manual = [];
+  try { manual = JSON.parse(localStorage.getItem(NET_KEYS[tab])||'[]'); } catch(e){ manual = []; }
   if(tab === 'investors'){
-    var sheet  = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var sheet = [];
+    try { sheet = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]'); } catch(e){ sheet = []; }
     var manualNames = new Set(manual.map(function(r){ return (r.investorName||'').toLowerCase(); }));
     var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
-    return manual.concat(sheetOnly);
+    var combined = manual.concat(sheetOnly);
+    if(window.SheetsDB && SheetsDB.isAuthenticated()){
+      // Merge: SheetsDB remote rows that aren't in local take precedence
+      var localIds = new Set(combined.map(function(r){ return r.id; }));
+      var remoteOnly = (SheetsDB.cache[tab]||[]).filter(function(r){ return !localIds.has(r.id); });
+      return combined.concat(remoteOnly);
+    }
+    return combined;
+  }
+  if(window.SheetsDB && SheetsDB.isAuthenticated()){
+    var local = manual;
+    var remote = SheetsDB.cache[tab] || [];
+    var localIds = new Set(local.map(function(r){ return r.id; }));
+    var remoteOnly = remote.filter(function(r){ return !localIds.has(r.id); });
+    return local.concat(remoteOnly);
   }
   return manual;
 }
 function netSave(tab, data){
+  // ALWAYS write to localStorage immediately (durability guarantee)
+  try {
+    if(tab === 'investors'){
+      var manualOnly = data.filter(function(r){ return !r._fromSheet; });
+      localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
+    } else {
+      localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
+    }
+  } catch(e){ console.error('[netSave] localStorage write failed', e); }
+
   if(window.SheetsDB && SheetsDB.isAuthenticated()){
     // Update cache synchronously so re-renders are instant
     SheetsDB.cache[tab] = data;
     // Write to Sheets in background — errors shown as toasts
     SheetsDB.pushTab(tab, data).catch(function(e){ console.error('[netSave]', e); });
-    return;
   }
-  // localStorage fallback
-  if(tab === 'investors'){
-    var manualOnly = data.filter(function(r){ return !r._fromSheet; });
-    localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
-    return;
-  }
-  localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
 }
 
 
@@ -1770,6 +1744,11 @@ let dragStartup='',dragInvestor='';
 
 // ═══ INIT ═══
 window.onload = async () => {
+  // Restore Drive token from localStorage to sessionStorage if needed
+  var _storedDriveTok = localStorage.getItem('log7_drive_token');
+  if(_storedDriveTok && !sessionStorage.getItem('log7_gapi_token')){
+    sessionStorage.setItem('log7_gapi_token', _storedDriveTok);
+  }
   const key=localStorage.getItem('l7_key')||'';
   document.getElementById('api-key').value=key;
   loadPreferences();loadUserProfile();loadTemplates();
@@ -1798,14 +1777,15 @@ window.onload = async () => {
 function showTab(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  var _pg=document.getElementById('page-'+name);
+  if(!_pg) return;
+  _pg.classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='pipeline'){
     renderKanban();renderPipelineList();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchTabInto('pipeline').then(function(){renderKanban();renderPipelineList();});
   }
   if(name==='audit') renderAuditLog();
-  if(name==='memo') generateICMemo();
   if(name==='network'){
     renderNetworkTab();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()){
@@ -2415,20 +2395,28 @@ function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
   const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
+  // Build investor\u2192fundName lookup for display
+  var netInvsKanban=netLoad('investors');
+  var fundByInv={};
+  netInvsKanban.forEach(function(inv){
+    var nm=(inv.investorName||inv.name||'').trim();
+    if(nm) fundByInv[nm.toLowerCase()]=inv.fundName||'';
+  });
   // Build startup\u2192roundSize lookup from Network startups for \u20b9 totals
   var netSt=netLoad('startups');
   var sizeBy={};netSt.forEach(function(s){var n=s.companyName||s.name||'';if(n)sizeBy[n.toLowerCase()]=s.roundSize||s.roundSizeCr||s.fundraise||'';});
   function parseCr(v){if(v==null)return 0;var s=String(v);var m=s.replace(/,/g,'').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;}
   function stageTotal(items){return items.reduce(function(acc,it){return acc+parseCr(sizeBy[String(it.startup).toLowerCase()]||0);},0);}
   function fmtCr(n){return n>0?' \u2022 \u20b9'+(n>=1?n.toFixed(n%1===0?0:1):n)+'Cr':'';}
-  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.investor)+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
+  boardEl.innerHTML='<div class="kanban-board">'+PIPELINE_STAGES.map(stage=>'<div class="kanban-col" data-stage="'+stage+'" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleKanbanDrop(event,\''+stage+'\')"><div class="kanban-col-header"><span>'+stage+' ('+byStage[stage].length+')'+fmtCr(stageTotal(byStage[stage]))+'</span></div>'+byStage[stage].map(item=>{const crm=getInvestorCRM(item.startup,item.investor);var _invFund=fundByInv[(item.investor||'').toLowerCase()]||'';var _invDisplay=escapeHtml(item.investor)+(_invFund?' / '+escapeHtml(_invFund):'');return'<div class="kanban-card" draggable="true" ondragstart="handleKanbanDragStart(event,\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')"><div class="kanban-card-title"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none">'+_invDisplay+'</a></div><div class="kanban-card-meta"><a href="#" onclick="event.preventDefault();event.stopPropagation();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--muted);text-decoration:underline">'+escapeHtml(item.startup)+'</a> \u00b7 '+item.score+'</div><div class="tag-row" style="margin-top:5px"><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'" style="font-size:9.5px">'+crm.status+'</span>'+(crm.followUp?'<span class="tag warn" style="font-size:9.5px">'+crm.followUp+'</span>':'')+'</div><div class="action-row" style="margin-top:7px"><select style="font-size:10px;padding:3px 6px;border-radius:5px" onchange="movePipelineStage(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\',this.value)">'+PIPELINE_STAGES.map(s=>'<option value="'+s+'" '+(item.stage===s?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="action-btn danger" style="padding:3px 7px;font-size:9.5px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">&#x2715;</button></div></div>';}).join('')+'</div>').join('')+'</div>';
 }
 function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInvestor=investor;e.dataTransfer.effectAllowed='move';}
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup&&dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
   const el=document.getElementById('pipeline-list');if(!el)return;const pipeline=getPipeline();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
-  el.innerHTML='<table class="table"><thead><tr><th>Investor</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
+  var _netInvsPL=netLoad('investors');var _fundByInvPL={};_netInvsPL.forEach(function(inv){var nm=(inv.investorName||inv.name||'').trim();if(nm)_fundByInvPL[nm.toLowerCase()]=inv.fundName||'';});
+  el.innerHTML='<table class="table"><thead><tr><th>Investor / Fund</th><th>Startup</th><th>Score</th><th>Verdict</th><th>Stage</th><th>Status</th><th>Follow-Up</th><th></th></tr></thead><tbody>'+pipeline.map(item=>{const crm=getInvestorCRM(item.startup,item.investor);var _plfund=_fundByInvPL[(item.investor||'').toLowerCase()]||'';return'<tr><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'investor\',\''+escapeQ(item.investor)+'\')" style="color:var(--accent);text-decoration:none;font-weight:600">'+escapeHtml(item.investor)+(_plfund?'<br><span style="color:var(--muted);font-size:10.5px;font-weight:400">'+escapeHtml(_plfund)+'</span>':'')+'</a></td><td><a href="#" onclick="event.preventDefault();openNetEntityModal(\'startup\',\''+escapeQ(item.startup)+'\')" style="color:var(--accent);text-decoration:none">'+escapeHtml(item.startup)+'</a></td><td><span style="color:'+scoreColor(item.score)+'">'+item.score+'</span></td><td><span class="tag '+verdictClass(item.verdict)+'">'+escapeHtml(item.verdict)+'</span></td><td>'+escapeHtml(item.stage||PIPELINE_STAGES[0])+'</td><td><span class="status-pill '+(crm.status==='invested'||crm.status==='meeting booked'?'hot':crm.status==='passed'?'pass':'')+'">'+crm.status+'</span></td><td>'+(crm.followUp||'\u2014')+'</td><td><button class="action-btn danger" style="padding:3px 9px" onclick="removePipelineItem(\''+escapeQ(item.startup)+'\',\''+escapeQ(item.investor)+'\')">Remove</button></td></tr>';}).join('')+'</tbody></table>';
 }
 function clearPipeline(){if(!confirm('Clear the entire pipeline?'))return;setPipeline([]);localStorage.removeItem('l7_pipeline');renderKanban();renderPipelineList();refreshHome();updateStats();addAuditEntry('pipeline','Pipeline cleared');}
 
@@ -3297,8 +3285,12 @@ function renderNetList(tab){
   var el = document.getElementById('net-list-'+tab);
   if(!el) return;
   var rows = netLoad(tab);
+  var _ns = ((document.getElementById('net-search')||{value:''}).value||'').toLowerCase().trim();
+  if(_ns) rows = rows.filter(function(r){ return JSON.stringify(r).toLowerCase().indexOf(_ns) >= 0; });
   if(!rows.length){
-    el.innerHTML = '<div class="empty" style="padding:20px">No entries yet. Click + Add New to get started.</div>';
+    el.innerHTML = '<div class="empty" style="padding:20px">'
+      + (_ns ? 'No entries match your search.' : 'No entries yet. Click + Add New to get started.')
+      + '</div>';
     return;
   }
   var fields = netFields(tab);
@@ -3322,7 +3314,7 @@ function renderNetList(tab){
 
   rows.forEach(function(row){
     var isDue = row.followUpDate && row.followUpDate <= today;
-    html += '<tr style="border-bottom:1px solid var(--border)"'+(isDue?' class="net-row-due"':'')+' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    html += '<tr style="border-bottom:1px solid var(--border);'+(row.followUpDone?'opacity:0.65;':'')+(isDue?' background:rgba(245,166,35,0.04);':'')+'"'+(isDue?' class="net-row-due"':'')+' onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
     visibleFields.forEach(function(f){
       var val = row[f.key]||'—';
       var cell = '<td style="padding:8px 10px;white-space:nowrap">';
@@ -3345,7 +3337,10 @@ function renderNetList(tab){
     }
     // Follow-up date cell
     var fuColor = !row.followUpDate ? 'var(--muted)' : row.followUpDate < today ? 'var(--red)' : row.followUpDate === today ? 'var(--amber)' : 'var(--text)';
-    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+(row.followUpDate||'—')+(isDue?' ⚑':'')+'</td>';
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'
+      + (row.followUpDone ? '<span style="color:var(--green);font-weight:600;font-size:11px">&#10003; Done</span>' : ((row.followUpDate||'—')+(isDue?' ⚑':'')))
+      + ' <button class="action-btn secondary" style="padding:1px 6px;font-size:10px;margin-left:4px" onclick="openFuModal(\''+tab+'\','+row.id+')" title="Set follow-up">&#128197;</button>'
+      + '</td>';
     html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     if(tab==='investors'||tab==='startups'){
       var entType = tab==='investors' ? 'investor' : 'startup';
@@ -3447,18 +3442,15 @@ function saveNetworkEntry(){
   var ok = true;
   fields.forEach(function(f){
     var el = document.getElementById('nf-'+f.key);
-    if(!el){ console.warn('[Save] field not found in DOM: nf-'+f.key); return; }
+    if(!el){ return; }
     var val = el.value.trim();
     if(f.required && !val){ el.style.borderColor='var(--red)'; ok=false; return; }
     entry[f.key] = val;
   });
   if(!ok){ showError('Please fill in required fields.'); return; }
 
-  // Belt-and-suspenders: explicitly read followUpDate in case loop missed it
   var fuEl = document.getElementById('nf-followUpDate');
   if(fuEl){ entry.followUpDate = fuEl.value || ''; }
-  console.log('[Save] tab:', tab, '| followUpDate input el:', fuEl, '| value:', fuEl ? fuEl.value : 'NOT FOUND');
-  console.log('[Save] full entry before persist:', JSON.stringify(entry));
 
   var rows = netLoad(tab);
   if(_netEditId !== null){
@@ -3476,12 +3468,6 @@ function saveNetworkEntry(){
     rows.push(entry);
   }
   netSave(tab, rows);
-
-  // Verify what was actually written to localStorage
-  var savedRows = netLoad(tab);
-  var savedEntry = savedRows.find(function(r){ return r.id === entry.id; });
-  console.log('[Save] verified from localStorage:', JSON.stringify(savedEntry));
-
   closeNetworkModal();
   renderNetList(tab);
   syncFollowupsToServer();
@@ -3650,6 +3636,66 @@ function netResetToSheet(id){
   localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetCache));
   renderNetList('investors');
   syncFollowupsToServer();
+}
+
+// ── FOLLOW-UP QUICK MODAL ─────────────────────────────────────
+var _fuModalTab = '';
+var _fuModalId = null;
+
+function openFuModal(tab, id){
+  var rows = netLoad(tab);
+  var row = rows.find(function(r){ return r.id===id; });
+  if(!row) return;
+  _fuModalTab = tab;
+  _fuModalId = id;
+  var titleEl = document.getElementById('fu-modal-title');
+  if(titleEl) titleEl.textContent = 'Follow-up: ' + netPrimaryKey(tab, row);
+  var dateEl = document.getElementById('fu-modal-date');
+  if(dateEl) dateEl.value = row.followUpDate || '';
+  var noteEl = document.getElementById('fu-modal-note');
+  if(noteEl) noteEl.value = row.notes || '';
+  var modal = document.getElementById('net-followup-modal');
+  if(modal){ modal.classList.remove('hidden'); modal.style.display='flex'; }
+}
+
+function closeFuModal(){
+  var modal = document.getElementById('net-followup-modal');
+  if(modal){ modal.classList.add('hidden'); modal.style.display='none'; }
+  _fuModalTab = '';
+  _fuModalId = null;
+}
+
+function saveFuModal(){
+  if(!_fuModalTab || _fuModalId === null) return;
+  var rows = netLoad(_fuModalTab);
+  var row = rows.find(function(r){ return r.id===_fuModalId; });
+  if(!row){ closeFuModal(); return; }
+  var dateEl = document.getElementById('fu-modal-date');
+  var noteEl = document.getElementById('fu-modal-note');
+  if(dateEl) row.followUpDate = dateEl.value || '';
+  if(noteEl) row.notes = noteEl.value;
+  netSave(_fuModalTab, rows);
+  closeFuModal();
+  renderNetList(_fuModalTab);
+  refreshNetFollowups();
+  addAuditEntry('network','Follow-up updated', netPrimaryKey(_fuModalTab, row));
+}
+
+function markFuDone(){
+  if(!_fuModalTab || _fuModalId === null) return;
+  var rows = netLoad(_fuModalTab);
+  var row = rows.find(function(r){ return r.id===_fuModalId; });
+  if(!row){ closeFuModal(); return; }
+  var noteEl = document.getElementById('fu-modal-note');
+  if(noteEl) row.notes = noteEl.value;
+  row.followUpDate = '';
+  row.followUpDone = true;
+  netSave(_fuModalTab, rows);
+  closeFuModal();
+  renderNetList(_fuModalTab);
+  refreshNetFollowups();
+  refreshHome();
+  addAuditEntry('network','Follow-up marked done', netPrimaryKey(_fuModalTab, row));
 }
 
 // ── WHATSAPP MANUAL TRIGGER ────────────────────────────────────
@@ -4066,7 +4112,7 @@ document.addEventListener('DOMContentLoaded', renderBulkOutreachPanel);
 
 // ═══ GLOBAL SEARCH ═══
 function goToTab(name){
-  var map={home:0,network:1,match:2,pipeline:3,startups:4,deck:5,memo:6,diligence:7,audit:8,docs:9};
+  var map={home:0,network:1,match:2,pipeline:3,startups:4,diligence:5,audit:6,docs:7,backup:8};
   var idx=map[name];if(idx==null)return;
   var btn=document.querySelectorAll('.nav-tab')[idx];if(btn)showTab(name,btn);
 }
