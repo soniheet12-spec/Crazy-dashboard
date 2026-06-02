@@ -3314,7 +3314,7 @@ function openAddDealModal(){
     var presetHtml=presetTags.map(function(t){return '<span onclick="addDealTag(\''+escapeQ(t)+'\')" style="cursor:pointer;display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:2px 9px;font-size:10px;margin:2px">'+escapeHtml(t)+'</span>';}).join('');
     body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
       + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
-      + '<div class="field-row"><div class="field"><label>Score (0-100)</label><input id="add-deal-score" type="number" min="0" max="100" value="50"></div><div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div></div>'
+      + '<div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div>'
       + '<div class="field"><label>Tags</label><div id="add-deal-tag-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:20px;margin-bottom:6px"></div><input id="add-deal-tag-input" placeholder="Type a tag, press Enter or comma" style="font-size:12px;width:100%" onkeydown="addDealTagOnKey(event)"><div style="margin-top:6px">'+presetHtml+'</div></div>'
       + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
   }
@@ -3324,14 +3324,13 @@ function closeAddDealModal(){var m=document.getElementById('add-deal-modal');m.c
 function submitAddDeal(){
   var startup  = document.getElementById('add-deal-startup').value;
   var investor = document.getElementById('add-deal-investor').value;
-  var score    = +document.getElementById('add-deal-score').value || 0;
   var stage    = document.getElementById('add-deal-stage').value;
   if(!startup || !investor) return showError('Pick both a startup and an investor.');
   var pipeline = getPipeline();
   if(pipeline.find(function(i){return i.startup===startup&&i.investor===investor;})){
     return showError('That deal is already in the pipeline.');
   }
-  pipeline.unshift({id:'pl_'+Date.now(),startup:startup,investor:investor,score:score,verdict:score>=70?'Strong Match':score>=40?'Good Match':'Weak Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage,hot:false,tags:_addDealTags.slice(),_crm:{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}});
+  pipeline.unshift({id:'pl_'+Date.now(),startup:startup,investor:investor,score:50,verdict:'Good Match',reasons:[],concerns:[],savedAt:new Date().toISOString(),stage:stage,hot:false,tags:_addDealTags.slice(),_crm:{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}});
   setPipeline(pipeline.slice(0,500));
   addAuditEntry('pipeline','Deal added manually',startup+' ↔ '+investor);
   closeAddDealModal();
@@ -4154,7 +4153,7 @@ function renderNetList(tab){
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
   var emailKey = tab==='startups' ? 'founderEmail' : 'contactEmail';
   var showEmail = tab==='investors' || tab==='partnerships' || tab==='startups';
-  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey).slice(0,4);
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey&&f.key!=='sectorFocus').slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
