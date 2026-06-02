@@ -1886,6 +1886,7 @@ window.SettingsDB = (function(){
       <div class="section-title">Network</div>
       <input type="text" id="net-search" placeholder="Search..." style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--s2);color:var(--text);width:180px" oninput="renderNetworkTab()">
       <button class="action-btn primary" onclick="openNetworkModal()">+ Add New</button>
+      <button class="ghost-btn" onclick="netDedupAll(false)">Remove Duplicates</button>
       <button class="ghost-btn" onclick="exportNetCsv()">Export CSV</button>
       <button class="ghost-btn" onclick="openCsvImport()">Import CSV</button>
       <input type="file" id="csv-import-file-input" accept=".csv" style="display:none" onchange="handleCsvFileSelect(event)">
@@ -2303,6 +2304,7 @@ function showTab(name,btn){
   }
   if(name==='audit') renderAuditLog();
   if(name==='network'){
+    netDedupAll(true);
     renderNetworkTab();
     if(window.SheetsDB&&SheetsDB.isAuthenticated()){
       Promise.all([SheetsDB.fetchTabInto('investors'),SheetsDB.fetchTabInto('startups'),SheetsDB.fetchTabInto('partnerships')]).then(function(){renderNetworkTab();});
@@ -4079,6 +4081,30 @@ function renderNetworkTab(){
   renderNetList('startups');
 }
 
+function netDedupAll(silent){
+  var primaryKeys = {partnerships:'partnerName', investors:'investorName', startups:'companyName'};
+  var totalRemoved = 0;
+  ['partnerships','investors','startups'].forEach(function(tab){
+    var rows = netLoad(tab);
+    var seen = new Set();
+    var deduped = rows.filter(function(r){
+      var key = (r[primaryKeys[tab]]||'').trim().toLowerCase();
+      if(!key) return true;
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    var removed = rows.length - deduped.length;
+    if(removed > 0){ netSave(tab, deduped); totalRemoved += removed; }
+  });
+  if(totalRemoved > 0){
+    renderNetworkTab();
+    if(!silent) showToast(totalRemoved+' duplicate'+(totalRemoved>1?'s':'')+' removed across Network tabs', 'success');
+    else showToast(totalRemoved+' duplicate'+(totalRemoved>1?'s':'')+' auto-removed from Network', 'info');
+  } else if(!silent){
+    showToast('No duplicates found', 'info');
+  }
+}
+
 // ── FIELD DEFINITIONS ──────────────────────────────────────────
 
 function netFields(tab){
@@ -4153,7 +4179,7 @@ function renderNetList(tab){
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
   var emailKey = tab==='startups' ? 'founderEmail' : 'contactEmail';
   var showEmail = tab==='investors' || tab==='partnerships' || tab==='startups';
-  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey&&f.key!=='sectorFocus').slice(0,4);
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey&&f.key!=='sectorFocus'&&f.key!=='stageFocus').slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
