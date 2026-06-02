@@ -4179,7 +4179,7 @@ function renderNetList(tab){
   var phoneKey = tab==='startups' ? 'founderPhone' : 'contactPhone';
   var emailKey = tab==='startups' ? 'founderEmail' : 'contactEmail';
   var showEmail = tab==='investors' || tab==='partnerships' || tab==='startups';
-  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey&&f.key!=='sectorFocus'&&f.key!=='stageFocus').slice(0,4);
+  var visibleFields = fields.filter(f=>f.key!=='notes'&&f.key!=='followUpDate'&&f.key!==phoneKey&&f.key!==emailKey&&f.key!=='sectorFocus'&&f.key!=='stageFocus'&&f.key!=='geography').slice(0,4);
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
