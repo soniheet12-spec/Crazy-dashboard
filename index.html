@@ -2127,6 +2127,14 @@ function _netFilterCorrupt(tab, rows){
   return rows.filter(function(e){
     var nm = (e[nk]||e.name||'').trim();
     return nm && !/^inv_\d+/.test(nm) && nm !== String(e.id||'');
+  }).map(function(e){
+    // Entries with NaN/missing id all serialize to 'NaN' in onclick — fix here so
+    // every row in the rendered table has a unique id that editNetEntry can look up
+    if(!e.id || String(e.id)==='NaN'){
+      var slug=(e[nk]||e.name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,30);
+      return Object.assign({},e,{id:'legacy_'+slug});
+    }
+    return e;
   });
 }
 function netLoad(tab){
@@ -2270,8 +2278,9 @@ let dragStartup='',dragInvestor='';
 
 // ═══ INIT ═══
 window.onload = async () => {
-  // One-time migration: fix sheet cache entries with NaN ids (from old Math.max bug)
+  // One-time migration: fix NaN/missing ids across all network stores
   try {
+    // Sheet cache — use sheetKey for stable id
     var _sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
     var _sheetFixed = false;
     _sheetCache.forEach(function(e){
@@ -2281,6 +2290,21 @@ window.onload = async () => {
       }
     });
     if(_sheetFixed) localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(_sheetCache));
+    // Manual stores — derive id from primary name key
+    var _manMigMap={l7_net_investors:'investorName',l7_net_partnerships:'partnerName',l7_net_startups:'companyName'};
+    Object.keys(_manMigMap).forEach(function(lsKey){
+      var nk=_manMigMap[lsKey];
+      var rows=JSON.parse(localStorage.getItem(lsKey)||'[]');
+      var fixed=false;
+      rows.forEach(function(e,i){
+        if(!e.id||String(e.id)==='NaN'){
+          var slug=(e[nk]||e.name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,30);
+          e.id='legacy_'+(slug||'entry')+'_'+i;
+          fixed=true;
+        }
+      });
+      if(fixed) localStorage.setItem(lsKey,JSON.stringify(rows));
+    });
   } catch(ex){}
   const key=getApiKey();
   document.getElementById('api-key').value=key;
