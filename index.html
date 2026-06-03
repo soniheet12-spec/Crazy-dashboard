@@ -1327,9 +1327,9 @@ const NET_KEYS = {
 };
 
 // ═══ GOOGLE SHEETS SYNC ═══
-// Runtime values — overridden from localStorage in loadPreferences()
-var GS_WEBAPP_URL = localStorage.getItem('log7_gs_url') || '';
-var GS_SHEET_ID   = localStorage.getItem('log7_gs_id')  || '';
+// Permanent defaults — overridden by Settings fields if set
+var GS_WEBAPP_URL = localStorage.getItem('log7_gs_url') || 'https://script.google.com/macros/s/AKfycbzu9xo4CiPps5psHDgRfL2eOlD2sLIrK2yEdCF08VNVeqSiRyEgCVMjXllrPG3_UlDVvg/exec';
+var GS_SHEET_ID   = localStorage.getItem('log7_gs_id')  || '1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0';
 
 function _gsConfigured(){
   return GS_WEBAPP_URL && GS_WEBAPP_URL !== 'YOUR_WEBAPP_URL' && GS_SHEET_ID && GS_SHEET_ID !== 'YOUR_SHEET_ID';
@@ -1676,12 +1676,9 @@ function loadPreferences(){
   document.getElementById('matching-mode').value=mm;
   var ts=localStorage.getItem('l7_settings_last_saved');
   var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
-  // Load GS settings
-  var gsUrl=localStorage.getItem('log7_gs_url')||'';
-  var gsId=localStorage.getItem('log7_gs_id')||'';
-  var urlEl=document.getElementById('gs-webapp-url');if(urlEl)urlEl.value=gsUrl;
-  var idEl=document.getElementById('gs-sheet-id');if(idEl)idEl.value=gsId;
-  GS_WEBAPP_URL=gsUrl; GS_SHEET_ID=gsId;
+  // Load GS settings — fall back to hardcoded defaults so fields always show current values
+  var urlEl=document.getElementById('gs-webapp-url');if(urlEl)urlEl.value=GS_WEBAPP_URL;
+  var idEl=document.getElementById('gs-sheet-id');if(idEl)idEl.value=GS_SHEET_ID;
 }
 function saveGsSettings(){
   var url=(document.getElementById('gs-webapp-url').value||'').trim();
