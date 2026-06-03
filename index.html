@@ -2275,6 +2275,16 @@ window.onload = async () => {
       });
       if(cleaned.length !== raw.length) localStorage.setItem(lsKey, JSON.stringify(cleaned));
     });
+    // Fix sheet cache entries with NaN ids (from old Math.max bug) — give them stable ids
+    var _sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
+    var _sheetFixed = false;
+    _sheetCache.forEach(function(e){
+      if(!e.id || String(e.id)==='NaN'){
+        e.id = 'sheet_row_' + (e._sheetKey||'').replace('sheet-','');
+        _sheetFixed = true;
+      }
+    });
+    if(_sheetFixed) localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(_sheetCache));
   } catch(ex){}
   const key=getApiKey();
   document.getElementById('api-key').value=key;
@@ -4076,7 +4086,7 @@ async function analyseExtraDoc(id){var apiKey=getApiKey();if(!apiKey){showError(
 let _netActiveTab = 'partnerships';
 let _netEditId = null;
 
-function netNextId(arr){ return arr.length ? Math.max(...arr.map(r=>r.id||0))+1 : 1; }
+function netNextId(arr){ return 'manual_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 
 function switchNetTab(tab, btn){
   _netActiveTab = tab;
@@ -4749,7 +4759,6 @@ async function netFetchInvestors(){
 
     var existing = netLoad('investors');
     var manual   = existing.filter(function(r){ return !r._fromSheet; });
-    var nextId   = existing.length ? Math.max.apply(null, existing.map(function(r){ return r.id||0; })) + 1 : 1;
 
     // Build sheet entries; preserve local overrides and follow-up dates
     var sheetEntries = [];
@@ -4757,12 +4766,15 @@ async function netFetchInvestors(){
       // Unique sheet key: row index in sheet
       var sheetKey = 'sheet-'+inv._sheetRowIdx;
       var prev = existing.find(function(r){ return r._fromSheet && r._sheetKey === sheetKey; });
+      // Stable string ID based on sheet row — avoids NaN from Math.max over mixed id types
+      var stableId = 'sheet_row_' + inv._sheetRowIdx;
       if(prev && prev._localOverride){
-        // Keep locally edited version; just update _sheetData for Reset
+        // Keep locally edited version; ensure id is valid, update _sheetData for Reset
+        if(!prev.id || String(prev.id)==='NaN') prev = Object.assign({}, prev, {id: stableId});
         sheetEntries.push(Object.assign({}, prev, { _sheetData: inv }));
       } else {
         sheetEntries.push({
-          id:           prev ? prev.id : nextId++,
+          id:           (prev && prev.id && String(prev.id)!=='NaN') ? prev.id : stableId,
           _sheetKey:    sheetKey,
           investorName: inv.investorName,
           fundName:     inv.fundName,
