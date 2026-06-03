@@ -1344,8 +1344,11 @@ async function gsWrite(tab, entries){
     } else {
       rows = [['id','data']].concat(entries.map(function(e){ return [e.id||'', JSON.stringify(e)]; }));
     }
+    // mode: 'no-cors' is required for Apps Script POST — avoids CORS preflight/redirect issues.
+    // The write goes through; we just can't read the response (which we don't need).
     await fetch(GS_WEBAPP_URL, {
       method: 'POST',
+      mode: 'no-cors',
       body: JSON.stringify({ sheetId: GS_SHEET_ID, tab: tab, action: 'write', rows: rows })
     });
   } catch(err){ console.warn('[gsWrite] '+tab+':', err); }
@@ -1354,8 +1357,10 @@ async function gsWrite(tab, entries){
 async function gsRead(tab){
   if(!_gsConfigured()) return null;
   try {
-    var res = await fetch(GS_WEBAPP_URL + '?sheetId=' + encodeURIComponent(GS_SHEET_ID) + '&tab=' + encodeURIComponent(tab));
-    var json = await res.json();
+    var url = GS_WEBAPP_URL + '?sheetId=' + encodeURIComponent(GS_SHEET_ID) + '&tab=' + encodeURIComponent(tab);
+    var res = await fetch(url, { redirect: 'follow' });
+    var text = await res.text();
+    var json = JSON.parse(text);
     if(!json.ok || !json.data || json.data.length < 2) return [];
     return json.data.slice(1).map(function(row){ try{ return JSON.parse(row[1]); }catch(e){ return null; } }).filter(Boolean);
   } catch(err){ console.warn('[gsRead] '+tab+':', err); return null; }
