@@ -658,6 +658,7 @@ window.SettingsDB = (function(){
         <div class="settings-label">&#128202; Google Sheet ID</div>
         <input type="text" id="gs-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" oninput="saveGsSettings()">
         <div class="template-help">The long ID from your Sheet&rsquo;s URL: /spreadsheets/d/<strong>ID</strong>/edit</div>
+        <button id="gs-test-btn" onclick="gsTestConnection()" style="margin-top:8px;padding:6px 12px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;width:100%">Test Connection</button>
       </div>
     </div>
   </div>
@@ -1344,26 +1345,57 @@ async function gsWrite(tab, entries){
     } else {
       rows = [['id','data']].concat(entries.map(function(e){ return [e.id||'', JSON.stringify(e)]; }));
     }
-    // mode: 'no-cors' is required for Apps Script POST — avoids CORS preflight/redirect issues.
-    // The write goes through; we just can't read the response (which we don't need).
     await fetch(GS_WEBAPP_URL, {
       method: 'POST',
       mode: 'no-cors',
       body: JSON.stringify({ sheetId: GS_SHEET_ID, tab: tab, action: 'write', rows: rows })
     });
-  } catch(err){ console.warn('[gsWrite] '+tab+':', err); }
+  } catch(err){ console.error('[gsWrite] '+tab+':', err); }
 }
 
 async function gsRead(tab){
   if(!_gsConfigured()) return null;
   try {
     var url = GS_WEBAPP_URL + '?sheetId=' + encodeURIComponent(GS_SHEET_ID) + '&tab=' + encodeURIComponent(tab);
-    var res = await fetch(url, { redirect: 'follow' });
+    var res = await fetch(url, { redirect: 'follow', cache: 'no-cache' });
     var text = await res.text();
     var json = JSON.parse(text);
     if(!json.ok || !json.data || json.data.length < 2) return [];
     return json.data.slice(1).map(function(row){ try{ return JSON.parse(row[1]); }catch(e){ return null; } }).filter(Boolean);
-  } catch(err){ console.warn('[gsRead] '+tab+':', err); return null; }
+  } catch(err){ console.error('[gsRead] '+tab+':', err); return null; }
+}
+
+async function gsTestConnection(){
+  var btn = document.getElementById('gs-test-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Testing…'; }
+  var log = [];
+  // Step 1: write a test row
+  try {
+    var testRow = [['id','data'],['_test_', JSON.stringify({id:'_test_',note:'connection_check',ts:Date.now()})]];
+    await fetch(GS_WEBAPP_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ sheetId: GS_SHEET_ID, tab: 'Test', action: 'write', rows: testRow })
+    });
+    log.push('WRITE: sent (no-cors — cannot confirm)');
+  } catch(e){ log.push('WRITE ERROR: '+e.message); }
+
+  // Step 2: wait 2s then read back
+  await new Promise(function(r){ setTimeout(r, 2000); });
+  try {
+    var url = GS_WEBAPP_URL + '?sheetId=' + encodeURIComponent(GS_SHEET_ID) + '&tab=Test';
+    var res = await fetch(url, { redirect: 'follow', cache: 'no-cache' });
+    var text = await res.text();
+    log.push('READ status: ' + res.status + ' (' + res.type + ')');
+    log.push('READ body (first 300 chars): ' + text.slice(0,300));
+    try {
+      var json = JSON.parse(text);
+      log.push('READ parsed ok: ' + (json.ok ? 'yes' : 'no') + ', rows: ' + (json.data ? json.data.length : 0));
+    } catch(pe){ log.push('READ parse error: '+pe.message); }
+  } catch(e){ log.push('READ ERROR: '+e.message); }
+
+  console.log('[gsTest]\n' + log.join('\n'));
+  alert('Sheets Test Results:\n\n' + log.join('\n') + '\n\n(Also in browser Console — F12 → Console)');
+  if(btn){ btn.disabled=false; btn.textContent='Test Connection'; }
 }
 
 async function netSync(tab){
