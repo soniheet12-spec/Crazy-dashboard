@@ -1,4 +1,4 @@
-const CACHE = 'log7-v6';
+const CACHE = 'log7-v8';
 const SHELL = [
   '/',
   '/index.html',
@@ -22,12 +22,11 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Only handle GET; skip cross-origin API calls (Google, Sheets, Drive)
+  // Only handle GET; skip cross-origin API calls
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // Let Sheets/Drive/Auth API calls go straight to network
+  // Let external API calls go straight to network
   if (url.hostname.includes('googleapis.com') ||
-      url.hostname.includes('accounts.google.com') ||
       url.pathname.startsWith('/api/')) return;
 
   // Network-first for HTML/navigation so new deploys show up immediately.

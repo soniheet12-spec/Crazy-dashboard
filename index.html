@@ -17,7 +17,6 @@
     document.documentElement.setAttribute('data-theme','dark');
 })();
 </script>
-<script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -530,810 +529,17 @@
 #overdue-banner{display:none;position:sticky;top:0;z-index:19;background:rgba(240,101,101,0.1);border-bottom:1px solid rgba(240,101,101,0.28);padding:9px 16px;font-size:13px;align-items:center;gap:10px;color:var(--text);}
 </style>
 <script>
-// ═══════════════════════════════════════════════════════════════
-// LOG7 BACKUP SYSTEM — inlined
-// ═══════════════════════════════════════════════════════════════
-(function(){
-var GOOGLE_CLIENT_ID = '918188740743-36sgbscqcjpr3lftb4b81jq6uts60qgl.apps.googleusercontent.com';
-var DRIVE_FOLDER_ID  = '1rwJ3Gx992uo5Ol41-ry2oIvBwHWe4J5A';
-var TOKEN_KEY        = 'log7_gapi_token';
-var SETTINGS_KEY     = 'log7_backup_settings';
-var HISTORY_KEY      = 'log7_backup_history';
-var BACKUP_PREFIX    = 'log7_backup_';
-var MAX_HISTORY      = 20;
-
-// ── Snapshot ──────────────────────────────────────────────────
-function collectSnapshot(){
-  var snap={version:'1.0',timestamp:new Date().toISOString(),source:window.location.hostname,data:{},meta:{totalKeys:0,sizeBytes:0}};
-  for(var i=0;i<localStorage.length;i++){
-    var k=localStorage.key(i);
-    if(k&&k.startsWith('l7_'))snap.data[k]=localStorage.getItem(k);
-  }
-  var str=JSON.stringify(snap.data);
-  snap.meta.totalKeys=Object.keys(snap.data).length;
-  snap.meta.sizeBytes=new Blob([str]).size;
-  return snap;
-}
-
-// ── Token ─────────────────────────────────────────────────────
-function getToken(){return sessionStorage.getItem(TOKEN_KEY)||null;}
-
-// ── Drive upload ──────────────────────────────────────────────
-async function uploadToDrive(snap){
-  var token=getToken();
-  if(!token)throw new Error('Not connected to Google Drive. Click "Connect Google Drive" first.');
-  var filename=BACKUP_PREFIX+snap.timestamp.replace(/[:.]/g,'-')+'.json';
-  var body=JSON.stringify(snap,null,2);
-  var boundary='l7bk';
-  var meta={name:filename,parents:[DRIVE_FOLDER_ID],mimeType:'application/json',
-    description:'Log7 backup — '+snap.meta.totalKeys+' keys, '+fmtBytes(snap.meta.sizeBytes)};
-  var mp=['--'+boundary,'Content-Type: application/json; charset=UTF-8','',JSON.stringify(meta),
-    '--'+boundary,'Content-Type: application/json','',body,'--'+boundary+'--'].join('\r\n');
-  var r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
-    method:'POST',
-    headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},
-    body:mp});
-  if(!r.ok){
-    if(r.status===401){sessionStorage.removeItem(TOKEN_KEY);throw new Error('Session expired. Reconnect Google Drive.');}
-    var e=await r.json();throw new Error((e&&e.error&&e.error.message)||'Upload failed: '+r.status);
-  }
-  return await r.json();
-}
-
-// ── List backups ──────────────────────────────────────────────
-async function listBackups(){
-  var token=getToken();if(!token)return[];
-  var q=encodeURIComponent("'"+DRIVE_FOLDER_ID+"' in parents and name contains '"+BACKUP_PREFIX+"' and trashed=false");
-  var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime+desc&pageSize=30&fields=files(id,name,createdTime,description,size)',
-    {headers:{Authorization:'Bearer '+token}});
-  if(!r.ok){if(r.status===401)sessionStorage.removeItem(TOKEN_KEY);return[];}
-  var d=await r.json();return d.files||[];
-}
-
-// ── Restore ───────────────────────────────────────────────────
-async function restoreFromDrive(fileId,filename){
-  var token=getToken();if(!token)throw new Error('Not connected to Google Drive.');
-  var r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
-    {headers:{Authorization:'Bearer '+token}});
-  if(!r.ok)throw new Error('Download failed: '+r.status);
-  var snap=await r.json();
-  if(!snap||!snap.data)throw new Error('Invalid backup format.');
-  localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(collectSnapshot()));
-  var n=0;
-  Object.keys(snap.data).forEach(function(k){localStorage.setItem(k,snap.data[k]);n++;});
-  addHistory({action:'restore',filename:filename,fileId:fileId,timestamp:new Date().toISOString(),keysRestored:n,fromTimestamp:snap.timestamp});
-  return{restored:n,fromTimestamp:snap.timestamp};
-}
-
-// ── History / Settings ────────────────────────────────────────
-function getHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return[];}}
-function addHistory(e){var h=getHistory();h.unshift(e);localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,MAX_HISTORY)));}
-function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');}catch(e){return{};}}
-function saveSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
-
-// ── Auto-backup ───────────────────────────────────────────────
-var _timer=null;
-function startAuto(){
-  stopAuto();
-  var s=getSettings();var h=s.intervalHours||6;
-  _timer=setInterval(async function(){try{await doBackup('auto');}catch(e){console.warn('[Backup] auto failed:',e.message);}},h*3600000);
-}
-function stopAuto(){if(_timer){clearInterval(_timer);_timer=null;}}
-
-// ── Main backup trigger ───────────────────────────────────────
-async function doBackup(src){
-  var snap=collectSnapshot();
-  var file=await uploadToDrive(snap);
-  addHistory({action:'backup',source:src||'manual',filename:file.name,fileId:file.id,timestamp:snap.timestamp,keys:snap.meta.totalKeys,sizeBytes:snap.meta.sizeBytes});
-  var s=getSettings();s.lastBackupAt=snap.timestamp;s.lastBackupFile=file.name;saveSettings(s);
-  return{file:file,snapshot:snap};
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB';}
-function fmtAgo(iso){
-  if(!iso)return'Never';
-  var d=Date.now()-new Date(iso).getTime();var m=Math.floor(d/60000);
-  if(m<1)return'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);
-  if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
-}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-// ── OAuth ─────────────────────────────────────────────────────
-var _tc=null;
-function initTokenClient(){
-  if(_tc||!window.google||!window.google.accounts)return;
-  _tc=window.google.accounts.oauth2.initTokenClient({
-    client_id:GOOGLE_CLIENT_ID,
-    scope:'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-    callback:function(resp){
-      if(resp.error){ if(window._driveSilentPending){window._driveSilentPending=false;return;} _toast('Sign-in failed: '+resp.error,'error');return;}
-      window._driveSilentPending=false;
-      sessionStorage.setItem(TOKEN_KEY,resp.access_token);
-      try{
-        var ttl=(parseInt(resp.expires_in,10)||3600)*1000;
-        localStorage.setItem('log7_gdrive_token', JSON.stringify({access_token:resp.access_token, expires_at:Date.now()+ttl}));
-      }catch(e){}
-      if(typeof _refreshSettingsBackupStatus==='function'){try{_refreshSettingsBackupStatus();}catch(e){}}
-      _toast('Google Drive connected ✓');
-      renderPanel('backup-panel-container');
-      startAuto();
-      // Initialize Sheets DB after auth — ensure tabs exist first, then migrate and fetch
-      if(window.SheetsDB) window.SheetsDB.ensureSheetTabsExist().then(function(){
-        return window.SheetsDB.migrateFromLocalStorage();
-      }).then(function(){
-        return window.SheetsDB.fetchAll();
-      }).then(function(ok){
-        if(!ok) return;
-        window.SettingsDB.load().then(function(){
-          loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
-          renderNetworkTab(); renderKanban(); renderPipelineList(); renderNetPipelineSection(); refreshHome();
-        });
-        window.SheetsDB.startPolling();
-      }).catch(function(e){
-        console.error('[SheetsDB] ensureSheetTabsExist error:', e);
-        _toast('Failed to initialize Sheets tabs: '+e.message, 'error');
-      });
-    }
-  });
-}
-function connectDrive(){
-  initTokenClient();
-  if(!_tc){
-    // GIS not loaded yet — retry once
-    setTimeout(function(){initTokenClient();if(_tc)_tc.requestAccessToken({prompt:'consent'});else _toast('Google Identity Services not ready. Try again.','error');},600);
-    return;
-  }
-  _tc.requestAccessToken({prompt:'consent'});
-}
-
-// ── Persistent Drive auth: restore from localStorage / silent refresh ──
-function driveStoredToken(){
-  try{ var t=JSON.parse(localStorage.getItem('log7_gdrive_token')||'null'); if(t&&t.access_token&&t.expires_at) return t; }catch(e){}
-  return null;
-}
-function driveTokenValid(){ var t=driveStoredToken(); return !!(t && t.expires_at > Date.now()+60000); }
-function driveSilentRefresh(){
-  initTokenClient();
-  if(!_tc){ setTimeout(driveSilentRefresh,800); return; }
-  window._driveSilentPending=true;
-  try{ _tc.requestAccessToken({prompt:''}); }catch(e){ window._driveSilentPending=false; }
-}
-function driveRestoreOnLoad(){
-  var t=driveStoredToken();
-  if(t && t.expires_at > Date.now()){
-    // Token still valid — rehydrate sessionStorage so all getToken() calls work
-    sessionStorage.setItem(TOKEN_KEY, t.access_token);
-    startAuto();
-  } else if(t){
-    // Expired but previously connected — attempt silent refresh
-    driveSilentRefresh();
-  }
-  if(typeof _refreshSettingsBackupStatus==='function'){ setTimeout(function(){try{_refreshSettingsBackupStatus();}catch(e){}},300); }
-}
-function driveDisconnect(){
-  sessionStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem('log7_gdrive_token');
-  stopAuto();
-  if(typeof _refreshSettingsBackupStatus==='function'){try{_refreshSettingsBackupStatus();}catch(e){}}
-}
-window._driveRestoreOnLoad = driveRestoreOnLoad;
-window._driveSilentRefresh = driveSilentRefresh;
-window._driveTokenValid = driveTokenValid;
-window._driveDisconnect = driveDisconnect;
-
-// ── Toast ──────────────────────────────────────────────────────
-function _toast(msg,kind){
-  if(typeof window.showToast==='function'){window.showToast(msg,kind==='error'?'error':undefined);return;}
-  var t=document.createElement('div');t.textContent=msg;
-  t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;background:'+(kind==='error'?'#f44336':'#4caf50')+';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.4)';
-  document.body.appendChild(t);setTimeout(function(){t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(function(){t.remove();},320);},3000);
-}
-
-// ── Render panel ──────────────────────────────────────────────
-function renderPanel(containerId){
-  var el=document.getElementById(containerId);if(!el)return;
-  var s=getSettings(),hist=getHistory(),snap=collectSnapshot(),connected=!!getToken();
-  var rows=hist.slice(0,10).map(function(h){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">'
-      +'<div style="font-size:14px;width:20px;text-align:center">'+(h.action==='restore'?'&#8681;':h.source==='auto'?'&#8635;':'&#8679;')+'</div>'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
-      +esc(h.action==='restore'?'Restored: '+(h.fromTimestamp?new Date(h.fromTimestamp).toLocaleString('en-IN'):h.filename):(h.filename||'Backup'))+'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(h.source==='auto'?'Auto':'Manual')+' &middot; '+(h.keys||h.keysRestored||'?')+' keys'+(h.sizeBytes?' &middot; '+fmtBytes(h.sizeBytes):'')+'</div>'
-      +'</div>'
-      +'<div style="font-size:11px;color:var(--muted);white-space:nowrap">'+fmtAgo(h.timestamp)+'</div>'
-      +'</div>';
-  }).join('');
-
-  el.innerHTML=
-    '<div style="display:flex;flex-direction:column;gap:16px">'
-
-    // Header
-    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
-    +'<div><div style="font-size:15px;font-weight:700;color:var(--text)">&#128190; Data Backup</div>'
-    +'<div style="font-size:12px;color:var(--muted);margin-top:2px">All dashboard data backed up to Google Drive</div></div>'
-    +'<div style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;white-space:nowrap;'
-    +(s.lastBackupAt?'background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)':'background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)')+'">'+
-    (s.lastBackupAt?'&#9679; Last: '+fmtAgo(s.lastBackupAt):'&#9888; Never backed up')+'</div>'
-    +'</div>'
-
-    // Connect row
-    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px">'
-    +(connected
-      ?'<div style="flex:1;font-size:13px;font-weight:600;color:var(--green)">&#10003; Google Drive connected</div>'
-       +'<button onclick="sessionStorage.removeItem(\''+TOKEN_KEY+'\');stopAutoBackup();window.Log7Backup.renderPanel(\'backup-panel-container\');_backupToast(\'Disconnected.\')" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif">Disconnect</button>'
-      :'<button onclick="window.Log7Backup._connect()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Poppins\',sans-serif">&#128279; Connect Google Drive</button>')
-    +'</div>'
-
-    // Action buttons
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<button onclick="window.Log7Backup._backupNow(this)" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8679; Back Up Now</button>'
-    +'<button onclick="window.Log7Backup._restore()" '+(connected?'':'disabled title="Connect first"')+' style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:'+(connected?1:.5)+'">&#8681; Restore</button>'
-    +'<a href="https://drive.google.com/drive/folders/'+DRIVE_FOLDER_ID+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--s2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:12px;text-decoration:none;font-family:\'Poppins\',sans-serif">&#128193; Open Drive</a>'
-    +'</div>'
-
-    // Auto-backup
-    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">'
-    +'<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px">Auto-backup interval</div>'
-    +'<div style="display:flex;align-items:center;gap:12px">'
-    +'<select onchange="window.Log7Backup._setInterval(this.value)" style="background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">'
-    +'<option value="2"'  +((s.intervalHours||6)==2 ?' selected':'')+'>Every 2 hours</option>'
-    +'<option value="6"'  +((s.intervalHours||6)==6 ?' selected':'')+'>Every 6 hours</option>'
-    +'<option value="12"' +((s.intervalHours||6)==12?' selected':'')+'>Every 12 hours</option>'
-    +'<option value="24"' +((s.intervalHours||6)==24?' selected':'')+'>Every 24 hours</option>'
-    +'</select>'
-    +'<span style="font-size:12px;color:var(--muted)">Active every '+(s.intervalHours||6)+'h</span>'
-    +'</div></div>'
-
-    // History
-    +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
-    +'<div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted)">'
-    +'<span>Backup History</span><span>'+hist.length+' entries</span></div>'
-    +'<div style="max-height:220px;overflow-y:auto">'
-    +(rows||'<div style="padding:20px 14px;text-align:center;color:var(--muted);font-size:13px">No backups yet</div>')
-    +'</div></div>'
-
-    // Stats
-    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
-    +['<div>'+snap.meta.totalKeys+'</div><div>Keys in storage</div>',
-      '<div>'+fmtBytes(snap.meta.sizeBytes)+'</div><div>Current size</div>',
-      '<div>'+hist.filter(function(h){return h.action==='backup';}).length+'</div><div>Total backups</div>']
-    .map(function(s){return '<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center">'+s.replace('<div>','<div style="font-size:18px;font-weight:700;color:var(--accent)">').replace('<div>','<div style="font-size:11px;color:var(--muted);margin-top:3px">')+'</div>';}).join('')
-    +'</div>'
-
-    +'</div>'
-
-    // Restore modal
-    +'<div id="l7-restore-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px">'
-    +'<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:520px;padding:24px;display:flex;flex-direction:column;gap:16px;max-height:90vh">'
-    +'<div style="font-size:15px;font-weight:700;color:var(--text)">&#8681; Restore from Backup</div>'
-    +'<div style="font-size:13px;color:var(--muted);line-height:1.6">Choose a backup. Current data is saved as emergency snapshot first.</div>'
-    +'<div id="l7-restore-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"><div style="padding:20px;text-align:center;color:var(--muted)">Loading…</div></div>'
-    +'<div style="display:flex;justify-content:flex-end"><button onclick="document.getElementById(\'l7-restore-modal\').style.display=\'none\'" style="background:var(--s2);color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">Cancel</button></div>'
-    +'</div></div>';
-}
-
-// ── Public action handlers ─────────────────────────────────────
-window._backupToast = _toast; // allow disconnect button inline
-window.stopAutoBackup = stopAuto;
-
-window.Log7Backup={
-  init:function(){
-    // Try to init token client now; if GIS not yet ready, wait
-    if(window.google&&window.google.accounts){initTokenClient();}
-    else{
-      var tries=0;
-      var iv=setInterval(function(){
-        tries++;
-        if(window.google&&window.google.accounts){initTokenClient();clearInterval(iv);}
-        else if(tries>20){clearInterval(iv);}
-      },300);
-    }
-    if(getToken())startAuto();
-    console.log('[Log7 Backup] Inlined backup system ready.');
-  },
-  renderPanel:renderPanel,
-  _connect:connectDrive,
-  _backupNow:async function(btn){
-    var orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='&#8987; Backing up…';
-    try{
-      var r=await doBackup('manual');
-      btn.innerHTML='&#10003; Done!';
-      _toast('Backed up '+r.snapshot.meta.totalKeys+' keys → '+r.file.name);
-      setTimeout(function(){btn.disabled=false;btn.innerHTML=orig;renderPanel('backup-panel-container');},2000);
-    }catch(e){btn.disabled=false;btn.innerHTML=orig;_toast('Backup failed: '+e.message,'error');}
-  },
-  _restore:async function(){
-    var modal=document.getElementById('l7-restore-modal');
-    if(!modal)return;
-    modal.style.display='flex';
-    var listEl=document.getElementById('l7-restore-list');
-    try{
-      var files=await listBackups();
-      if(!files.length){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">No backups found in Drive folder.</div>';return;}
-      listEl.innerHTML=files.map(function(f){
-        return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">'
-          +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name.replace(BACKUP_PREFIX,''))+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(f.description||'')+'</div>'
-          +'</div>'
-          +'<button onclick="window.Log7Backup._doRestore(\''+f.id+'\',\''+esc(f.name)+'\',this)" style="background:var(--s2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif;flex-shrink:0">Restore</button>'
-          +'</div>';
-      }).join('');
-    }catch(e){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--red)">Error: '+esc(e.message)+'</div>';}
-  },
-  _doRestore:async function(fileId,filename,btn){
-    if(!confirm('Restore from "'+filename+'"?\n\nYour current data will be saved as an emergency snapshot.'))return;
-    btn.disabled=true;btn.textContent='Restoring…';
-    try{
-      var r=await restoreFromDrive(fileId,filename);
-      document.getElementById('l7-restore-modal').style.display='none';
-      _toast('Restored '+r.restored+' keys. Reloading…');
-      setTimeout(function(){location.reload();},1800);
-    }catch(e){btn.disabled=false;btn.textContent='Restore';_toast('Restore failed: '+e.message,'error');}
-  },
-  _setInterval:function(val){
-    var s=getSettings();s.intervalHours=parseInt(val,10);saveSettings(s);stopAuto();startAuto();
-    _toast('Auto-backup set to every '+val+' hours');
-  },
-  backup:doBackup,
-  collectSnapshot:collectSnapshot,
-  getHistory:getLocalHistory,
-};
-function getLocalHistory(){return getHistory();}
-})();
-
-/* ═══ SHEETS DB ═══════════════════════════════════════════════════════ */
-window.SheetsDB = (function(){
-  var SPREADSHEET_ID = '1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0';
-  var API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets/' + SPREADSHEET_ID;
-  var TOKEN_KEY = 'log7_gapi_token';
-
-  var COLUMNS = {
-    investors:    ['_id','InvestorName','FundName','StageFocus','CheckSize','Geography','SectorFocus','ContactPhone','ContactEmail','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
-    startups:     ['_id','Name','Contact','Phone','Email','Sector','Stage','Status','ReferredBy','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
-    partnerships: ['_id','Name','Type','ContactName','ContactEmail','ContactPhone','Status','Notes','FollowUpDate','Done','DriveLink','CreatedAt'],
-    pipeline:     ['_id','Startup','Investor','Score','Verdict','Stage','Hot','SavedAt','CRMStatus','CRMNotes','CRMTags','CRMWarmIntro','CRMFollowUp'],
-    net_pipeline: ['_id','Name','Company','Type','Status','Notes','LastUpdated','SourceTab','SourceId'],
-    ActivityLog:  ['Timestamp','Action','Entity','Detail'],
-  };
-
-  var _cache = { investors:[], startups:[], partnerships:[], pipeline:[], net_pipeline:[] };
-  var _sheetIds = {};
-  var _lastSync = null;
-  var _pollInterval = null;
-  var _initialized = false;
-
-  function getToken(){ return sessionStorage.getItem(TOKEN_KEY); }
-  function isAuthenticated(){ return !!getToken(); }
-
-  function _toast(msg, type){
-    if(typeof showToast === 'function') showToast(msg, type);
-    else console.warn('[SheetsDB]', msg);
-  }
-
-  function updateSyncEl(offline){
-    var el = document.getElementById('home-sync-status');
-    if(!el) return;
-    if(offline){ el.innerHTML = '<span style="color:var(--amber)">⚠ Offline — changes saved locally</span>'; return; }
-    if(!_lastSync){ el.textContent = ''; return; }
-    el.innerHTML = '<span style="color:var(--green)">● Synced</span> <span style="color:var(--muted)">' + _lastSync.toLocaleTimeString() + '</span>';
-  }
-
-  async function apiCall(method, path, body){
-    var token = getToken();
-    if(!token){
-      console.error('[SheetsDB] apiCall: no token in sessionStorage — user must reconnect Google');
-      throw new Error('Not authenticated — please reconnect Google Drive');
-    }
-    var opts = { method: method, headers: { 'Authorization': 'Bearer '+token, 'Content-Type': 'application/json' } };
-    if(body) opts.body = JSON.stringify(body);
-    var url = API_BASE + path;
-    console.log('[SheetsDB]', method, path.split('?')[0]);
-    var resp = await fetch(url, opts);
-    if(!resp.ok){
-      var txt = await resp.text();
-      console.error('[SheetsDB] API error', resp.status, path, txt);
-      if(resp.status === 401){
-        sessionStorage.removeItem(TOKEN_KEY);
-        _toast('Google session expired — please reconnect Drive in Settings', 'error');
-      }
-      throw new Error('Sheets API '+resp.status+': '+txt.slice(0,300));
-    }
-    return resp.json();
-  }
-
-  async function fetchMeta(){
-    var data = await apiCall('GET', '?fields=sheets.properties');
-    (_sheetIds = {});
-    (data.sheets||[]).forEach(function(s){ _sheetIds[s.properties.title] = s.properties.sheetId; });
-    return Object.keys(_sheetIds);
-  }
-
-  async function createTab(name, headers){
-    await apiCall('POST', ':batchUpdate', { requests:[{ addSheet:{ properties:{ title:name } } }] });
-    await fetchMeta();
-    await apiCall('PUT', '/values/'+encodeURIComponent(name+'!A1')+'?valueInputOption=USER_ENTERED', { values:[headers] });
-  }
-
-  async function ensureTabs(){
-    await ensureSheetTabsExist();
-  }
-
-  async function ensureSheetTabsExist(){
-    var data = await apiCall('GET', '?fields=sheets.properties');
-    var existingSet = new Set((data.sheets||[]).map(function(s){ return s.properties.title; }));
-    (data.sheets||[]).forEach(function(s){ _sheetIds[s.properties.title] = s.properties.sheetId; });
-
-    var needed = Object.keys(COLUMNS);
-    var toCreate = needed.filter(function(n){ return !existingSet.has(n); });
-
-    if(toCreate.length > 0){
-      console.log('[SheetsDB] Creating missing tabs:', toCreate);
-      await apiCall('POST', ':batchUpdate', {
-        requests: toCreate.map(function(title){ return { addSheet:{ properties:{ title:title } } }; })
-      });
-      await fetchMeta();
-      for(var i=0; i<toCreate.length; i++){
-        var tab = toCreate[i];
-        await apiCall('PUT', '/values/'+encodeURIComponent(tab+'!A1')+'?valueInputOption=USER_ENTERED', { values:[COLUMNS[tab]] });
-      }
-    }
-
-    _initialized = true;
-  }
-
-  async function fetchTab(tab){
-    var cols = COLUMNS[tab];
-    var colLetter = String.fromCharCode(64 + cols.length);
-    var data = await apiCall('GET', '/values/'+encodeURIComponent(tab+'!A:'+colLetter));
-    var rows = data.values || [];
-    if(rows.length < 2) return [];
-    var header = rows[0];
-    return rows.slice(1).map(function(row, i){
-      var obj = { _rowIndex: i+2 };
-      header.forEach(function(col, j){ obj[col] = row[j] || ''; });
-      return obj;
-    }).filter(function(r){ return Object.entries(r).some(function(kv){ return kv[0]!=='_rowIndex' && String(kv[1]||'').trim(); }); });
-  }
-
-  // ── Row mappers: sheet row → app object ──────────────────────────────
-  function toInvestor(r){ return { id:r._id||'', _rowIndex:r._rowIndex, investorName:r.InvestorName||'', fundName:r.FundName||'', stageFocus:r.StageFocus||'', checkSize:r.CheckSize||'', geography:r.Geography||'', sectorFocus:r.SectorFocus||'', contactPhone:r.ContactPhone||'', contactEmail:r.ContactEmail||'', status:r.Status||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
-  function toStartup(r){ return { id:r._id||'', _rowIndex:r._rowIndex, companyName:r.Name||'', founderName:r.Contact||'', founderPhone:r.Phone||'', founderEmail:r.Email||'', sector:r.Sector||'', stage:r.Stage||'', status:r.Status||'', referredBy:r.ReferredBy||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
-  function toPartnership(r){ return { id:r._id||'', _rowIndex:r._rowIndex, partnerName:r.Name||'', type:r.Type||'', contactName:r.ContactName||'', contactEmail:r.ContactEmail||'', contactPhone:r.ContactPhone||'', status:r.Status||'', notes:r.Notes||'', followUpDate:r.FollowUpDate||'', done:r.Done==='true', driveLink:r.DriveLink||'', createdAt:r.CreatedAt||'' }; }
-  function toPipeline(r){ return { id:r._id||'', _rowIndex:r._rowIndex, startup:r.Startup||'', investor:r.Investor||'', score:parseInt(r.Score)||0, verdict:r.Verdict||'', stage:r.Stage||'Sourcing', hot:r.Hot==='true', savedAt:r.SavedAt||'', _crm:{ status:r.CRMStatus||'not contacted', notes:r.CRMNotes||'', tags:r.CRMTags?r.CRMTags.split('|').map(function(t){return t.trim();}).filter(Boolean):[], warmIntro:r.CRMWarmIntro||'', followUp:r.CRMFollowUp||'' } }; }
-
-  // ── Row mappers: app object → sheet row array ─────────────────────────
-  function fromInvestor(o,id){ return [id||o.id||('inv_'+Date.now()),o.investorName||'',o.fundName||'',o.stageFocus||'',o.checkSize||'',o.geography||'',o.sectorFocus||'',o.contactPhone||'',o.contactEmail||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
-  function fromStartup(o,id){ return [id||o.id||('st_'+Date.now()),o.companyName||'',o.founderName||'',o.founderPhone||'',o.founderEmail||'',o.sector||'',o.stage||'',o.status||'',o.referredBy||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
-  function fromPartnership(o,id){ return [id||o.id||('pa_'+Date.now()),o.partnerName||'',o.type||'',o.contactName||'',o.contactEmail||'',o.contactPhone||'',o.status||'',o.notes||'',o.followUpDate||'',String(o.done||false),o.driveLink||'',o.createdAt||new Date().toISOString()]; }
-  function fromPipeline(o,id){ var crm=o._crm||{}; return [id||o.id||('pl_'+Date.now()),o.startup||'',o.investor||'',String(o.score||0),o.verdict||'',o.stage||'Sourcing',String(o.hot||false),o.savedAt||new Date().toISOString(),crm.status||'not contacted',crm.notes||'',(crm.tags||[]).join('|'),crm.warmIntro||'',crm.followUp||'']; }
-  function toNetPipeline(r){ return { id:r._id||'', _rowIndex:r._rowIndex, name:r.Name||'', company:r.Company||'', type:r.Type||'', status:r.Status||'', notes:r.Notes||'', lastUpdated:r.LastUpdated||'', sourceTab:r.SourceTab||'', sourceId:r.SourceId||'' }; }
-  function fromNetPipeline(o,id){ return [id||o.id||('np_'+Date.now()),o.name||'',o.company||'',o.type||'',o.status||'',o.notes||'',o.lastUpdated||new Date().toISOString(),o.sourceTab||'',o.sourceId||'']; }
-
-  var _tabMap = {
-    investors:    { toObj:toInvestor,    fromObj:fromInvestor },
-    startups:     { toObj:toStartup,     fromObj:fromStartup },
-    partnerships: { toObj:toPartnership, fromObj:fromPartnership },
-    pipeline:     { toObj:toPipeline,    fromObj:fromPipeline },
-    net_pipeline: { toObj:toNetPipeline, fromObj:fromNetPipeline },
-  };
-
-  // Push full tab contents (clear data rows then rewrite)
-  async function pushTab(tab, rows){
-    if(!_initialized) await ensureSheetTabsExist();
-    var cols = COLUMNS[tab];
-    var fromObj = _tabMap[tab].fromObj;
-    var values = [cols].concat(rows.map(function(r){ return fromObj(r); }));
-    try {
-      await apiCall('POST', '/values/'+encodeURIComponent(tab+'!A2:Z')+':clear', {});
-      if(rows.length) await apiCall('PUT', '/values/'+encodeURIComponent(tab+'!A1')+'?valueInputOption=USER_ENTERED', { values:values });
-      _cache[tab] = rows;
-      _lastSync = new Date();
-      updateSyncEl(false);
-    } catch(e) {
-      updateSyncEl(true);
-      _toast('Failed to save '+tab+': '+e.message, 'error');
-      throw e;
-    }
-  }
-
-  async function fetchAll(silent){
-    if(!isAuthenticated()){
-      if(!silent) _toast('Connect Google Drive first to enable Sheets sync', 'error');
-      return false;
-    }
-    try {
-      if(!_initialized){ await ensureTabs(); _initialized=true; }
-      var tabs = ['investors','startups','partnerships','pipeline'];
-      var results = await Promise.all(tabs.map(fetchTab));
-      tabs.forEach(function(t,i){ _cache[t] = results[i].map(_tabMap[t].toObj); });
-      _lastSync = new Date();
-      updateSyncEl(false);
-      return true;
-    } catch(e) {
-      updateSyncEl(true);
-      if(!silent) _toast('Sheets sync failed: '+e.message, 'error');
-      else console.warn('[SheetsDB] sync failed:', e.message);
-      return false;
-    }
-  }
-
-  function startPolling(){
-    if(_pollInterval) clearInterval(_pollInterval);
-    _pollInterval = setInterval(function(){
-      if(!isAuthenticated()) return;
-      fetchAll(true).then(function(ok){
-        if(!ok) return;
-        var pg = document.querySelector('.page.active');
-        if(!pg) return;
-        var id = pg.id;
-        if(id==='page-home') refreshHome();
-        else if(id==='page-network') renderNetworkTab();
-        else if(id==='page-pipeline'){ renderKanban(); renderPipelineList(); renderNetPipelineSection(); }
-      });
-    }, 60000);
-  }
-
-  async function logActivity(action, entity, detail){
-    if(!isAuthenticated()) return;
-    try {
-      await apiCall('POST', '/values/'+encodeURIComponent('ActivityLog!A:D')+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS', {
-        values:[[new Date().toISOString(), action||'', entity||'', detail||'']]
-      });
-    } catch(e){ console.warn('[SheetsDB] logActivity:', e.message); }
-  }
-
-  // ── One-time migration from localStorage ─────────────────────────────
-  var MIGRATION_KEY = 'l7_migration_done';
-
-  // Flatten pipeline: handles both flat array and {stage:[...]} object shapes
-  function flattenPipeline(raw){
-    if(Array.isArray(raw)) return raw;
-    var out = [];
-    if(raw && typeof raw === 'object'){
-      Object.entries(raw).forEach(function(kv){
-        var stage = kv[0], items = kv[1];
-        if(Array.isArray(items)) items.forEach(function(item){
-          out.push(Object.assign({}, item, { stage: item.stage || stage }));
-        });
-      });
-    }
-    return out;
-  }
-
-  // Mapping: each entry lists all localStorage key aliases to check
-  var _lsMapping = [
-    { lsKeys:['l7_net_investors','log7_investors'],    tab:'investors',    idFn:function(r){ return (r.investorName||r.name||'').toLowerCase(); } },
-    { lsKeys:['l7_net_startups','log7_startups'],      tab:'startups',     idFn:function(r){ return (r.companyName||r.name||'').toLowerCase(); } },
-    { lsKeys:['l7_net_partnerships','log7_partnerships'], tab:'partnerships', idFn:function(r){ return (r.partnerName||r.name||'').toLowerCase(); } },
-    { lsKeys:['l7_pipeline','log7_pipeline'],          tab:'pipeline',     idFn:function(r){ return ((r.startup||r.dealName||'')+'_'+(r.investor||r.investorName||'')).toLowerCase(); } },
-  ];
-
-  // Read data from the first key in the list that has content
-  function readLsData(keys, isPipeline){
-    for(var i=0; i<keys.length; i++){
-      var raw = localStorage.getItem(keys[i]);
-      if(!raw) continue;
-      try {
-        var d = JSON.parse(raw);
-        if(isPipeline) d = flattenPipeline(d);
-        if(Array.isArray(d) && d.length > 0) return { data:d, key:keys[i] };
-      } catch(e){}
-    }
-    return null;
-  }
-
-  async function runMigration(onProgress){
-    if(!isAuthenticated()) throw new Error('Not authenticated');
-    if(!_initialized){ await ensureTabs(); _initialized=true; }
-
-    var migratedKeys = [];
-    var totalMigrated = 0;
-
-    for(var i=0; i<_lsMapping.length; i++){
-      var m = _lsMapping[i];
-      var found = readLsData(m.lsKeys, m.tab==='pipeline');
-      if(!found) continue;
-
-      var local = found.data;
-      if(onProgress) onProgress('Migrating '+m.tab+'… ('+local.length+' entries)');
-
-      // Fetch existing Sheets rows to deduplicate
-      var existing = [];
-      try { var fetched = await fetchTab(m.tab); existing = fetched.map(_tabMap[m.tab].toObj); } catch(e){ existing=[]; }
-
-      var existingIds = new Set(existing.map(m.idFn));
-      var toAdd = local.filter(function(r){ return !existingIds.has(m.idFn(r)); });
-      console.log('[SheetsDB] migration', m.tab, '— existing:', existing.length, 'local:', local.length, 'new:', toAdd.length);
-
-      if(toAdd.length > 0){
-        await pushTab(m.tab, existing.concat(toAdd));
-        totalMigrated += toAdd.length;
-      }
-      migratedKeys.push(found.key);
-    }
-
-    return { migratedKeys: migratedKeys, totalMigrated: totalMigrated };
-  }
-
-  async function migrateFromLocalStorage(){
-    if(localStorage.getItem(MIGRATION_KEY) === 'true' || localStorage.getItem('log7_migration_done') === 'true') return;
-    if(!isAuthenticated()) return;
-
-    var hasData = _lsMapping.some(function(m){ return readLsData(m.lsKeys, m.tab==='pipeline') !== null; });
-    if(!hasData){ localStorage.setItem(MIGRATION_KEY,'true'); return; }
-
-    _toast('Migrating your local data to Google Sheets…');
-    try {
-      var result = await runMigration(function(msg){ console.log('[SheetsDB]', msg); });
-      result.migratedKeys.forEach(function(k){ localStorage.removeItem(k); });
-      localStorage.setItem(MIGRATION_KEY, 'true');
-      localStorage.setItem('log7_migration_done', 'true');
-      _toast('Migration complete! '+(result.totalMigrated||'All')+' entries synced to Google Sheets.');
-    } catch(e){
-      console.error('[SheetsDB] migration error:', e);
-      _toast('Migration failed: '+e.message+' — your local data is safe.', 'error');
-    }
-  }
-
-  // Manual migration triggered by the Settings button
-  async function manualMigrate(statusElId){
-    var statusEl = document.getElementById(statusElId);
-    function setStatus(msg, color){ if(statusEl){ statusEl.textContent=msg; statusEl.style.color=color||'var(--muted)'; } }
-
-    if(!isAuthenticated()){
-      _toast('Connect Google Drive first (click Connect Drive)', 'error');
-      setStatus('Not connected to Google', 'var(--red)');
-      return;
-    }
-
-    // Reset migration flag so we can re-run
-    localStorage.removeItem(MIGRATION_KEY);
-
-    setStatus('Connecting to Sheets…', 'var(--muted)');
-    try {
-      if(!_initialized){ await ensureTabs(); _initialized=true; }
-
-      var hasData = _lsMapping.some(function(m){ return readLsData(m.lsKeys, m.tab==='pipeline') !== null; });
-      if(!hasData){
-        setStatus('No local data found to migrate.', 'var(--muted)');
-        localStorage.setItem(MIGRATION_KEY,'true');
-        return;
-      }
-
-      var result = await runMigration(function(msg){ setStatus(msg, 'var(--muted)'); });
-
-      if(result.totalMigrated === 0){
-        setStatus('All entries already exist in Sheets — nothing new to migrate.', 'var(--green)');
-        localStorage.setItem(MIGRATION_KEY, 'true');
-        return;
-      }
-
-      setStatus('✓ Migrated '+result.totalMigrated+' entries. Click "Clear Local Data" to remove duplicates.', 'var(--green)');
-      localStorage.setItem(MIGRATION_KEY, 'true');
-      // Show the clear button
-      var clearBtn = document.getElementById('migrate-clear-btn');
-      if(clearBtn){ clearBtn.style.display='inline-block'; clearBtn._migratedKeys = result.migratedKeys; }
-      _toast('Migration complete! '+result.totalMigrated+' entries synced.');
-    } catch(e){
-      console.error('[SheetsDB] manualMigrate error:', e);
-      setStatus('Failed: '+e.message, 'var(--red)');
-      _toast('Migration failed: '+e.message, 'error');
-    }
-  }
-
-  function clearMigratedData(btnEl){
-    var keys = btnEl._migratedKeys || [];
-    if(!keys.length){
-      // Clear all known keys
-      _lsMapping.forEach(function(m){ m.lsKeys.forEach(function(k){ localStorage.removeItem(k); }); });
-    } else {
-      keys.forEach(function(k){ localStorage.removeItem(k); });
-    }
-    var statusEl = document.getElementById('migrate-status');
-    if(statusEl) statusEl.textContent = 'Local data cleared.';
-    btnEl.style.display = 'none';
-    _toast('Local data cleared — Sheets is now the only source.');
-  }
-
-  return {
-    get cache(){ return _cache; },
-    get lastSync(){ return _lastSync; },
-    isAuthenticated: isAuthenticated,
-    fetchAll: fetchAll,
-    fetchTabInto: async function(tab){
-      if(!_initialized) await ensureSheetTabsExist();
-      var rows = await fetchTab(tab);
-      _cache[tab] = rows.map(_tabMap[tab].toObj);
-      return _cache[tab];
-    },
-    ensureSheetTabsExist: ensureSheetTabsExist,
-    pushTab: pushTab,
-    logActivity: logActivity,
-    startPolling: startPolling,
-    updateSyncEl: updateSyncEl,
-    migrateFromLocalStorage: migrateFromLocalStorage,
-    manualMigrate: manualMigrate,
-    clearMigratedData: clearMigratedData,
-    apiRaw: apiCall,
-    fetchMeta: fetchMeta,
-  };
-})();
-
+// SettingsDB — localStorage-only stub (Google Sheets sync removed)
 window.SettingsDB = (function(){
-  var SPREADSHEET_ID = '1D5WXgPhKfEckVf_5TfA3GdQXRCVtXMAG4mBxzDRRXy0';
-  var TOKEN_KEY = 'log7_gapi_token';
-  var TAB = 'Settings';
-  var _cache = null; // null=not loaded, {}=loaded
-
-  function getToken(){ return sessionStorage.getItem(TOKEN_KEY); }
-  function isAuth(){ return !!getToken(); }
-
-  async function _api(method, path, body){
-    var token = getToken();
-    if(!token) throw new Error('Not authenticated');
-    var opts = { method:method, headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'} };
-    if(body) opts.body = JSON.stringify(body);
-    var url = 'https://sheets.googleapis.com/v4/spreadsheets/'+SPREADSHEET_ID+path;
-    var resp = await fetch(url, opts);
-    if(!resp.ok){ var t = await resp.text(); throw new Error('API '+resp.status+': '+t.slice(0,200)); }
-    return resp.json();
-  }
-
-  async function _ensureTab(){
-    var data = await _api('GET', '?fields=sheets.properties');
-    var exists = (data.sheets||[]).some(function(s){ return s.properties.title===TAB; });
-    if(!exists){
-      await _api('POST', ':batchUpdate', { requests:[{addSheet:{properties:{title:TAB}}}] });
-      await _api('PUT', '/values/'+encodeURIComponent(TAB+'!A1')+'?valueInputOption=USER_ENTERED', { values:[['key','value','updatedAt']] });
-    }
-  }
-
-  async function _pushAll(){
-    if(!_cache) return;
-    var ts = new Date().toISOString();
-    var rows = Object.entries(_cache).filter(function(kv){ return kv[0]; }).map(function(kv){ return [kv[0], String(kv[1]||''), ts]; });
-    try {
-      await _api('POST', '/values/'+encodeURIComponent(TAB+'!A2:C')+':clear', {});
-      if(rows.length) await _api('PUT', '/values/'+encodeURIComponent(TAB+'!A1')+'?valueInputOption=USER_ENTERED', { values:[['key','value','updatedAt']].concat(rows) });
-    } catch(e){ console.warn('[SettingsDB] push failed:', e.message); }
-  }
-
-  async function load(){
-    if(!isAuth()) return;
-    try {
-      await _ensureTab();
-      var data = await _api('GET', '/values/'+encodeURIComponent(TAB+'!A:C'));
-      var rows = (data.values||[]).slice(1);
-      _cache = {};
-      rows.forEach(function(row){ if(row[0]) _cache[row[0]] = row[1]||''; });
-    } catch(e){ console.warn('[SettingsDB] load failed:', e.message); _cache = {}; }
-  }
-
   function get(key, defaultVal){
     var d = (defaultVal !== undefined) ? defaultVal : null;
-    if(_cache !== null && key in _cache) return _cache[key];
     var ls = localStorage.getItem(key);
     return ls !== null ? ls : d;
   }
-
-  // set: caller already did localStorage.setItem — this syncs to Sheets
-  function set(key, value){
-    if(_cache === null) _cache = {};
-    _cache[key] = String(value||'');
-    if(!isAuth()) return;
-    _pushAll().catch(function(e){ console.warn('[SettingsDB] set push failed:', e.message); });
-  }
-
-  function remove(key){
-    if(_cache !== null) delete _cache[key];
-    if(!isAuth()) return;
-    _pushAll().catch(function(e){ console.warn('[SettingsDB] remove push failed:', e.message); });
-  }
-
-  return { load:load, get:get, set:set, remove:remove, isLoaded:function(){ return _cache!==null; } };
+  function set(key, value){ localStorage.setItem(key, String(value||'')); }
+  function remove(key){ localStorage.removeItem(key); }
+  function load(){ return Promise.resolve(); }
+  return { load:load, get:get, set:set, remove:remove, isLoaded:function(){ return true; } };
 })();
 </script>
 </head>
@@ -1442,22 +648,6 @@ window.SettingsDB = (function(){
         <div class="settings-label">&#128231; Reminder Email Address</div>
         <input type="email" id="reminder-email" placeholder="heet@log7capital.com" oninput="saveReminderEmail()">
         <div class="template-help">Daily 6pm follow-up summary is sent here (via Gmail compose).</div>
-      </div>
-      <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
-        <div class="settings-label">&#128190; Google Drive Backup &amp; Sheets Sync</div>
-        <div id="settings-backup-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Not connected</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button id="settings-backup-connect-btn" onclick="window._settingsBackupConnect()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">Connect Drive</button>
-          <button id="settings-backup-now-btn" onclick="window._settingsBackupNow(this)" style="background:var(--s3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif">Back Up Now</button>
-        </div>
-      </div>
-      <div class="settings-section" style="border-top:1px solid var(--border);padding-top:14px">
-        <div class="settings-label">&#128257; Migrate Local Data → Sheets</div>
-        <div id="migrate-status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Copies all localStorage entries to Google Sheets.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button onclick="window.SheetsDB&&SheetsDB.manualMigrate('migrate-status')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128257; Migrate Local Data → Sheets</button>
-          <button id="migrate-clear-btn" onclick="window.SheetsDB&&SheetsDB.clearMigratedData(this)" style="display:none;background:var(--red);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif">&#128465; Clear Local Data</button>
-        </div>
       </div>
     </div>
   </div>
@@ -1977,14 +1167,17 @@ window.SettingsDB = (function(){
   <div id="page-backup" class="page">
     <div class="section-bar">
       <div class="section-title">Data Backup</div>
-      <button class="ghost-btn" onclick="Log7Backup.renderPanel('backup-panel-container')">&#8635; Refresh</button>
     </div>
     <div class="module-banner">
-      <strong>Google Drive backup.</strong>
-      Backs up all dashboard localStorage data to your Google Drive folder. Restore any previous snapshot with one click.
+      <strong>Local data backup.</strong>
+      Export your data as CSV files to back up. Use the Export CSV buttons on each tab (Network, Pipeline, Audit Log) to download your data.
     </div>
     <div class="card" style="max-width:640px">
-      <div id="backup-panel-container"></div>
+      <div id="backup-panel-container">
+        <div style="padding:20px;font-size:13px;color:var(--muted)">
+          Use the Export CSV buttons on the Network, Pipeline, and Audit Log tabs to back up your data locally.
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2148,13 +1341,6 @@ function netLoad(tab){
     var sheetOnly = sheet.filter(function(r){ return !manualNames.has((r.investorName||'').toLowerCase()); });
     manual = manual.concat(sheetOnly);
   }
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    // Merge: remote rows + any local-only rows not yet in Sheets
-    var sheetsData = SheetsDB.cache[tab] || [];
-    var remoteIds = new Set(sheetsData.map(function(r){ return String(r.id||''); }).filter(Boolean));
-    var localOnly = manual.filter(function(r){ return r.id && !remoteIds.has(String(r.id)); });
-    return _netFilterCorrupt(tab, sheetsData.concat(localOnly));
-  }
   return _netFilterCorrupt(tab, manual);
 }
 function netSave(tab, data){
@@ -2164,11 +1350,6 @@ function netSave(tab, data){
     localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
   } else {
     localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
-  }
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    // Also update in-memory cache and push to Sheets in background
-    SheetsDB.cache[tab] = data;
-    SheetsDB.pushTab(tab, data).catch(function(e){ console.error('[netSave]', e); });
   }
 }
 
@@ -2317,22 +1498,6 @@ window.onload = async () => {
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
-  if(window.Log7Backup) Log7Backup.init();
-  // Restore persisted Google Drive token (silent reconnect) before checking auth
-  if(window._driveRestoreOnLoad) window._driveRestoreOnLoad();
-  // If already authenticated from a previous session, migrate then fetch
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.migrateFromLocalStorage().then(function(){
-      return SheetsDB.fetchAll(true);
-    }).then(function(ok){
-      if(!ok) return;
-      return window.SettingsDB.load().then(function(){
-        loadPreferences(); loadUserProfile(); refreshCapitalDisplay();
-        renderNetworkTab(); renderKanban(); renderPipelineList(); renderNetPipelineSection(); refreshHome();
-        SheetsDB.startPolling();
-      });
-    });
-  }
 };
 
 // ═══ NAV ═══
@@ -2343,74 +1508,21 @@ function showTab(name,btn){
   if(btn) btn.classList.add('active');
   if(name==='pipeline'){
     renderKanban();renderPipelineList();renderNetPipelineSection();
-    if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchTabInto('pipeline').then(function(){renderKanban();renderPipelineList();renderNetPipelineSection();});
   }
   if(name==='audit') renderAuditLog();
   if(name==='network'){
     netDedupAll(true);
     renderNetworkTab();
-    if(window.SheetsDB&&SheetsDB.isAuthenticated()){
-      Promise.all([SheetsDB.fetchTabInto('investors'),SheetsDB.fetchTabInto('startups'),SheetsDB.fetchTabInto('partnerships')]).then(function(){renderNetworkTab();});
-    }
   }
   if(name==='home'){
     refreshHome();
-    if(window.SheetsDB&&SheetsDB.isAuthenticated()) SheetsDB.fetchAll(true).then(function(ok){if(ok)refreshHome();});
   }
   if(name==='outreach'){ outInit(); }
-  if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
+  if(name==='backup') { var bp=document.getElementById('backup-panel-container'); if(bp) bp.innerHTML='<div style="padding:20px;color:var(--muted);font-size:13px">Google Drive backup has been removed. Use the Export CSV buttons to back up your data.</div>'; }
 }
 function toggleSettings(){
   document.getElementById('settings-wrap').classList.toggle('open');
-  _refreshSettingsBackupStatus();
 }
-function _refreshSettingsBackupStatus(){
-  var statusEl=document.getElementById('settings-backup-status');
-  var connectBtn=document.getElementById('settings-backup-connect-btn');
-  var nowBtn=document.getElementById('settings-backup-now-btn');
-  if(!statusEl) return;
-  var connected=!!sessionStorage.getItem('log7_gapi_token');
-  var hadToken=false; try{ hadToken=!!JSON.parse(localStorage.getItem('log7_gdrive_token')||'null'); }catch(e){}
-  var valid = window._driveTokenValid ? window._driveTokenValid() : connected;
-  var s={};try{s=JSON.parse(localStorage.getItem('log7_backup_settings')||'{}');}catch(e){}
-  if(connected || valid){
-    statusEl.style.color='var(--green)';
-    statusEl.textContent='✓ Google Drive connected'+(s.lastBackupAt?' · Last: '+_fmtAgoShort(s.lastBackupAt):'');
-    if(connectBtn){connectBtn.textContent='Disconnect';connectBtn.onclick=function(){ if(window._driveDisconnect)window._driveDisconnect(); else sessionStorage.removeItem('log7_gapi_token'); _refreshSettingsBackupStatus();};}
-    if(nowBtn) nowBtn.style.opacity='1';
-  } else if(hadToken){
-    statusEl.style.color='var(--amber)';
-    statusEl.textContent='⚠ Reconnection required';
-    if(connectBtn){connectBtn.textContent='Reconnect';connectBtn.onclick=window._settingsBackupConnect;}
-    if(nowBtn) nowBtn.style.opacity='.4';
-  } else {
-    statusEl.style.color='var(--muted)';
-    statusEl.textContent='Not connected';
-    if(connectBtn){connectBtn.textContent='Connect Drive';connectBtn.onclick=window._settingsBackupConnect;}
-    if(nowBtn) nowBtn.style.opacity='.4';
-  }
-}
-function _fmtAgoShort(iso){
-  var d=Date.now()-new Date(iso).getTime(),m=Math.floor(d/60000);
-  if(m<1)return'just now';if(m<60)return m+'m ago';
-  var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';
-}
-window._settingsBackupConnect=function(){
-  if(!window.Log7Backup){showToast('Backup system not ready','error');return;}
-  window.Log7Backup._connect();
-  // Refresh status after short delay to pick up token
-  setTimeout(_refreshSettingsBackupStatus,2000);
-};
-window._settingsBackupNow=async function(btn){
-  if(!sessionStorage.getItem('log7_gapi_token')){showToast('Connect Google Drive first','error');return;}
-  var orig=btn.textContent;btn.disabled=true;btn.textContent='Backing up…';
-  try{
-    var r=await window.Log7Backup.backup('manual');
-    showToast('Backed up '+r.snapshot.meta.totalKeys+' keys ✓');
-    _refreshSettingsBackupStatus();
-  }catch(e){showToast('Backup failed: '+e.message,'error');}
-  btn.disabled=false;btn.textContent=orig;
-};
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
 // ═══ THEME ═══
@@ -2481,9 +1593,6 @@ function addAuditEntry(type,action,entity){
   const u=getCurrentUser(),log=getAuditLog();
   log.unshift({id:Date.now(),ts:new Date().toISOString(),type,action,entity:entity||'',user:u.name,role:u.role});
   saveAuditLog(log);renderAuditLog();renderHomeActivity();
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.logActivity(action, entity, type).catch(function(){});
-  }
 }
 function renderAuditLog(){
   const el=document.getElementById('audit-log-list');if(!el)return;
@@ -2992,36 +2101,18 @@ window._debugPipeline = function(){
   console.log('=== PIPELINE KEYS ===');
   console.log('l7_pipeline (canonical board/home):', localStorage.getItem('l7_pipeline'));
   console.log('l7_net_pipeline (Network +Pipeline index):', localStorage.getItem('l7_net_pipeline'));
-  console.log('SheetsDB authed:', !!(window.SheetsDB&&SheetsDB.isAuthenticated()));
-  try{ console.log('SheetsDB.cache.pipeline:', window.SheetsDB?SheetsDB.cache.pipeline:'n/a'); }catch(e){ console.log('cache read error', e); }
   console.log('getPipeline() merged result:', getPipeline());
 };
 
-// l7_pipeline is the canonical durable key. Sheets cache is an overlay merged on read.
+// l7_pipeline is the canonical durable key.
 function getPipeline(){
   var local = [];
   try { local = JSON.parse(localStorage.getItem('l7_pipeline')||'[]'); } catch(e){ local = []; }
   if(!Array.isArray(local)) local = [];
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var cached = (window.SheetsDB.cache && SheetsDB.cache.pipeline) || [];
-    if(cached.length){
-      var seen = {};
-      local.forEach(function(it){ if(it && it.id) seen[it.id] = 1; });
-      // Local items keep their order (newest first); append Sheets-only items.
-      var extra = cached.filter(function(it){ return it && it.id && !seen[it.id]; });
-      return local.concat(extra);
-    }
-  }
   return local;
 }
 function setPipeline(data){
-  // Always persist to localStorage so additions are durable and immediately visible.
   try { localStorage.setItem('l7_pipeline', JSON.stringify(data)); } catch(e){ console.error('[setPipeline]', e); }
-  // Mirror to Google Sheets when connected (background, non-blocking).
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.cache.pipeline = data;
-    SheetsDB.pushTab('pipeline', data).catch(function(e){ console.error('[setPipeline push]', e); });
-  }
 }
 // Re-render every surface that shows pipeline data, after any write.
 function refreshPipelineUI(){
@@ -3033,15 +2124,10 @@ function refreshPipelineUI(){
   try { window.dispatchEvent(new Event('storage')); } catch(e){}
 }
 function getNetPipeline(){
-  if(window.SheetsDB && SheetsDB.isAuthenticated()) return (SheetsDB.cache.net_pipeline||[]);
   return JSON.parse(localStorage.getItem('l7_net_pipeline')||'[]');
 }
 function saveNetPipeline(data){
   localStorage.setItem('l7_net_pipeline', JSON.stringify(data));
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    SheetsDB.cache.net_pipeline = data;
-    SheetsDB.pushTab('net_pipeline', data).catch(function(e){ console.error('[saveNetPipeline]', e); });
-  }
 }
 function isInNetPipeline(sourceTab, sourceId){
   return getNetPipeline().some(function(p){ return p.sourceTab===sourceTab && String(p.sourceId)===String(sourceId); });
@@ -3387,23 +2473,12 @@ function submitAddDeal(){
 // ═══ CRM ═══
 function crmKey(startup,investor){return'l7_crm_'+(startup||'global')+'_'+investor;}
 function getInvestorCRM(startup,investor){
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var item=getPipeline().find(function(i){return i.startup===startup&&i.investor===investor;});
-    if(item&&item._crm) return Object.assign({pipelineStage:PIPELINE_STAGES[0]},item._crm);
-    return {status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:'',pipelineStage:PIPELINE_STAGES[0]};
-  }
   const saved=JSON.parse(localStorage.getItem(crmKey(startup,investor))||'null');
   return saved||{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:'',pipelineStage:PIPELINE_STAGES[0]};
 }
 function updateInvestorCRM(investor,field,value){
   const startup=selectedStartup?.company||'';
-  if(window.SheetsDB && SheetsDB.isAuthenticated()){
-    var raw=getPipeline();
-    var item=raw.find(function(i){return i.startup===startup&&i.investor===investor;});
-    if(item){ item._crm=item._crm||{status:'not contacted',notes:'',tags:[],warmIntro:'',followUp:''}; item._crm[field]=value; setPipeline(raw); }
-  } else {
-    const record=getInvestorCRM(startup,investor);record[field]=value;localStorage.setItem(crmKey(startup,investor),JSON.stringify(record));
-  }
+  const record=getInvestorCRM(startup,investor);record[field]=value;localStorage.setItem(crmKey(startup,investor),JSON.stringify(record));
   addAuditEntry('pipeline','CRM updated: '+field+' \u2192 '+value,startup+' \u2194 '+investor);refreshPipelineUI();
 }
 function updateInvestorTags(investor,value){updateInvestorCRM(investor,'tags',value.split(',').map(t=>t.trim()).filter(Boolean));}
@@ -4453,7 +3528,6 @@ function saveNetworkEntry(){
   closeNetworkModal();
   renderNetList(tab);
   if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
-  syncFollowupsToServer();
   refreshNetFollowups();
   addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
 }
@@ -4463,7 +3537,6 @@ function deleteNetEntry(tab, id){
   var rows = netLoad(tab).filter(function(r){return String(r.id)!==String(id);});
   netSave(tab, rows);
   renderNetList(tab);
-  syncFollowupsToServer();
   addAuditEntry('network','Deleted '+tab.slice(0,-1),tab);
 }
 
@@ -4891,7 +3964,6 @@ function netResetToSheet(id){
   };
   localStorage.setItem('l7_net_inv_sheet_cache', JSON.stringify(sheetCache));
   renderNetList('investors');
-  syncFollowupsToServer();
 }
 
 // ── WHATSAPP MANUAL TRIGGER ────────────────────────────────────
@@ -4941,34 +4013,6 @@ async function sendWhatsAppReminder(){
   if(btn){ btn.disabled=false; btn.textContent='📲 Send WhatsApp Reminder Now'; }
 }
 
-// ── FOLLOW-UP SERVER SYNC ──────────────────────────────────────
-function syncFollowupsToServer(){
-  // Collect all entries with a followUpDate across all 3 network tabs
-  var followups = [];
-  var tabNameKeys = {
-    partnerships: 'partnerName',
-    investors:    'investorName',
-    startups:     'companyName',
-  };
-  Object.keys(tabNameKeys).forEach(function(tab){
-    netLoad(tab).forEach(function(row){
-      if(!row.followUpDate) return;
-      followups.push({
-        tab:          tab,
-        name:         row[tabNameKeys[tab]] || '',
-        followUpDate: row.followUpDate,
-        notes:        row.notes || '',
-      });
-    });
-  });
-
-  // Fire-and-forget POST — silent, never blocks the UI
-  fetch('/api/save-followups', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ followups: followups }),
-  }).catch(function(){});
-}
 
 // ═══ WHATSAPP OUTREACH ═══
 
@@ -6541,7 +5585,6 @@ function saveFollowupModal(){
   renderNetList(tab);
   if(typeof refreshNetFollowups==='function') refreshNetFollowups();
   if(typeof refreshHome==='function') refreshHome();
-  if(typeof syncFollowupsToServer==='function') try{syncFollowupsToServer();}catch(e){}
   addAuditEntry('network', date?'Follow-up set for '+date:'Follow-up cleared', netPrimaryKey(tab,row||{}));
 }
 function clearFollowup(){
