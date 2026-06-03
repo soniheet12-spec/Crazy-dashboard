@@ -649,6 +649,16 @@ window.SettingsDB = (function(){
         <input type="email" id="reminder-email" placeholder="heet@log7capital.com" oninput="saveReminderEmail()">
         <div class="template-help">Daily 6pm follow-up summary is sent here (via Gmail compose).</div>
       </div>
+      <div class="settings-section">
+        <div class="settings-label">&#128202; Google Sheets Web App URL</div>
+        <input type="url" id="gs-webapp-url" placeholder="https://script.google.com/macros/s/…/exec" oninput="saveGsSettings()">
+        <div class="template-help">Apps Script Web App URL. Deploy with &ldquo;Execute as: Me, Anyone can access&rdquo;.</div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">&#128202; Google Sheet ID</div>
+        <input type="text" id="gs-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" oninput="saveGsSettings()">
+        <div class="template-help">The long ID from your Sheet&rsquo;s URL: /spreadsheets/d/<strong>ID</strong>/edit</div>
+      </div>
     </div>
   </div>
 </aside>
@@ -661,6 +671,7 @@ window.SettingsDB = (function(){
     <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
   </div>
   <div class="topbar-actions" style="display:flex;gap:8px;align-items:center">
+    <button id="gs-sync-btn" class="pill-btn" onclick="manualSync()" title="Sync all data with Google Sheets">&#x21BB; Sync</button>
     <button class="pill-btn" onclick="exportMatchesCsv()">Export CSV</button>
     <button class="pill-btn" onclick="window.print()">Print / PDF</button>
   </div>
@@ -1315,6 +1326,95 @@ const NET_KEYS = {
   startups:     'l7_net_startups',
 };
 
+// ═══ GOOGLE SHEETS SYNC ═══
+// Runtime values — overridden from localStorage in loadPreferences()
+var GS_WEBAPP_URL = localStorage.getItem('log7_gs_url') || '';
+var GS_SHEET_ID   = localStorage.getItem('log7_gs_id')  || '';
+
+function _gsConfigured(){
+  return GS_WEBAPP_URL && GS_WEBAPP_URL !== 'YOUR_WEBAPP_URL' && GS_SHEET_ID && GS_SHEET_ID !== 'YOUR_SHEET_ID';
+}
+
+async function gsWrite(tab, entries){
+  if(!_gsConfigured()) return;
+  try {
+    var rows;
+    if(!entries || entries.length === 0){
+      rows = [['id','data']];
+    } else {
+      rows = [['id','data']].concat(entries.map(function(e){ return [e.id||'', JSON.stringify(e)]; }));
+    }
+    await fetch(GS_WEBAPP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ sheetId: GS_SHEET_ID, tab: tab, action: 'write', rows: rows })
+    });
+  } catch(err){ console.warn('[gsWrite] '+tab+':', err); }
+}
+
+async function gsRead(tab){
+  if(!_gsConfigured()) return null;
+  try {
+    var res = await fetch(GS_WEBAPP_URL + '?sheetId=' + encodeURIComponent(GS_SHEET_ID) + '&tab=' + encodeURIComponent(tab));
+    var json = await res.json();
+    if(!json.ok || !json.data || json.data.length < 2) return [];
+    return json.data.slice(1).map(function(row){ try{ return JSON.parse(row[1]); }catch(e){ return null; } }).filter(Boolean);
+  } catch(err){ console.warn('[gsRead] '+tab+':', err); return null; }
+}
+
+async function netSync(tab){
+  var remote = await gsRead('Network_'+tab);
+  if(remote === null) return netLoad(tab); // sheets not configured — use local
+  var local = netLoad(tab);
+  var merged = local.slice();
+  for(var i=0;i<remote.length;i++){
+    var r = remote[i];
+    var idx = merged.findIndex(function(e){ return e.id && r.id && String(e.id)===String(r.id); });
+    if(idx > -1) merged[idx] = r; else merged.push(r);
+  }
+  var clean = _netFilterCorrupt(tab, merged);
+  localStorage.setItem(NET_KEYS[tab], JSON.stringify(clean));
+  return clean;
+}
+
+async function pipelineSync(){
+  var remote = await gsRead('Pipeline');
+  if(remote === null) return getPipeline();
+  var local = getPipeline();
+  var merged = local.slice();
+  for(var i=0;i<remote.length;i++){
+    var r = remote[i];
+    var idx = merged.findIndex(function(e){ return e.id && r.id && String(e.id)===String(r.id); });
+    if(idx > -1) merged[idx] = r; else merged.push(r);
+  }
+  localStorage.setItem('l7_pipeline', JSON.stringify(merged));
+  return merged;
+}
+
+var _syncInProgress = false;
+async function manualSync(){
+  if(_syncInProgress) return;
+  if(!_gsConfigured()){ showToast('Configure Sheets URL and Sheet ID in Settings first', 'warn'); return; }
+  _syncInProgress = true;
+  var btn = document.getElementById('gs-sync-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Syncing…'; }
+  showToast('Syncing…', 'info');
+  try {
+    await netSync('investors');
+    await netSync('startups');
+    await netSync('partnerships');
+    await pipelineSync();
+    try { renderNetworkTab(); } catch(e){}
+    try { renderKanban(); renderPipelineList(); } catch(e){}
+    showToast('Synced ✓', 'success');
+  } catch(e){
+    showToast('Sync failed — check console', 'error');
+    console.error('[manualSync]', e);
+  } finally {
+    _syncInProgress = false;
+    if(btn){ btn.disabled=false; btn.textContent='⟳ Sync'; }
+  }
+}
+
 function _netFilterCorrupt(tab, rows){
   var nk = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
   return rows.filter(function(e){
@@ -1344,12 +1444,13 @@ function netLoad(tab){
   return _netFilterCorrupt(tab, manual);
 }
 function netSave(tab, data){
-  // Always persist to localStorage immediately for durability
   if(tab === 'investors'){
     var manualOnly = data.filter(function(r){ return !r._fromSheet; });
     localStorage.setItem('l7_net_investors', JSON.stringify(manualOnly));
+    gsWrite('Network_investors', manualOnly);
   } else {
     localStorage.setItem(NET_KEYS[tab], JSON.stringify(data));
+    gsWrite('Network_'+tab, data);
   }
 }
 
@@ -1498,6 +1599,28 @@ window.onload = async () => {
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
   netStartPolling();
+  // Background sync from Sheets after local render is complete
+  if(_gsConfigured()){
+    Promise.all([
+      netSync('investors'), netSync('startups'), netSync('partnerships')
+    ]).then(function(){
+      try { renderNetworkTab(); } catch(e){}
+    }).catch(function(){});
+    pipelineSync().then(function(){
+      try { renderKanban(); renderPipelineList(); } catch(e){}
+    }).catch(function(){});
+  }
+  // Auto-sync every 60 seconds
+  setInterval(function(){
+    if(_gsConfigured() && !_syncInProgress){
+      Promise.all([netSync('investors'),netSync('startups'),netSync('partnerships')]).then(function(){
+        try { renderNetworkTab(); } catch(e){}
+      }).catch(function(){});
+      pipelineSync().then(function(){
+        try { renderKanban(); renderPipelineList(); } catch(e){}
+      }).catch(function(){});
+    }
+  }, 60000);
 };
 
 // ═══ NAV ═══
@@ -1548,12 +1671,25 @@ function applyTheme(name){
 }
 function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
 function loadPreferences(){
-  // Dark mode is applied in <head> flash-prevention script; just sync the button state
   applyDarkModeState(localStorage.getItem('dark_mode')==='1');
   var mm=SettingsDB.get('l7_matching_mode','auto');
   document.getElementById('matching-mode').value=mm;
   var ts=localStorage.getItem('l7_settings_last_saved');
   var el=document.getElementById('settings-last-saved');if(el&&ts)el.textContent='Last saved: '+new Date(ts).toLocaleTimeString();
+  // Load GS settings
+  var gsUrl=localStorage.getItem('log7_gs_url')||'';
+  var gsId=localStorage.getItem('log7_gs_id')||'';
+  var urlEl=document.getElementById('gs-webapp-url');if(urlEl)urlEl.value=gsUrl;
+  var idEl=document.getElementById('gs-sheet-id');if(idEl)idEl.value=gsId;
+  GS_WEBAPP_URL=gsUrl; GS_SHEET_ID=gsId;
+}
+function saveGsSettings(){
+  var url=(document.getElementById('gs-webapp-url').value||'').trim();
+  var id=(document.getElementById('gs-sheet-id').value||'').trim();
+  localStorage.setItem('log7_gs_url',url);
+  localStorage.setItem('log7_gs_id',id);
+  GS_WEBAPP_URL=url; GS_SHEET_ID=id;
+  _markSettingsSaved('Sheets');
 }
 function savePreferences(){var v=document.getElementById('matching-mode').value;localStorage.setItem('l7_matching_mode',v);SettingsDB.set('l7_matching_mode',v);}
 
@@ -2113,6 +2249,7 @@ function getPipeline(){
 }
 function setPipeline(data){
   try { localStorage.setItem('l7_pipeline', JSON.stringify(data)); } catch(e){ console.error('[setPipeline]', e); }
+  gsWrite('Pipeline', data);
 }
 // Re-render every surface that shows pipeline data, after any write.
 function refreshPipelineUI(){
