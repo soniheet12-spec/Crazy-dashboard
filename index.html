@@ -4240,9 +4240,12 @@ function renderNetList(tab){
     + '<th style="padding:8px 10px"></th>'
     + '</tr></thead><tbody>';
 
+  var _nkRender = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
   rows.forEach(function(row){
     var isDue = row.followUpDate && normalizeDateStr(row.followUpDate) <= today;
-    html += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" title="Double-click to edit"'+(isDue?' class="net-row-due"':'')+' ondblclick="editNetEntry(\''+tab+'\',\''+row.id+'\')" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    // Use primary name as the edit key — immune to id corruption (null/NaN/'')
+    var _epn = escapeQ(String(row[_nkRender]||row.name||''));
+    html += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" title="Double-click to edit"'+(isDue?' class="net-row-due"':'')+' ondblclick="editNetEntry(\''+tab+'\',\''+_epn+'\')" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
     visibleFields.forEach(function(f){
       var val = row[f.key]||'—';
       var cell = '<td style="padding:8px 10px;white-space:nowrap">';
@@ -4323,7 +4326,7 @@ function renderNetList(tab){
           : '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">+ Pipeline</button>')
       + emailBtn
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openFollowupModal(\''+tab+'\',\''+row.id+'\')">&#9873; Follow-up</button>'
-      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+row.id+'\')">Edit</button>'
+      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+_epn+'\')">Edit</button>'
       + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')">Delete</button>'
       + '</td></tr>';
   });
@@ -4348,12 +4351,23 @@ function openNetworkModal(tab){
   modal.style.display='flex';
 }
 
-function editNetEntry(tab, id){
+function editNetEntry(tab, nameOrId){
+  var nameKey = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
   var rows = netLoad(tab);
-  var row = rows.find(function(r){return String(r.id)===String(id);});
+  var lc = String(nameOrId).toLowerCase();
+  // Look up by primary name first (immune to id corruption), then fall back to id
+  var row = rows.find(function(r){ return (r[nameKey]||r.name||'').toLowerCase()===lc; })
+         || rows.find(function(r){ return String(r.id)===String(nameOrId); });
   if(!row) return;
+  // If the found entry has no valid id, assign one now and persist it so saveNetworkEntry can find it
+  if(!row.id || String(row.id)==='NaN' || row.id===''){
+    row.id = 'manual_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    var _allRows = netLoad(tab);
+    var _fixIdx = _allRows.findIndex(function(r){ return (r[nameKey]||r.name||'').toLowerCase()===lc; });
+    if(_fixIdx>-1){ _allRows[_fixIdx].id=row.id; netSave(tab,_allRows); }
+  }
   _netActiveTab = tab;
-  _netEditId = id;
+  _netEditId = row.id;
   var tabLabel = tab==='startups'?'Startup':tab==='investors'?'Investor':'Partnership';
   document.getElementById('net-modal-title').textContent = 'Edit '+tabLabel;
   document.getElementById('net-modal-form').innerHTML = buildNetForm(tab, row);
@@ -4416,9 +4430,15 @@ function saveNetworkEntry(){
   }
   if(_netEditId !== null){
     var idx = rows.findIndex(function(r){return String(r.id)===String(_netEditId);});
+    if(idx===-1){
+      // id lookup failed (stale/corrupt) — fall back to primary name match
+      var _saveNk=tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
+      var _origName=(entry[_saveNk]||'').toLowerCase();
+      if(_origName) idx=rows.findIndex(function(r){return(r[_saveNk]||'').toLowerCase()===_origName;});
+    }
     if(idx>-1){
       var prev = rows[idx];
-      entry.id = _netEditId;
+      entry.id = prev.id || _netEditId;
       entry.dateAdded = prev.dateAdded;
       if(prev._fromSheet){ entry._fromSheet=true; entry._sheetData=prev._sheetData||null; entry._localOverride=true; }
       rows[idx] = entry;
