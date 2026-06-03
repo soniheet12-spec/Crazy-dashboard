@@ -2263,6 +2263,19 @@ let dragStartup='',dragInvestor='';
 
 // ═══ INIT ═══
 window.onload = async () => {
+  // Clean corrupt network entries (name = inv_TIMESTAMP) before any render
+  try {
+    var _netCleanMap = { l7_net_investors:'investorName', l7_net_partnerships:'partnerName', l7_net_startups:'companyName' };
+    Object.keys(_netCleanMap).forEach(function(lsKey){
+      var nf = _netCleanMap[lsKey];
+      var raw = JSON.parse(localStorage.getItem(lsKey)||'[]');
+      var cleaned = raw.filter(function(e){
+        var nm = e[nf]||e.name||'';
+        return nm && !/^inv_\d+/.test(nm) && nm !== e.id;
+      });
+      if(cleaned.length !== raw.length) localStorage.setItem(lsKey, JSON.stringify(cleaned));
+    });
+  } catch(ex){}
   const key=getApiKey();
   document.getElementById('api-key').value=key;
   loadPreferences();loadUserProfile();loadTemplates();
@@ -4569,6 +4582,12 @@ function runCsvPreview(){
       if(val) blank = false;
     });
     if(blank){ parsed.push({ row:ri+2, entry:entry, skip:true, reason:'blank row' }); return; }
+    // Skip rows where the primary name field looks like a generated ID
+    var _nameKey2 = s.tab==='investors'?'investorName':s.tab==='startups'?'companyName':'partnerName';
+    var _nameVal  = (entry[_nameKey2]||'').trim();
+    if(!_nameVal || /^inv_\d+/.test(_nameVal)){
+      parsed.push({ row:ri+2, entry:entry, skip:true, reason:'name looks like an auto-generated ID — check column mapping' }); return;
+    }
     var warns = [];
     emailKeys.forEach(function(k){
       if(entry[k] && !emailRe.test(entry[k])) warns.push('invalid email: '+entry[k]);
