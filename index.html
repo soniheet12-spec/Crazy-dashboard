@@ -1436,13 +1436,28 @@ async function manualSync(){
   if(btn){ btn.disabled=true; btn.textContent='Syncing…'; }
   showToast('Syncing…', 'info');
   try {
+    // PUSH local data to Sheets first — so existing entries are uploaded before we merge
+    var invLocal = netLoad('investors').filter(function(r){ return !r._fromSheet; });
+    var stLocal   = netLoad('startups');
+    var parLocal  = netLoad('partnerships');
+    var pipLocal  = getPipeline();
+    await Promise.all([
+      gsWrite('Network_investors',    invLocal),
+      gsWrite('Network_startups',     stLocal),
+      gsWrite('Network_partnerships', parLocal),
+      gsWrite('Pipeline',             pipLocal),
+    ]);
+    // Brief pause so Apps Script has time to commit the write before we read back
+    await new Promise(function(r){ setTimeout(r, 1500); });
+    // PULL + merge from Sheets into localStorage
     await netSync('investors');
     await netSync('startups');
     await netSync('partnerships');
     await pipelineSync();
     try { renderNetworkTab(); } catch(e){}
     try { renderKanban(); renderPipelineList(); } catch(e){}
-    showToast('Synced ✓', 'success');
+    var total = invLocal.length + stLocal.length + parLocal.length + pipLocal.length;
+    showToast('Synced ✓ (' + total + ' records pushed)', 'success');
   } catch(e){
     showToast('Sync failed — check console', 'error');
     console.error('[manualSync]', e);
