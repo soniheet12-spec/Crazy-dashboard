@@ -2122,6 +2122,13 @@ const NET_KEYS = {
   startups:     'l7_net_startups',
 };
 
+function _netFilterCorrupt(tab, rows){
+  var nk = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
+  return rows.filter(function(e){
+    var nm = (e[nk]||e.name||'').trim();
+    return nm && !/^inv_\d+/.test(nm) && nm !== String(e.id||'');
+  });
+}
 function netLoad(tab){
   // Always read localStorage first so local-only entries survive token expiry
   var manual = [];
@@ -2138,9 +2145,9 @@ function netLoad(tab){
     var sheetsData = SheetsDB.cache[tab] || [];
     var remoteIds = new Set(sheetsData.map(function(r){ return String(r.id||''); }).filter(Boolean));
     var localOnly = manual.filter(function(r){ return r.id && !remoteIds.has(String(r.id)); });
-    return sheetsData.concat(localOnly);
+    return _netFilterCorrupt(tab, sheetsData.concat(localOnly));
   }
-  return manual;
+  return _netFilterCorrupt(tab, manual);
 }
 function netSave(tab, data){
   // Always persist to localStorage immediately for durability
@@ -2263,19 +2270,8 @@ let dragStartup='',dragInvestor='';
 
 // ═══ INIT ═══
 window.onload = async () => {
-  // Clean corrupt network entries (name = inv_TIMESTAMP) before any render
+  // One-time migration: fix sheet cache entries with NaN ids (from old Math.max bug)
   try {
-    var _netCleanMap = { l7_net_investors:'investorName', l7_net_partnerships:'partnerName', l7_net_startups:'companyName' };
-    Object.keys(_netCleanMap).forEach(function(lsKey){
-      var nf = _netCleanMap[lsKey];
-      var raw = JSON.parse(localStorage.getItem(lsKey)||'[]');
-      var cleaned = raw.filter(function(e){
-        var nm = e[nf]||e.name||'';
-        return nm && !/^inv_\d+/.test(nm) && nm !== e.id;
-      });
-      if(cleaned.length !== raw.length) localStorage.setItem(lsKey, JSON.stringify(cleaned));
-    });
-    // Fix sheet cache entries with NaN ids (from old Math.max bug) — give them stable ids
     var _sheetCache = JSON.parse(localStorage.getItem('l7_net_inv_sheet_cache')||'[]');
     var _sheetFixed = false;
     _sheetCache.forEach(function(e){
