@@ -4540,6 +4540,13 @@ function updateCsvMapping(fieldKey, colIdx){
   if(el) el.innerHTML = preview;
 }
 
+function _sanitizeCsvVal(v){
+  if(!v) return v;
+  if(v[0]==='=') return '';
+  if(/^#(ERROR!|REF!|N\/A|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!)/i.test(v)) return '';
+  return v;
+}
+
 function runCsvPreview(){
   var s = _csvImportState;
   var fields = netFields(s.tab);
@@ -4557,7 +4564,7 @@ function runCsvPreview(){
     var blank = true;
     fields.forEach(function(f){
       var ci = s.mapping[f.key];
-      var val = (ci!=='' && row[parseInt(ci)] !== undefined) ? row[parseInt(ci)].trim() : '';
+      var val = (ci!=='' && row[parseInt(ci)] !== undefined) ? _sanitizeCsvVal(row[parseInt(ci)].trim()) : '';
       entry[f.key] = val;
       if(val) blank = false;
     });
@@ -4624,25 +4631,26 @@ async function confirmCsvImport(){
 
   var tab = s.tab;
   var rows = netLoad(tab);
-  // Build dedup set from existing primary name key
   var nameKey = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
-  var existingNames = new Set(rows.map(function(r){ return (r[nameKey]||'').toLowerCase().trim(); }));
 
   var succeeded=[], skipped=[], failed=[];
-  var nextId = netNextId(rows);
 
   toImport.forEach(function(p){
     var name = (p.entry[nameKey]||'').toLowerCase().trim();
-    if(name && existingNames.has(name)){
-      skipped.push({ row:p.row, name:p.entry[nameKey], reason:'duplicate' });
-      return;
+    var existingIdx = name ? rows.findIndex(function(r){ return (r[nameKey]||'').toLowerCase().trim()===name; }) : -1;
+    if(existingIdx >= 0){
+      // BUG 3 fix: UPDATE existing entry instead of skipping; preserve id and dateAdded
+      var keep = { id: rows[existingIdx].id, dateAdded: rows[existingIdx].dateAdded };
+      Object.assign(rows[existingIdx], p.entry, keep);
+      succeeded.push({ row:p.row, name:p.entry[nameKey] });
+    } else {
+      // BUG 1 fix: always generate a fresh string id, never read from CSV
+      var entry = Object.assign({}, p.entry);
+      entry.id = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+      entry.dateAdded = new Date().toISOString();
+      rows.push(entry);
+      succeeded.push({ row:p.row, name:p.entry[nameKey] });
     }
-    var entry = Object.assign({}, p.entry);
-    entry.id = nextId++;
-    entry.dateAdded = new Date().toISOString();
-    rows.push(entry);
-    if(name) existingNames.add(name);
-    succeeded.push({ row:p.row, name:p.entry[nameKey] });
   });
 
   // Persist
