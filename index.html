@@ -527,6 +527,82 @@
   }
 @keyframes netLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.4)}}
 #overdue-banner{display:none;position:sticky;top:0;z-index:19;background:rgba(240,101,101,0.1);border-bottom:1px solid rgba(240,101,101,0.28);padding:9px 16px;font-size:13px;align-items:center;gap:10px;color:var(--text);}
+
+/* ── Institutional sidebar ── */
+.nav-tab { padding:7px 12px; font-size:12px; gap:9px; }
+.nav-tab .tab-icon { width:18px; height:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nav-tab .tab-icon svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.nav-tab.active .tab-icon svg { stroke:var(--accent); }
+.nav-tab:hover .tab-icon svg { stroke:var(--text); }
+.nav-tab.active::before { content:''; position:absolute; left:0; top:20%; bottom:20%; width:2.5px; background:var(--accent); border-radius:0 2px 2px 0; }
+.nav-tab { position:relative; }
+.sb-section-label { padding:10px 12px 3px; font-size:8.5px; }
+
+/* ── Revenue dashboard ── */
+#rev-dashboard { margin-bottom:14px; }
+.rev-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:10px; }
+.rev-stat { background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:11px 12px; }
+.rev-val { font-size:1.25rem; font-weight:700; color:var(--text); line-height:1.1; }
+.rev-lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-top:3px; font-weight:600; }
+.rev-stat.accent .rev-val { color:var(--accent); }
+.rev-stat.green .rev-val  { color:var(--green); }
+.rev-stat.amber .rev-val  { color:var(--amber); }
+@media(max-width:900px){.rev-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:600px){.rev-grid{grid-template-columns:repeat(2,1fr);}}
+
+/* ── Needs attention strip ── */
+#home-needs-attention { margin-bottom:12px; }
+.na-strip { display:flex; gap:8px; flex-wrap:wrap; }
+.na-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 10px; border-radius:6px; font-size:11.5px; font-weight:500;
+  border:1px solid var(--border2); background:var(--s1); cursor:pointer;
+  transition:background 0.15s;
+}
+.na-chip:hover { background:var(--s2); }
+.na-chip .na-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.na-chip.urgent  { border-color:rgba(212,60,60,0.35); background:rgba(212,60,60,0.06); }
+.na-chip.amber   { border-color:rgba(212,129,10,0.35); background:rgba(212,129,10,0.06); }
+.na-chip.green   { border-color:rgba(24,154,94,0.35);  background:rgba(24,154,94,0.06);  }
+.na-chip.info    { border-color:rgba(44,95,232,0.25);  background:rgba(44,95,232,0.05);  }
+
+/* ── Status dots (institutional) ── */
+.status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; vertical-align:middle; flex-shrink:0; }
+.sd-green  { background:var(--green); }
+.sd-amber  { background:var(--amber); }
+.sd-red    { background:var(--red); }
+.sd-blue   { background:var(--blue); }
+.sd-muted  { background:var(--muted); }
+
+/* ── Enhanced search overlay ── */
+#global-search-results .srch-group-hdr { padding:5px 10px 3px; font-size:9.5px; font-weight:700; letter-spacing:.07em; color:var(--muted); background:var(--s2); border-bottom:1px solid var(--border); text-transform:uppercase; }
+#global-search-results .srch-item { padding:8px 12px; border-bottom:1px solid var(--border); cursor:pointer; font-size:12.5px; display:flex; align-items:flex-start; gap:8px; }
+#global-search-results .srch-item:hover { background:var(--s2); }
+#global-search-results .srch-icon { width:28px; height:28px; border-radius:6px; background:var(--s3); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:11px; font-weight:700; color:var(--accent); }
+#global-search-results .srch-name { font-weight:600; color:var(--text); line-height:1.3; }
+#global-search-results .srch-meta { font-size:11px; color:var(--muted); margin-top:1px; }
+#global-search-results .srch-recents-hdr { padding:7px 10px 4px; font-size:9.5px; font-weight:700; letter-spacing:.07em; color:var(--muted); text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; }
+#global-search-results .srch-recents-hdr button { font-size:9.5px; background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-family:inherit; }
+#global-search-results .srch-recents-hdr button:hover { color:var(--red); }
+#global-search-results .srch-recent-item { padding:6px 12px; border-bottom:1px solid var(--border); cursor:pointer; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+#global-search-results .srch-recent-item:hover { background:var(--s2); color:var(--text); }
+.global-search-kbd { display:inline-block; background:var(--s2); border:1px solid var(--border2); border-radius:3px; padding:1px 5px; font-size:10px; font-family:monospace; color:var(--muted); margin-left:4px; }
+
+/* ── Revenue modal ── */
+#rev-edit-modal .rev-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:600px){#rev-edit-modal .rev-modal-grid{grid-template-columns:1fr;}}
+
+/* ── Weekly summary (override injected 3-col) ── */
+#home-week-bar { display:grid !important; grid-template-columns:repeat(5,1fr) !important; gap:8px !important; margin-bottom:12px !important; }
+.ux-week-card { padding:10px 12px; }
+.ux-week-val  { font-size:1.4rem; }
+@media(max-width:900px){#home-week-bar{grid-template-columns:repeat(3,1fr) !important;}}
+@media(max-width:600px){#home-week-bar{grid-template-columns:repeat(2,1fr) !important;}}
+
+/* ── Compact home stats ── */
+#page-home .stat { padding:10px 12px; }
+#page-home .stat-value { font-size:1.35rem; }
+#page-home .stat-label { font-size:9.5px; }
 </style>
 <script>
 // SettingsDB — localStorage-only stub (Google Sheets sync removed)
@@ -580,18 +656,18 @@ window.SettingsDB = (function(){
     <button class="sb-toggle" onclick="toggleSidebar()" title="Collapse sidebar">&#9776;</button>
   </div>
   <nav class="sb-nav">
-    <button class="nav-tab active" data-tab="home" onclick="showTab('home',this)"><span class="tab-icon">&#127968;</span><span class="tab-label">Home</span></button>
-    <button class="nav-tab" id="nav-tab-network" data-tab="network" onclick="showTab('network',this)"><span class="tab-icon">&#127760;</span><span class="tab-label">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></span></button>
+    <button class="nav-tab active" data-tab="home" onclick="showTab('home',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></span><span class="tab-label">Home</span></button>
+    <button class="nav-tab" id="nav-tab-network" data-tab="network" onclick="showTab('network',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span><span class="tab-label">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></span></button>
     <div class="sb-section-label">Deal Flow</div>
-    <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon">&#128200;</span><span class="tab-label">Pipeline</span></button>
-    <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon">&#128228;</span><span class="tab-label">Outreach</span></button>
+    <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="tab-label">Pipeline</span></button>
+    <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="tab-label">Outreach</span></button>
     <div class="sb-section-label">Research</div>
-    <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon">&#128269;</span><span class="tab-label">Diligence</span></button>
+    <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><span class="tab-label">Diligence</span></button>
     <div class="sb-section-label">Admin</div>
-    <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon">&#128193;</span><span class="tab-label">Docs</span></button>
-    <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon">&#128203;</span><span class="tab-label">Audit Log</span></button>
-    <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon">&#128190;</span><span class="tab-label">Backup</span></button>
-    <button class="nav-tab" data-tab="mandate" onclick="showTab('mandate',this)"><span class="tab-icon">&#128220;</span><span class="tab-label">Mandate</span></button>
+    <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span><span class="tab-label">Docs</span></button>
+    <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span><span class="tab-label">Audit Log</span></button>
+    <button class="nav-tab" data-tab="backup" onclick="showTab('backup',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg></span><span class="tab-label">Backup</span></button>
+    <button class="nav-tab" data-tab="mandate" onclick="showTab('mandate',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M17 14l-5 5-3-3"/></svg></span><span class="tab-label">Mandate</span></button>
   </nav>
   <div style="padding:6px 12px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:4px">
     <button id="dark-mode-btn" onclick="toggleDarkMode()" title="Toggle dark/light mode" style="flex:1;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px;background:transparent;border:none;cursor:pointer;color:var(--muted);font-family:'Poppins',sans-serif">
@@ -699,52 +775,86 @@ window.SettingsDB = (function(){
   <!-- ═══ HOME ═══ -->
   <div id="page-home" class="page active">
     <div id="home-notifications" style="margin-bottom:8px"></div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:4px">
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-stat-startups">0</div><div class="stat-label">Startups</div></div>
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-stat-investors">0</div><div class="stat-label">Investors</div></div>
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-stat-pipeline">0</div><div class="stat-label">Pipeline</div></div>
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-stat-contacted">0</div><div class="stat-label">Contacted</div></div>
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-followups" style="color:var(--amber)">0</div><div class="stat-label">Follow-ups Due</div></div>
-      <div class="stat" style="padding:12px 14px"><div class="stat-value" id="home-hot-deals" style="color:var(--green)">0</div><div class="stat-label">Hot Deals</div></div>
+
+    <!-- Pipeline + activity stats row -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px">
+      <div class="stat"><div class="stat-value" id="home-stat-startups">0</div><div class="stat-label">Startups</div></div>
+      <div class="stat"><div class="stat-value" id="home-stat-investors">0</div><div class="stat-label">Investors</div></div>
+      <div class="stat"><div class="stat-value" id="home-stat-pipeline">0</div><div class="stat-label">Pipeline</div></div>
+      <div class="stat"><div class="stat-value" id="home-stat-contacted">0</div><div class="stat-label">Contacted</div></div>
+      <div class="stat"><div class="stat-value" id="home-followups" style="color:var(--amber)">0</div><div class="stat-label">Follow-ups Due</div></div>
+      <div class="stat"><div class="stat-value" id="home-hot-deals" style="color:var(--green)">0</div><div class="stat-label">Hot Deals</div></div>
     </div>
-    <div id="home-sync-status" style="font-size:11px;color:var(--muted);text-align:right;margin-bottom:10px;min-height:14px"></div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start">
+
+    <!-- Revenue dashboard -->
+    <div id="rev-dashboard" class="card" style="margin-bottom:12px;padding:14px 16px">
+      <div class="card-header" style="padding-bottom:10px;margin-bottom:10px">
+        <div class="card-title">Revenue &amp; Mandate Tracker</div>
+        <div style="display:flex;gap:6px">
+          <button class="mini-btn" onclick="renderRevenueDashboard()">Refresh</button>
+          <button class="mini-btn" onclick="goToTab('mandate')">Mandates &#8599;</button>
+        </div>
+      </div>
+      <div class="rev-grid" id="rev-stats-grid">
+        <div class="rev-stat accent"><div class="rev-val" id="rev-active-mandates">—</div><div class="rev-lbl">Active Mandates</div></div>
+        <div class="rev-stat green"><div class="rev-val" id="rev-signed">—</div><div class="rev-lbl">Signed</div></div>
+        <div class="rev-stat"><div class="rev-val" id="rev-expected-fees">—</div><div class="rev-lbl">Expected Fees</div></div>
+        <div class="rev-stat"><div class="rev-val" id="rev-weighted-fees">—</div><div class="rev-lbl">Weighted Fees</div></div>
+        <div class="rev-stat amber"><div class="rev-val" id="rev-retainer-pending">—</div><div class="rev-lbl">Retainer Pending</div></div>
+        <div class="rev-stat green"><div class="rev-val" id="rev-this-month">—</div><div class="rev-lbl">Closing This Month</div></div>
+      </div>
+      <div id="rev-deal-flags" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Needs Attention strip -->
+    <div id="home-needs-attention" style="margin-bottom:10px">
+      <div class="na-strip" id="na-items">
+        <span style="font-size:11px;color:var(--muted)">Loading…</span>
+      </div>
+    </div>
+
+    <div id="home-sync-status" style="font-size:11px;color:var(--muted);text-align:right;margin-bottom:8px;min-height:14px"></div>
+
+    <!-- Weekly summary bar (injected by JS as before) -->
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:14px;align-items:start">
       <div>
         <div class="card" style="margin-bottom:14px">
           <div class="card-header"><div class="card-title">Pipeline Snapshot</div><div style="display:flex;gap:6px"><button class="mini-btn" onclick="loadData()">&#8635; Refresh</button><button class="mini-btn" onclick="goToTab('pipeline')">Full Board &#8599;</button></div></div>
           <div id="home-pipeline-snapshot"><div class="empty" style="padding:18px">No pipeline deals yet.</div></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Sector News Signals</div><button class="mini-btn" onclick="fetchNewsMonitor()">&#128240; Fetch</button></div>
+          <div class="card-header"><div class="card-title">Sector News Signals</div><button class="mini-btn" onclick="fetchNewsMonitor()">Fetch</button></div>
           <div id="home-news-feed"><div class="empty" style="padding:16px">Click Fetch to load AI-generated sector signals.</div></div>
         </div>
       </div>
       <div>
-        <div class="card" style="margin-bottom:14px">
-          <div class="card-title" style="margin-bottom:10px">Quick Actions</div>
-          <div style="display:grid;gap:6px">
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('network')">&#127760; Network</button>
-            <button class="action-btn primary" style="width:100%" onclick="goToTab('outreach')">&#128228; Outreach</button>
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('pipeline')">&#128203; Pipeline</button>
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('diligence')">&#128269; Diligence</button>
-            <button class="action-btn secondary" style="width:100%" onclick="goToTab('docs')">&#128194; Docs</button>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:10px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--muted)">Quick Actions</div>
+          <div style="display:grid;gap:5px">
+            <button class="action-btn primary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="openAddDealModal()">+ New Deal</button>
+            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('pipeline')">Pipeline Board</button>
+            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('outreach')">Send Outreach</button>
+            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('network')">Network</button>
+            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('mandate')">Generate Mandate</button>
+            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('diligence')">Diligence</button>
           </div>
         </div>
-        <div class="card" style="margin-bottom:14px">
+        <div class="card" style="margin-bottom:12px">
           <div class="card-header"><div class="card-title">Overdue Follow-ups</div></div>
           <div id="home-overdue-list"><div class="empty" style="padding:12px;font-size:12px">No overdue follow-ups.</div></div>
         </div>
-        <div class="card" style="margin-bottom:14px">
-          <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span><button id="wa-remind-btn" class="mini-btn" style="margin-left:auto" onclick="sendWhatsAppReminder()">📲 Send WhatsApp Reminder Now</button></div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-header"><div class="card-title">Network Follow-ups</div><span id="net-followup-badge" class="badge" style="display:none;background:var(--red);color:#fff;border-color:transparent"></span><button id="wa-remind-btn" class="mini-btn" style="margin-left:auto" onclick="sendWhatsAppReminder()">Send Reminder</button></div>
           <div id="home-net-followups"><div class="empty" style="padding:12px;font-size:12px">No network follow-ups due today.</div></div>
         </div>
-        <div class="card">
+        <div class="card" style="margin-bottom:12px">
           <div class="card-header"><div class="card-title">Recent Activity</div></div>
           <div id="home-recent-activity"><div class="empty" style="padding:12px;font-size:12px">Activity appears here.</div></div>
         </div>
-        <div class="card" style="margin-top:14px">
+        <div class="card">
           <div class="card-header">
-            <div class="card-title">📌 Quick Notes</div>
+            <div class="card-title">Quick Notes</div>
             <span id="pinned-notes-saved" style="font-size:10px;color:var(--green);opacity:0;transition:opacity 0.4s">Saved</span>
           </div>
           <textarea id="pinned-notes" rows="4" placeholder="Quick notes during calls…" style="width:100%;resize:vertical;font-size:12.5px;line-height:1.5;font-family:'Poppins',sans-serif;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" oninput="debouncePinnedNotes()"></textarea>
@@ -5125,6 +5235,65 @@ function mandSelectStartup(idx){
 }
 </script>
 
+<!-- ── Revenue Edit Modal ─────────────────────────────────────────────────── -->
+<div id="rev-edit-modal" class="hidden" style="position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeRevEditModal()">
+  <div style="max-width:520px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+    <div class="card-header" style="margin-bottom:16px">
+      <div>
+        <div class="card-title">Revenue Fields</div>
+        <div id="rev-edit-deal-label" style="font-size:12px;color:var(--muted);margin-top:3px"></div>
+      </div>
+      <button onclick="closeRevEditModal()" style="background:transparent;border:none;cursor:pointer;font-size:18px;color:var(--muted);padding:2px 6px">&#10005;</button>
+    </div>
+    <input type="hidden" id="rev-edit-deal-id">
+    <div class="rev-modal-grid">
+      <div class="field">
+        <label>Mandate Signed?</label>
+        <select id="rev-mandate-signed">
+          <option value="">Not set</option>
+          <option value="yes">Yes — Signed</option>
+          <option value="no">No — Not yet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Expected Raise (&#8377; Cr)</label>
+        <input type="number" id="rev-expected-raise" placeholder="e.g. 20" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>Success Fee %</label>
+        <input type="number" id="rev-success-fee" placeholder="e.g. 2.5" min="0" max="100" step="0.1">
+      </div>
+      <div class="field">
+        <label>Close Probability %</label>
+        <input type="number" id="rev-close-prob" placeholder="e.g. 60" min="0" max="100" step="5">
+      </div>
+      <div class="field">
+        <label>Retainer Amount (&#8377; L)</label>
+        <input type="number" id="rev-retainer-amt" placeholder="e.g. 2.5" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>Retainer Paid (&#8377; L)</label>
+        <input type="number" id="rev-retainer-paid" placeholder="e.g. 1" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>Mandate Fee %</label>
+        <input type="number" id="rev-mandate-fee" placeholder="e.g. 1" min="0" max="100" step="0.1">
+      </div>
+      <div class="field">
+        <label>Expected Close Date</label>
+        <input type="date" id="rev-close-date">
+      </div>
+    </div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:4px;font-size:12px" id="rev-computed-preview">
+      Computed values appear here after saving.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="action-btn primary" style="flex:1" onclick="saveRevEditModal()">Save Revenue Fields</button>
+      <button class="action-btn secondary" onclick="closeRevEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Shortcuts Modal ───────────────────────────────────────────────────── -->
 <div id="shortcuts-modal" class="hidden" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeShortcutsModal()">
   <div style="max-width:460px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px">
@@ -6691,6 +6860,765 @@ if('serviceWorker' in navigator){
       .catch(function(e){ console.warn('[SW] registration failed:', e); });
   });
 }
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  DASHBOARD UPGRADES v2 — purely additive, backward compatible
+//  New localStorage keys only: l7_recent_searches, l7_recent_records
+//  All new helper functions follow the l7_ naming convention
+// ═══════════════════════════════════════════════════════════════════
+
+// ── A. REVENUE DASHBOARD ─────────────────────────────────────────
+
+function getRevenueFields(deal) {
+  // Read optional revenue fields from deal record (safe defaults for old records)
+  return {
+    mandateSigned:    deal.mandateSigned    || false,
+    mandateFeePercent: parseFloat(deal.mandateFeePercent) || 0,
+    successFeePercent: parseFloat(deal.successFeePercent) || 0,
+    retainerAmount:   parseFloat(deal.retainerAmount)    || 0,
+    retainerPaid:     parseFloat(deal.retainerPaid)      || 0,
+    expectedRaise:    parseFloat(deal.expectedRaise)     || 0,
+    closeProbability: parseFloat(deal.closeProbability)  || 0,
+    expectedCloseDate: deal.expectedCloseDate            || ''
+  };
+}
+
+function computeDealRevenue(deal) {
+  var f = getRevenueFields(deal);
+  var expectedFee    = f.expectedRaise > 0 && f.successFeePercent > 0
+    ? f.expectedRaise * f.successFeePercent / 100 : 0;
+  var weightedFee    = expectedFee > 0 && f.closeProbability > 0
+    ? expectedFee * f.closeProbability / 100 : 0;
+  var retainerPending = Math.max(0, f.retainerAmount - f.retainerPaid);
+  return {
+    expectedFee:      expectedFee,
+    weightedFee:      weightedFee,
+    retainerPending:  retainerPending,
+    fields:           f
+  };
+}
+
+// Format INR in crore/lakh friendly way
+function fmtInr(cr) {
+  if (!cr || cr === 0) return '—';
+  if (cr >= 1) return '₹' + (Math.round(cr * 10) / 10) + ' Cr';
+  var l = cr * 100;
+  if (l >= 1) return '₹' + (Math.round(l * 10) / 10) + ' L';
+  return '₹' + (Math.round(cr * 10000) / 100) + ' K';
+}
+
+function getRevenueDashboardStats() {
+  var pipeline = getPipeline();
+  var mandateLog = [];
+  try { mandateLog = JSON.parse(localStorage.getItem('mandate_log') || '[]'); } catch(e) {}
+
+  var today = new Date().toISOString().slice(0, 10);
+  var thisMonthStart = today.slice(0, 7) + '-01';
+  var nextMonthStart = (function() {
+    var d = new Date(thisMonthStart);
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  var activeMandates = 0, signedMandates = 0;
+  var totalExpectedFees = 0, totalWeightedFees = 0, totalRetainerPending = 0;
+  var closingThisMonth = 0;
+  var flaggedDeals = [];
+
+  pipeline.forEach(function(deal) {
+    var r = computeDealRevenue(deal);
+    var f = r.fields;
+
+    // Count as active mandate if mandate log has entry OR deal has revenue fields set
+    var hasRevFields = f.expectedRaise > 0 || f.successFeePercent > 0 || f.mandateSigned;
+    if (hasRevFields) activeMandates++;
+    if (f.mandateSigned) signedMandates++;
+
+    totalExpectedFees    += r.expectedFee;
+    totalWeightedFees    += r.weightedFee;
+    totalRetainerPending += r.retainerPending;
+
+    if (f.expectedCloseDate >= thisMonthStart && f.expectedCloseDate < nextMonthStart) {
+      closingThisMonth++;
+    }
+
+    // Build flags for deals needing attention
+    if (!f.mandateSigned && hasRevFields) {
+      flaggedDeals.push({ deal: deal, flag: 'no-mandate', msg: 'Mandate not signed' });
+    } else if (r.retainerPending > 0) {
+      flaggedDeals.push({ deal: deal, flag: 'retainer-pending', msg: 'Retainer ₹' + (Math.round(r.retainerPending * 10) / 10) + 'L pending' });
+    } else if (f.closeProbability > 0 && f.closeProbability < 30) {
+      flaggedDeals.push({ deal: deal, flag: 'low-prob', msg: 'Low probability (' + f.closeProbability + '%)' });
+    }
+  });
+
+  // Also count mandates from mandate_log (separate from pipeline)
+  var logSigned = mandateLog.length;
+
+  return {
+    activeMandates:     activeMandates || logSigned,
+    signedMandates:     signedMandates || logSigned,
+    expectedFees:       totalExpectedFees,
+    weightedFees:       totalWeightedFees,
+    retainerPending:    totalRetainerPending,
+    closingThisMonth:   closingThisMonth,
+    flaggedDeals:       flaggedDeals
+  };
+}
+
+function renderRevenueDashboard() {
+  var s = getRevenueDashboardStats();
+
+  function setEl(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  setEl('rev-active-mandates', s.activeMandates || '0');
+  setEl('rev-signed',          s.signedMandates || '0');
+  setEl('rev-expected-fees',   s.expectedFees   ? fmtInr(s.expectedFees)  : '—');
+  setEl('rev-weighted-fees',   s.weightedFees   ? fmtInr(s.weightedFees)  : '—');
+  setEl('rev-retainer-pending',s.retainerPending ? fmtInr(s.retainerPending / 100) : '—');
+  setEl('rev-this-month',      s.closingThisMonth || '0');
+
+  // Deal flags
+  var flagEl = document.getElementById('rev-deal-flags');
+  if (flagEl && s.flaggedDeals.length) {
+    flagEl.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + s.flaggedDeals.slice(0, 6).map(function(fd) {
+        var c = fd.flag === 'no-mandate' ? 'amber'
+              : fd.flag === 'retainer-pending' ? 'amber'
+              : fd.flag === 'low-prob' ? 'urgent' : 'info';
+        var name = escapeHtml((fd.deal.startup || fd.deal.investor || '').slice(0, 22));
+        return '<div class="na-chip ' + c + '" onclick="revOpenDealEdit(\'' + escapeQ(fd.deal.id || fd.deal.startup || '') + '\')" style="font-size:10.5px">'
+          + '<span class="na-dot" style="background:' + (c === 'urgent' ? 'var(--red)' : c === 'amber' ? 'var(--amber)' : 'var(--accent)') + '"></span>'
+          + name + ': ' + escapeHtml(fd.msg) + '</div>';
+      }).join('')
+      + '</div>';
+  } else if (flagEl) {
+    flagEl.innerHTML = '';
+  }
+}
+
+// Revenue edit modal functions
+var _revEditDealId = null;
+
+function revOpenDealEdit(dealId) {
+  var pipeline = getPipeline();
+  var deal = pipeline.find(function(d) { return d.id === dealId || d.startup === dealId; });
+  if (!deal) { showToast('Deal not found', 'error'); return; }
+
+  _revEditDealId = deal.id || null;
+  var f = getRevenueFields(deal);
+  var lbl = document.getElementById('rev-edit-deal-label');
+  if (lbl) lbl.textContent = (deal.startup || '') + (deal.investor ? ' ↔ ' + deal.investor : '');
+
+  document.getElementById('rev-edit-deal-id').value = deal.id || '';
+  document.getElementById('rev-mandate-signed').value = f.mandateSigned ? 'yes' : (deal.mandateSigned === false ? 'no' : '');
+  document.getElementById('rev-expected-raise').value  = f.expectedRaise    || '';
+  document.getElementById('rev-success-fee').value     = f.successFeePercent || '';
+  document.getElementById('rev-close-prob').value      = f.closeProbability  || '';
+  document.getElementById('rev-retainer-amt').value    = f.retainerAmount    || '';
+  document.getElementById('rev-retainer-paid').value   = f.retainerPaid      || '';
+  document.getElementById('rev-mandate-fee').value     = f.mandateFeePercent  || '';
+  document.getElementById('rev-close-date').value      = f.expectedCloseDate  || '';
+
+  updateRevComputedPreview();
+
+  var modal = document.getElementById('rev-edit-modal');
+  if (modal) { modal.classList.remove('hidden'); modal.style.display = 'flex'; }
+}
+
+function updateRevComputedPreview() {
+  var expectedRaise  = parseFloat(document.getElementById('rev-expected-raise').value) || 0;
+  var successFee     = parseFloat(document.getElementById('rev-success-fee').value) || 0;
+  var prob           = parseFloat(document.getElementById('rev-close-prob').value) || 0;
+  var retAmt         = parseFloat(document.getElementById('rev-retainer-amt').value) || 0;
+  var retPaid        = parseFloat(document.getElementById('rev-retainer-paid').value) || 0;
+  var expectedFee    = expectedRaise > 0 && successFee > 0 ? expectedRaise * successFee / 100 : 0;
+  var weightedFee    = expectedFee > 0 && prob > 0 ? expectedFee * prob / 100 : 0;
+  var retPending     = Math.max(0, retAmt - retPaid);
+
+  var el = document.getElementById('rev-computed-preview');
+  if (!el) return;
+  if (!expectedRaise && !retAmt) {
+    el.textContent = 'Fill in raise amount and fee % to see computed values.';
+    return;
+  }
+  el.innerHTML = '<div style="display:flex;gap:16px;flex-wrap:wrap">'
+    + (expectedFee   ? '<span><strong>' + fmtInr(expectedFee)  + '</strong> expected fee</span>' : '')
+    + (weightedFee   ? '<span><strong>' + fmtInr(weightedFee)  + '</strong> weighted fee</span>' : '')
+    + (retPending > 0 ? '<span style="color:var(--amber)"><strong>₹' + (Math.round(retPending*10)/10) + 'L</strong> retainer pending</span>' : '')
+    + '</div>';
+}
+
+function saveRevEditModal() {
+  var dealId = document.getElementById('rev-edit-deal-id').value;
+  var pipeline = getPipeline();
+  var idx = pipeline.findIndex(function(d) { return d.id === dealId; });
+  if (idx < 0) { showToast('Deal not found', 'error'); return; }
+
+  var deal = pipeline[idx];
+  deal.mandateSigned     = document.getElementById('rev-mandate-signed').value === 'yes';
+  deal.expectedRaise     = parseFloat(document.getElementById('rev-expected-raise').value) || 0;
+  deal.successFeePercent = parseFloat(document.getElementById('rev-success-fee').value) || 0;
+  deal.closeProbability  = parseFloat(document.getElementById('rev-close-prob').value) || 0;
+  deal.retainerAmount    = parseFloat(document.getElementById('rev-retainer-amt').value) || 0;
+  deal.retainerPaid      = parseFloat(document.getElementById('rev-retainer-paid').value) || 0;
+  deal.mandateFeePercent = parseFloat(document.getElementById('rev-mandate-fee').value) || 0;
+  deal.expectedCloseDate = document.getElementById('rev-close-date').value || '';
+  deal.lastUpdated       = new Date().toISOString();
+
+  pipeline[idx] = deal;
+  setPipeline(pipeline);
+  addAuditEntry('pipeline', 'Revenue fields updated', deal.startup || deal.investor || dealId);
+  closeRevEditModal();
+  renderRevenueDashboard();
+  showToast('Revenue fields saved.');
+}
+
+function closeRevEditModal() {
+  var modal = document.getElementById('rev-edit-modal');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+}
+
+// ── B. NEEDS ATTENTION ITEMS ─────────────────────────────────────
+
+function getNeedsAttentionItems() {
+  var items = [];
+  var today = new Date().toISOString().slice(0, 10);
+  var pipeline = getPipeline();
+  var allContacts = [].concat(netLoad('investors'), netLoad('startups'), netLoad('partnerships'));
+
+  // Overdue follow-ups
+  var overdue = allContacts.filter(function(r) {
+    return r.followUpDate && r.followUpDate <= today;
+  });
+  if (overdue.length) {
+    items.push({ cls: 'urgent', dot: 'var(--red)', text: overdue.length + ' overdue follow-up' + (overdue.length > 1 ? 's' : ''), action: function() { goToTab('network'); } });
+  }
+
+  // Deals in Diligence or Term Sheet stage
+  var advancedDeals = pipeline.filter(function(d) { return d.stage === 'Diligence' || d.stage === 'Term Sheet'; });
+  if (advancedDeals.length) {
+    items.push({ cls: 'amber', dot: 'var(--amber)', text: advancedDeals.length + ' deal' + (advancedDeals.length > 1 ? 's' : '') + ' in Diligence / Term Sheet', action: function() { goToTab('pipeline'); } });
+  }
+
+  // Retainer pending
+  var retainerPending = pipeline.filter(function(d) {
+    var r = computeDealRevenue(d);
+    return r.retainerPending > 0;
+  });
+  if (retainerPending.length) {
+    items.push({ cls: 'amber', dot: 'var(--amber)', text: retainerPending.length + ' retainer' + (retainerPending.length > 1 ? 's' : '') + ' pending collection', action: function() { renderRevenueDashboard(); } });
+  }
+
+  // Unsigned mandates (has rev fields but not signed)
+  var unsignedMandates = pipeline.filter(function(d) {
+    var f = getRevenueFields(d);
+    return (f.expectedRaise > 0 || f.successFeePercent > 0) && !f.mandateSigned;
+  });
+  if (unsignedMandates.length) {
+    items.push({ cls: 'amber', dot: 'var(--amber)', text: unsignedMandates.length + ' mandate' + (unsignedMandates.length > 1 ? 's' : '') + ' not yet signed', action: function() { goToTab('mandate'); } });
+  }
+
+  // Hot deals
+  var hot = pipeline.filter(function(d) { return d.stage === 'Money in the Bank'; });
+  if (hot.length) {
+    items.push({ cls: 'green', dot: 'var(--green)', text: hot.length + ' deal' + (hot.length > 1 ? 's' : '') + ' closed / money in bank', action: function() { goToTab('pipeline'); } });
+  }
+
+  // Closing this month
+  var thisMonthStart = today.slice(0, 7) + '-01';
+  var nextMonthStart = (function() {
+    var d = new Date(thisMonthStart); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10);
+  })();
+  var closingThisMonth = pipeline.filter(function(d) {
+    var f = getRevenueFields(d);
+    return f.expectedCloseDate >= thisMonthStart && f.expectedCloseDate < nextMonthStart;
+  });
+  if (closingThisMonth.length) {
+    items.push({ cls: 'info', dot: 'var(--accent)', text: closingThisMonth.length + ' deal' + (closingThisMonth.length > 1 ? 's' : '') + ' expected close this month', action: function() { goToTab('pipeline'); } });
+  }
+
+  return items;
+}
+
+function renderNeedsAttention() {
+  var el = document.getElementById('na-items');
+  if (!el) return;
+  var items = getNeedsAttentionItems();
+  if (!items.length) {
+    el.innerHTML = '<span style="font-size:11.5px;color:var(--muted)">No immediate actions required.</span>';
+    return;
+  }
+  el.innerHTML = items.map(function(item) {
+    return '<button class="na-chip ' + item.cls + '" onclick="(function(){' + encodeURIComponent('/* chip action */') + '})()" style="font-size:11px">'
+      + '<span class="na-dot" style="background:' + item.dot + '"></span>'
+      + escapeHtml(item.text)
+      + '</button>';
+  }).join('');
+  // Wire up click handlers separately (avoids inline eval)
+  var chips = el.querySelectorAll('.na-chip');
+  chips.forEach(function(chip, i) {
+    if (items[i] && items[i].action) {
+      chip.addEventListener('click', items[i].action);
+    }
+  });
+}
+
+// ── B2. WEEKLY SUMMARY (enhance existing week bar) ───────────────
+
+function getWeeklySummary() {
+  var ws = (function() {
+    var n = new Date(); var day = n.getDay(); var diff = (day === 0 ? -6 : 1 - day);
+    n.setDate(n.getDate() + diff); n.setHours(0, 0, 0, 0); return n.toISOString();
+  })();
+
+  // New startups this week
+  var allSt = netLoad('startups');
+  var newStartups = allSt.filter(function(r) { return r.dateAdded && r.dateAdded >= ws; }).length;
+
+  // New investors contacted
+  var allInv = netLoad('investors');
+  var newContacted = allInv.filter(function(r) {
+    return r.dateAdded && r.dateAdded >= ws && r.status && r.status !== 'Cold' && r.status !== '';
+  }).length;
+
+  // Outreach log
+  var outLog = [];
+  try { outLog = JSON.parse(localStorage.getItem('log7_outreach_log') || '[]'); } catch(e) {}
+  var emailsSent = outLog.filter(function(e) { return e.ts && e.ts >= ws; }).length;
+
+  // Mandates signed this week
+  var mandateLog = [];
+  try { mandateLog = JSON.parse(localStorage.getItem('mandate_log') || '[]'); } catch(e) {}
+  var mandatesSigned = mandateLog.filter(function(m) { return m.timestamp && m.timestamp >= ws; }).length;
+
+  // Deals moved this week
+  var pipeline = getPipeline();
+  var dealsMoved = pipeline.filter(function(d) { return d.lastUpdated && d.lastUpdated >= ws; }).length;
+
+  return {
+    newStartups: newStartups,
+    newContacted: newContacted,
+    emailsSent: emailsSent,
+    mandatesSigned: mandatesSigned,
+    dealsMoved: dealsMoved
+  };
+}
+
+// Override the existing uxRenderWeekBar to show 5 columns
+(function() {
+  function l7RenderWeekBar() {
+    var el = document.getElementById('home-week-bar');
+    if (!el) return;
+    var s = getWeeklySummary();
+    el.innerHTML =
+      '<div class="ux-week-card"><div class="ux-week-val">' + s.newStartups + '</div><div class="ux-week-label">Startups added</div><div class="ux-week-sub">this week</div></div>' +
+      '<div class="ux-week-card"><div class="ux-week-val">' + s.newContacted + '</div><div class="ux-week-label">Investors reached</div><div class="ux-week-sub">this week</div></div>' +
+      '<div class="ux-week-card"><div class="ux-week-val">' + s.emailsSent + '</div><div class="ux-week-label">Emails sent</div><div class="ux-week-sub">this week</div></div>' +
+      '<div class="ux-week-card"><div class="ux-week-val">' + s.mandatesSigned + '</div><div class="ux-week-label">Mandates signed</div><div class="ux-week-sub">this week</div></div>' +
+      '<div class="ux-week-card"><div class="ux-week-val">' + s.dealsMoved + '</div><div class="ux-week-label">Deals moved</div><div class="ux-week-sub">this week</div></div>';
+  }
+  // Replace uxRenderWeekBar
+  window.uxRenderWeekBar = l7RenderWeekBar;
+})();
+
+// ── C. PATCH refreshHome to include revenue + attention ──────────
+
+(function() {
+  var _origRefreshHome = window.refreshHome;
+  window.refreshHome = function() {
+    _origRefreshHome.apply(this, arguments);
+    try { renderRevenueDashboard(); } catch(e) {}
+    try { renderNeedsAttention(); } catch(e) {}
+  };
+})();
+
+// ── E/F. GLOBAL SEARCH WITH FUZZY SCORING ───────────────────────
+
+// New localStorage keys: l7_recent_searches, l7_recent_records (safe, additive)
+
+function saveRecentSearch(query) {
+  if (!query || query.trim().length < 2) return;
+  try {
+    var recents = JSON.parse(localStorage.getItem('l7_recent_searches') || '[]');
+    recents = recents.filter(function(q) { return q !== query; });
+    recents.unshift(query);
+    localStorage.setItem('l7_recent_searches', JSON.stringify(recents.slice(0, 8)));
+  } catch(e) {}
+}
+
+function getRecentSearches() {
+  try { return JSON.parse(localStorage.getItem('l7_recent_searches') || '[]'); } catch(e) { return []; }
+}
+
+function saveRecentRecord(record) {
+  if (!record || !record.name) return;
+  try {
+    var recents = JSON.parse(localStorage.getItem('l7_recent_records') || '[]');
+    recents = recents.filter(function(r) { return !(r.name === record.name && r.kind === record.kind); });
+    recents.unshift({ name: record.name, kind: record.kind, meta: record.meta || '', ts: new Date().toISOString() });
+    localStorage.setItem('l7_recent_records', JSON.stringify(recents.slice(0, 10)));
+  } catch(e) {}
+}
+
+function getRecentRecords() {
+  try { return JSON.parse(localStorage.getItem('l7_recent_records') || '[]'); } catch(e) { return []; }
+}
+
+function clearRecentSearches() {
+  localStorage.removeItem('l7_recent_searches');
+  var inp = document.getElementById('global-search');
+  if (inp) runGlobalSearch('');
+}
+
+// Fuzzy scoring function — no external dependencies
+function fuzzyScore(query, candidate) {
+  if (!query || !candidate) return 0;
+  var q = query.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  var c = candidate.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  if (!q || !c) return 0;
+
+  // Exact match: highest priority
+  if (c === q) return 1.0;
+  // Prefix match
+  if (c.startsWith(q)) return 0.9;
+  // Substring match
+  if (c.indexOf(q) >= 0) return 0.8;
+
+  // Token match: all query tokens appear in candidate
+  var qTokens = q.split(' ').filter(Boolean);
+  var cTokens = c.split(' ').filter(Boolean);
+  var tokenMatches = qTokens.filter(function(qt) {
+    return cTokens.some(function(ct) { return ct.startsWith(qt); });
+  }).length;
+  if (tokenMatches === qTokens.length) return 0.7;
+  if (tokenMatches > 0) return 0.4 + 0.1 * (tokenMatches / qTokens.length);
+
+  // Subsequence match (typo tolerance)
+  var qi = 0, ci2 = 0, matched = 0;
+  while (qi < q.length && ci2 < c.length) {
+    if (q[qi] === c[ci2]) { matched++; qi++; }
+    ci2++;
+  }
+  var subseqScore = qi === q.length ? 0.2 + 0.15 * (matched / c.length) : 0;
+  if (subseqScore > 0.2) return subseqScore;
+
+  // Single-char typo: edit distance 1 on short tokens
+  if (q.length <= 6) {
+    for (var i = 0; i < q.length; i++) {
+      var variant = q.slice(0, i) + q.slice(i + 1);
+      if (c.indexOf(variant) >= 0) return 0.25;
+    }
+  }
+
+  return 0;
+}
+
+// Build search index from all data sources (sync, safe)
+function buildGlobalSearchIndex() {
+  var index = [];
+
+  // Network: investors
+  netLoad('investors').forEach(function(r) {
+    var name = r.investorName || r.name || '';
+    if (!name) return;
+    index.push({ kind: 'Investor', tab: 'network', subtab: 'investors', name: name,
+      meta: [r.fundName, r.sectorFocus, r.stageFocus].filter(Boolean).join(' · '),
+      searchText: [name, r.fundName, r.sectorFocus, r.stageFocus, r.contactEmail, r.contactPhone].filter(Boolean).join(' '),
+      raw: r });
+  });
+
+  // Network: startups
+  netLoad('startups').forEach(function(r) {
+    var name = r.companyName || r.name || '';
+    if (!name) return;
+    index.push({ kind: 'Startup', tab: 'network', subtab: 'startups', name: name,
+      meta: [r.founderName, r.sector, r.stage].filter(Boolean).join(' · '),
+      searchText: [name, r.founderName, r.sector, r.stage, r.founderEmail, r.founderPhone].filter(Boolean).join(' '),
+      raw: r });
+  });
+
+  // Network: partnerships
+  netLoad('partnerships').forEach(function(r) {
+    var name = r.partnerName || r.name || '';
+    if (!name) return;
+    index.push({ kind: 'Partner', tab: 'network', subtab: 'partnerships', name: name,
+      meta: [r.organisation, r.role].filter(Boolean).join(' · '),
+      searchText: [name, r.organisation, r.role].filter(Boolean).join(' '),
+      raw: r });
+  });
+
+  // Pipeline
+  getPipeline().forEach(function(d) {
+    var name = (d.investor || '') + (d.startup ? ' ↔ ' + d.startup : '');
+    if (!name.trim()) return;
+    var rev = computeDealRevenue(d);
+    index.push({ kind: 'Pipeline', tab: 'pipeline', name: name,
+      meta: [d.stage, d.score != null ? 'Score ' + d.score : ''].filter(Boolean).join(' · '),
+      searchText: [d.investor, d.startup, d.stage, d.verdict].filter(Boolean).join(' '),
+      raw: d,
+      revData: rev });
+  });
+
+  // Mandates
+  var mandateLog = [];
+  try { mandateLog = JSON.parse(localStorage.getItem('mandate_log') || '[]'); } catch(e) {}
+  mandateLog.forEach(function(m) {
+    var name = m.company || m.clientName || '';
+    if (!name) return;
+    index.push({ kind: 'Mandate', tab: 'mandate', name: name,
+      meta: [m.clientName, m.signatoryName || m.signatoryKey, m.fee ? m.fee + '%' : ''].filter(Boolean).join(' · '),
+      searchText: [name, m.clientName, m.signatoryName, m.founderEmail].filter(Boolean).join(' '),
+      raw: m });
+  });
+
+  return index;
+}
+
+// Query IndexedDB docs asynchronously then merge into results
+async function searchDocsAsync(query, callback) {
+  try {
+    var db = await initDocsDb();
+    var tx = db.transaction('documents', 'readonly');
+    var store = tx.objectStore('documents');
+    var req = store.getAll();
+    req.onsuccess = function() {
+      var docs = req.result || [];
+      var results = [];
+      docs.forEach(function(doc) {
+        var searchText = [doc.fileName, doc.entityName, doc.category, doc.extractedText].filter(Boolean).join(' ');
+        var score = fuzzyScore(query, searchText);
+        if (score > 0.1) {
+          results.push({ kind: 'Document', tab: 'docs', name: doc.fileName || 'Document',
+            meta: [doc.entityName, doc.category, doc.sizeKb ? doc.sizeKb + ' KB' : ''].filter(Boolean).join(' · '),
+            score: score, raw: doc });
+        }
+      });
+      results.sort(function(a, b) { return b.score - a.score; });
+      callback(results.slice(0, 5));
+    };
+    req.onerror = function() { callback([]); };
+  } catch(e) {
+    callback([]);
+  }
+}
+
+// Kind → short label for search icon
+function _srchKindIcon(kind) {
+  var map = { Investor: 'INV', Startup: 'STR', Partner: 'PRT', Pipeline: 'PL', Mandate: 'MND', Document: 'DOC' };
+  return map[kind] || kind.slice(0, 3).toUpperCase();
+}
+
+// Open a search result and navigate to it
+// Accepts either a plain object or an encodeURIComponent-encoded JSON string
+function openSearchResult(resultOrPayload) {
+  var result;
+  if (typeof resultOrPayload === 'string') {
+    try { result = JSON.parse(decodeURIComponent(resultOrPayload)); } catch(e) { return; }
+  } else {
+    result = resultOrPayload;
+  }
+  saveRecentRecord({ name: result.name, kind: result.kind, meta: result.meta || '', tab: result.tab, subtab: result.subtab });
+  closeGlobalSearch();
+  if (result.tab === 'network' && result.subtab) {
+    goToTab('network');
+    setTimeout(function() {
+      var btn = document.getElementById('net-tab-' + result.subtab);
+      if (btn && typeof switchNetTab === 'function') switchNetTab(result.subtab, btn);
+      setTimeout(function() {
+        var rows = document.querySelectorAll('#page-network tr, #page-network .net-row');
+        rows.forEach(function(row) {
+          if (row.textContent && row.textContent.toLowerCase().indexOf(result.name.toLowerCase()) >= 0) {
+            row.style.transition = 'background 0.4s';
+            var orig = row.style.background;
+            row.style.background = 'var(--accent-soft)';
+            setTimeout(function() { row.style.background = orig; }, 1600);
+          }
+        });
+      }, 150);
+    }, 100);
+  } else if (result.tab === 'pipeline') {
+    goToTab('pipeline');
+    setTimeout(function() {
+      var cards = document.querySelectorAll('.kanban-card, #pipeline-list tr');
+      cards.forEach(function(c) {
+        if (c.textContent && c.textContent.toLowerCase().indexOf(result.name.toLowerCase().split(' ')[0]) >= 0) {
+          c.style.transition = 'background 0.4s';
+          var orig = c.style.background;
+          c.style.background = 'var(--accent-soft)';
+          setTimeout(function() { c.style.background = orig; }, 1600);
+        }
+      });
+    }, 150);
+  } else if (result.tab === 'mandate') {
+    goToTab('mandate');
+  } else if (result.tab === 'docs') {
+    goToTab('docs');
+  }
+}
+
+// Main enhanced search function (replaces original runGlobalSearch)
+var _l7SearchDebounce = null;
+(function() {
+  var _origSearch = window.runGlobalSearch;
+
+  window.runGlobalSearch = function(q) {
+    var box = document.getElementById('global-search-results');
+    if (!box) return;
+    q = (q || '').trim();
+
+    // Show recents on empty query
+    if (!q) {
+      var recents = getRecentSearches();
+      var recentRecs = getRecentRecords();
+      if (!recents.length && !recentRecs.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      var html = '';
+      if (recents.length) {
+        html += '<div class="srch-recents-hdr">Recent Searches <button onclick="clearRecentSearches()">Clear</button></div>';
+        html += recents.map(function(rq) {
+          return '<div class="srch-recent-item" onmousedown="document.getElementById(\'global-search\').value=\'' + escapeQ(rq) + '\';runGlobalSearch(\'' + escapeQ(rq) + '\')">'
+            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>'
+            + escapeHtml(rq) + '</div>';
+        }).join('');
+      }
+      if (recentRecs.length) {
+        html += '<div class="srch-recents-hdr" style="margin-top:4px">Recently Opened</div>';
+        html += recentRecs.slice(0, 5).map(function(r) {
+          var payload = encodeURIComponent(JSON.stringify({ tab: r.tab || '', subtab: r.subtab, name: r.name, kind: r.kind, meta: r.meta || '' }));
+          return '<div class="srch-item" onmousedown="openSearchResult(\'' + payload + '\')">'
+            + '<div class="srch-icon">' + _srchKindIcon(r.kind) + '</div>'
+            + '<div><div class="srch-name">' + escapeHtml(r.name) + '</div>'
+            + '<div class="srch-meta">' + escapeHtml(r.kind) + (r.meta ? ' · ' + escapeHtml(r.meta.slice(0, 50)) : '') + '</div></div>'
+            + '</div>';
+        }).join('');
+      }
+      box.innerHTML = html;
+      box.style.display = 'block';
+      return;
+    }
+
+    // Debounce heavy work
+    clearTimeout(_l7SearchDebounce);
+    _l7SearchDebounce = setTimeout(function() {
+      var index = buildGlobalSearchIndex();
+      var qLow = q.toLowerCase();
+
+      // Score each entry
+      var scored = index.map(function(item) {
+        var score = fuzzyScore(qLow, item.searchText);
+        return { item: item, score: score };
+      }).filter(function(s) { return s.score > 0.15; });
+
+      // Sort by score desc, then recency if available
+      scored.sort(function(a, b) { return b.score - a.score; });
+
+      // Group by kind
+      var groups = {};
+      scored.forEach(function(s) {
+        var k = s.item.kind;
+        if (!groups[k]) groups[k] = [];
+        if (groups[k].length < 6) groups[k].push(s.item);
+      });
+
+      var ORDER = ['Pipeline', 'Startup', 'Investor', 'Partner', 'Mandate', 'Document'];
+      var html = '';
+      var totalHits = 0;
+
+      ORDER.forEach(function(kind) {
+        if (!groups[kind] || !groups[kind].length) return;
+        html += '<div class="srch-group-hdr">' + escapeHtml(kind) + 's</div>';
+        groups[kind].forEach(function(item) {
+          totalHits++;
+          var payload = encodeURIComponent(JSON.stringify({ name: item.name, kind: item.kind, meta: item.meta, tab: item.tab, subtab: item.subtab }));
+          html += '<div class="srch-item" onmousedown="openSearchResult(\'' + payload + '\')">'
+            + '<div class="srch-icon">' + _srchKindIcon(item.kind) + '</div>'
+            + '<div style="flex:1;min-width:0">'
+            + '<div class="srch-name">' + escapeHtml(item.name.slice(0, 50)) + '</div>'
+            + (item.meta ? '<div class="srch-meta">' + escapeHtml(item.meta.slice(0, 60)) + '</div>' : '')
+            + '</div>'
+            + '</div>';
+        });
+      });
+
+      if (!totalHits) {
+        html = '<div style="padding:14px 12px;color:var(--muted);font-size:12px">No results for <em>' + escapeHtml(q) + '</em></div>';
+      }
+
+      box.innerHTML = html;
+      box.style.display = 'block';
+
+      // Also search docs async (non-blocking)
+      try {
+        searchDocsAsync(qLow, function(docResults) {
+          if (!docResults.length) return;
+          var docHtml = '<div class="srch-group-hdr">Documents</div>';
+          docResults.forEach(function(item) {
+            var payload = encodeURIComponent(JSON.stringify({ name: item.name, kind: item.kind, meta: item.meta, tab: item.tab }));
+            docHtml += '<div class="srch-item" onmousedown="openSearchResult(\'' + payload + '\')">'
+              + '<div class="srch-icon">DOC</div>'
+              + '<div><div class="srch-name">' + escapeHtml(item.name.slice(0, 50)) + '</div>'
+              + (item.meta ? '<div class="srch-meta">' + escapeHtml(item.meta.slice(0, 60)) + '</div>' : '')
+              + '</div></div>';
+          });
+          var currentBox = document.getElementById('global-search-results');
+          if (currentBox && currentBox.style.display !== 'none') {
+            currentBox.innerHTML += docHtml;
+          }
+        });
+      } catch(e) {}
+
+    }, 120);
+  };
+
+  // Wire up the focus handler to show recents
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('global-search');
+    if (!inp) return;
+    inp.addEventListener('focus', function() {
+      if (!this.value.trim()) runGlobalSearch('');
+    });
+    // On blur, save search to recents
+    inp.addEventListener('blur', function() {
+      var val = this.value.trim();
+      if (val.length >= 2) saveRecentSearch(val);
+      setTimeout(closeGlobalSearch, 160);
+    });
+  });
+})();
+
+// ── D. PATCH openSearchResult into globalSearchPick fallback ─────
+
+// Extend globalSearchPick to also save recent record (backward compat)
+(function() {
+  var _origPick = window.globalSearchPick;
+  window.globalSearchPick = function(payload) {
+    try {
+      var p = JSON.parse(decodeURIComponent(payload));
+      saveRecentRecord({ name: p.name || '', kind: p.kind || '', meta: '', tab: p.tab, subtab: p.subtab });
+    } catch(e) {}
+    _origPick.apply(this, arguments);
+  };
+})();
+
+// ── INIT: run revenue dashboard + needs attention on load ────────
+
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    try { renderRevenueDashboard(); } catch(e) {}
+    try { renderNeedsAttention(); } catch(e) {}
+  }, 300);
+
+  // Wire up revenue modal input updates
+  ['rev-expected-raise', 'rev-success-fee', 'rev-close-prob', 'rev-retainer-amt', 'rev-retainer-paid'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateRevComputedPreview);
+  });
+});
 </script>
 </body>
 </html>
