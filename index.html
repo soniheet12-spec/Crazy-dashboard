@@ -34,6 +34,8 @@
     --body-bg: linear-gradient(135deg,#eef2f7 0%,#f4f6f9 60%);
     --topbar-bg: rgba(255,255,255,0.97);
     --settings-menu-bg: rgba(255,255,255,0.99);
+    --card-radius: 10px;
+    --font-base: 13px;
   }
 
   /* ── Dark mode variable overrides (midnight palette) ── */
@@ -159,7 +161,7 @@
   .card {
     background:linear-gradient(160deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008));
     background-color:var(--s1);
-    border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:16px; overflow:hidden;
+    border:1px solid var(--border); border-radius:var(--card-radius,10px); padding:18px; margin-bottom:16px; overflow:hidden;
     box-shadow:0 2px 12px rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.04) inset;
   }
   .card.flush { padding:0; }
@@ -266,8 +268,14 @@
   .settings-section:last-child { margin-bottom:0; padding-bottom:0; border-bottom:none; }
   .settings-label { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:8px; }
   .theme-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-  .theme-chip { padding:10px 12px; background:var(--s2); border:1px solid var(--border); color:var(--text); text-align:left; border-radius:6px; font-size:12px; }
-  .theme-chip.active { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+  .theme-chip { padding:7px 6px; background:var(--s2); border:1px solid var(--border); color:var(--muted); text-align:center; border-radius:6px; font-size:9px; font-weight:600; letter-spacing:0.03em; display:flex; flex-direction:column; gap:4px; cursor:pointer; }
+  .theme-chip:hover { border-color:var(--accent); color:var(--text); }
+  .theme-chip.active { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); color:var(--text); }
+  .style-opt-btn { flex:1; padding:5px 8px; background:var(--s2); border:1px solid var(--border); color:var(--muted); border-radius:6px; font-size:11px; font-weight:500; cursor:pointer; font-family:'Poppins',sans-serif; transition:all .15s; }
+  .style-opt-btn:hover { border-color:var(--accent); color:var(--text); }
+  .style-opt-btn.active { border-color:var(--accent); background:var(--accent-soft); color:var(--text); font-weight:600; }
+  [data-density="compact"] .nav-tab { padding:5px 14px !important; font-size:12px !important; }
+  [data-density="compact"] .sb-section-label { padding:4px 14px 1px !important; font-size:9px !important; }
   .theme-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px; vertical-align:middle; }
 
   /* Insight cards */
@@ -682,6 +690,36 @@ window.SettingsDB = (function(){
     <button class="settings-toggle" style="width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:12px" onclick="toggleSettings()"><span class="tab-icon">&#9881;</span><span class="tab-label">Settings</span></button>
     <div class="settings-menu" style="bottom:60px;top:auto;right:0;left:0;width:auto;max-width:400px">
       <div id="settings-last-saved" style="padding:6px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)"></div>
+
+      <!-- ── Appearance ── -->
+      <div class="settings-section">
+        <div class="settings-label">Theme</div>
+        <div id="theme-chips" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:4px"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Font Size</div>
+        <div style="display:flex;gap:5px;margin-top:4px">
+          <button class="style-opt-btn" data-opt="font" data-val="small" onclick="setStyleOption('font','small',this)">Small</button>
+          <button class="style-opt-btn" data-opt="font" data-val="default" onclick="setStyleOption('font','default',this)">Default</button>
+          <button class="style-opt-btn" data-opt="font" data-val="large" onclick="setStyleOption('font','large',this)">Large</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Card Style</div>
+        <div style="display:flex;gap:5px;margin-top:4px">
+          <button class="style-opt-btn" data-opt="radius" data-val="sharp" onclick="setStyleOption('radius','sharp',this)">Sharp</button>
+          <button class="style-opt-btn" data-opt="radius" data-val="default" onclick="setStyleOption('radius','default',this)">Default</button>
+          <button class="style-opt-btn" data-opt="radius" data-val="rounded" onclick="setStyleOption('radius','rounded',this)">Rounded</button>
+        </div>
+      </div>
+      <div class="settings-section" style="border-bottom:2px solid var(--border);margin-bottom:4px;padding-bottom:12px">
+        <div class="settings-label">Sidebar Density</div>
+        <div style="display:flex;gap:5px;margin-top:4px">
+          <button class="style-opt-btn" data-opt="density" data-val="compact" onclick="setStyleOption('density','compact',this)">Compact</button>
+          <button class="style-opt-btn" data-opt="density" data-val="default" onclick="setStyleOption('density','default',this)">Default</button>
+        </div>
+      </div>
+
       <div class="settings-section">
         <div class="settings-label">Active User / Role</div>
         <div class="field-row" style="margin-bottom:0">
@@ -1970,9 +2008,55 @@ function applyTheme(name){
   [['--bg',t.bg],['--s1',t.s1],['--s2',t.s2],['--s3',t.s3],['--border',t.border],['--border2',t.border2],['--text',t.text],['--muted',t.muted],['--accent',t.accent],['--accent-soft',t.accentSoft],['--green',t.green],['--amber',t.amber],['--red',t.red],['--blue',t.blue]].forEach(([k,v])=>r.style.setProperty(k,v));
   document.querySelectorAll('.theme-chip').forEach(c=>c.classList.toggle('active',c.dataset.theme===name));
 }
-function setTheme(name){localStorage.setItem('l7_theme',name);applyTheme(name);_markSettingsSaved('Theme');}
+function setTheme(name){
+  localStorage.setItem('l7_theme',name);
+  applyTheme(name);
+  // sync dark/light mode: steel is the light theme, all others are dark
+  var isLight=(name==='steel');
+  localStorage.setItem('dark_mode',isLight?'0':'1');
+  applyDarkModeState(!isLight);
+  _markSettingsSaved('Theme');
+}
+function initThemeChips(){
+  var container=document.getElementById('theme-chips');if(!container)return;
+  var labels={midnight:'Midnight',slate:'Slate',graphite:'Graphite',teal:'Teal',violet:'Violet',rose:'Rose',forest:'Forest',steel:'Light'};
+  container.innerHTML=Object.keys(THEMES).map(function(name){
+    var t=THEMES[name];
+    return'<button class="theme-chip" data-theme="'+name+'" onclick="setTheme(\''+name+'\')">'
+      +'<div style="display:flex;gap:1px;height:16px;border-radius:3px;overflow:hidden;width:100%">'
+        +'<div style="flex:3;background:'+t.bg+'"></div>'
+        +'<div style="flex:1;background:'+t.s2+'"></div>'
+        +'<div style="flex:2;background:'+t.accent+'"></div>'
+      +'</div>'
+      +(labels[name]||name)
+      +'</button>';
+  }).join('');
+  var saved=localStorage.getItem('l7_theme')||'midnight';
+  document.querySelectorAll('.theme-chip').forEach(function(c){c.classList.toggle('active',c.dataset.theme===saved);});
+}
+function setStyleOption(opt,val){
+  localStorage.setItem('l7_style_'+opt,val);
+  applyStyleOptions();
+}
+function applyStyleOptions(){
+  var font=localStorage.getItem('l7_style_font')||'default';
+  var radius=localStorage.getItem('l7_style_radius')||'default';
+  var density=localStorage.getItem('l7_style_density')||'default';
+  var r=document.documentElement;
+  r.style.setProperty('--font-base',{small:'11px',default:'13px',large:'15px'}[font]||'13px');
+  r.style.setProperty('--card-radius',{sharp:'4px',default:'10px',rounded:'18px'}[radius]||'10px');
+  r.setAttribute('data-density',density);
+  ['font','radius','density'].forEach(function(opt){
+    var saved=localStorage.getItem('l7_style_'+opt)||'default';
+    document.querySelectorAll('.style-opt-btn[data-opt="'+opt+'"]').forEach(function(b){b.classList.toggle('active',b.dataset.val===saved);});
+  });
+}
 function loadPreferences(){
+  var savedTheme=localStorage.getItem('l7_theme');
+  if(savedTheme&&THEMES[savedTheme]){applyTheme(savedTheme);}
   applyDarkModeState(localStorage.getItem('dark_mode')==='1');
+  applyStyleOptions();
+  initThemeChips();
   var mm=SettingsDB.get('l7_matching_mode','auto');
   document.getElementById('matching-mode').value=mm;
   var ts=localStorage.getItem('l7_settings_last_saved');
