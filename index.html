@@ -1321,8 +1321,8 @@ window.SettingsDB = (function(){
       </div>
       <canvas id="fin-chart" style="width:100%;display:block" height="220"></canvas>
       <div style="display:flex;gap:16px;padding-top:10px;font-size:11px;color:var(--muted)">
-        <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Billed</span>
-        <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Received</span>
+        <span><span style="display:inline-block;width:20px;height:2px;background:rgba(74,222,128,0.35);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Billed</span>
+        <span><span style="display:inline-block;width:20px;height:2px;background:#4ade80;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Received</span>
       </div>
     </div>
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)">
@@ -7887,35 +7887,54 @@ function renderFinChart(){
   canvas.width=W*dpr;canvas.height=H*dpr;ctx.scale(dpr,dpr);
   var buckets=_buckets();
   var style=getComputedStyle(document.documentElement);
-  var clr={text:style.getPropertyValue('--text').trim()||'#e5e7eb',muted:style.getPropertyValue('--muted').trim()||'#9ca3af',border:style.getPropertyValue('--border').trim()||'rgba(255,255,255,0.08)',accent:style.getPropertyValue('--accent').trim()||'#3b82f6',green:style.getPropertyValue('--green').trim()||'#22c55e'};
+  var clr={text:style.getPropertyValue('--text').trim()||'#e5e7eb',muted:style.getPropertyValue('--muted').trim()||'#9ca3af',border:style.getPropertyValue('--border').trim()||'rgba(255,255,255,0.08)',accent:style.getPropertyValue('--accent').trim()||'#3b82f6',green:'#4ade80'};
   ctx.clearRect(0,0,W,H);
   if(!buckets.length){ctx.fillStyle=clr.muted;ctx.font='13px Poppins,sans-serif';ctx.textAlign='center';ctx.fillText('Set a date range to view data',W/2,H/2);return;}
-  var pL=60,pR=16,pT=16,pB=38,cW=W-pL-pR,cH=H-pT-pB;
+  var pL=60,pR=20,pT=16,pB=38,cW=W-pL-pR,cH=H-pT-pB;
   var maxV=Math.max(1,...buckets.map(function(b){return Math.max(b.billed,b.received);}));
   var mag=Math.pow(10,Math.floor(Math.log10(maxV)));maxV=Math.ceil(maxV/mag)*mag;
-  // Grid
+  // Grid lines + Y labels
   for(var g=0;g<=4;g++){
     var gy=pT+cH-(g/4)*cH;
     ctx.strokeStyle=clr.border;ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(pL,gy);ctx.lineTo(pL+cW,gy);ctx.stroke();
     ctx.fillStyle=clr.muted;ctx.font='9.5px Poppins,sans-serif';ctx.textAlign='right';
     ctx.fillText(finFmtCompact((g/4)*maxV),pL-5,gy+3);
   }
-  // Bars
-  var n=buckets.length,slotW=cW/n,bW=Math.min(slotW*0.28,16),gap=bW*0.55;
+  var n=buckets.length;
+  function xPos(i){return pL+(i/(n-1||1))*cW;}
+  function yPos(v){return pT+cH-(maxV>0?(v/maxV)*cH:0);}
+  // Draw billed as thin dashed line in muted green
+  if(n>1){
+    ctx.beginPath();ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(74,222,128,0.35)';ctx.lineWidth=1.5;
+    buckets.forEach(function(b,i){i===0?ctx.moveTo(xPos(i),yPos(b.billed)):ctx.lineTo(xPos(i),yPos(b.billed));});
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  // Area fill under received line
+  var grad=ctx.createLinearGradient(0,pT,0,pT+cH);
+  grad.addColorStop(0,'rgba(74,222,128,0.22)');grad.addColorStop(1,'rgba(74,222,128,0)');
+  ctx.beginPath();
+  buckets.forEach(function(b,i){i===0?ctx.moveTo(xPos(i),yPos(b.received)):ctx.lineTo(xPos(i),yPos(b.received));});
+  ctx.lineTo(xPos(n-1),pT+cH);ctx.lineTo(xPos(0),pT+cH);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  // Received line
+  if(n>1){
+    ctx.beginPath();ctx.strokeStyle='#4ade80';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';
+    buckets.forEach(function(b,i){i===0?ctx.moveTo(xPos(i),yPos(b.received)):ctx.lineTo(xPos(i),yPos(b.received));});
+    ctx.stroke();
+  }
+  // Dots on received line
   buckets.forEach(function(b,i){
-    var cx=pL+i*slotW+slotW/2;
-    var bH=maxV>0?(b.billed/maxV)*cH:0;
-    ctx.fillStyle=clr.accent;ctx.globalAlpha=0.82;
-    if(bH>0)ctx.fillRect(cx-gap-bW,pT+cH-bH,bW,bH);
-    var rH=maxV>0?(b.received/maxV)*cH:0;
-    ctx.fillStyle=clr.green;ctx.globalAlpha=0.9;
-    if(rH>0)ctx.fillRect(cx+gap,pT+cH-rH,bW,rH);
-    ctx.globalAlpha=1;
-    ctx.fillStyle=clr.muted;ctx.font='9px Poppins,sans-serif';ctx.textAlign='center';
-    ctx.fillText(b.l,cx,H-pB+14);
+    var cx=xPos(i),cy=yPos(b.received);
+    ctx.beginPath();ctx.arc(cx,cy,3.5,0,Math.PI*2);
+    ctx.fillStyle='#4ade80';ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,2,0,Math.PI*2);
+    ctx.fillStyle=style.getPropertyValue('--s1').trim()||'#0f172a';ctx.fill();
   });
+  // X labels
+  ctx.fillStyle=clr.muted;ctx.font='9px Poppins,sans-serif';ctx.textAlign='center';
+  buckets.forEach(function(b,i){ctx.fillText(b.l,xPos(i),H-pB+14);});
   canvas._finBuckets=buckets;
-  canvas._finLayout={pL,pR,pT,pB,cW,cH,slotW,bW,gap,maxV,n};
+  canvas._finLayout={pL,pR,pT,pB,cW,cH,slotW:cW/(n-1||1),n,xPos,yPos,maxV};
   _initChartTooltip(canvas);
 }
 
@@ -7927,14 +7946,16 @@ function _initChartTooltip(canvas){
     document.body.appendChild(_finTip);
   }
   canvas.addEventListener('mousemove',function(e){
-    var b=canvas._finBuckets,lay=canvas._finLayout;if(!b||!lay)return;
+    var b=canvas._finBuckets,lay=canvas._finLayout;if(!b||!lay||!lay.n)return;
     var r=canvas.getBoundingClientRect(),mx=e.clientX-r.left;
-    var idx=Math.floor((mx-lay.pL)/lay.slotW);
-    if(idx<0||idx>=lay.n){_finTip.style.display='none';return;}
-    var bk=b[idx];if(!bk){_finTip.style.display='none';return;}
+    // Find nearest point
+    var best=-1,bestDist=Infinity;
+    for(var i=0;i<lay.n;i++){var dx=mx-lay.xPos(i);if(Math.abs(dx)<bestDist){bestDist=Math.abs(dx);best=i;}}
+    if(best<0||bestDist>lay.cW/lay.n){_finTip.style.display='none';return;}
+    var bk=b[best];if(!bk){_finTip.style.display='none';return;}
     _finTip.innerHTML='<div style="font-weight:600;margin-bottom:6px">'+bk.l+'</div>'
-      +'<div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px"><span style="color:var(--muted)">Billed</span><span style="color:var(--accent);font-weight:600">'+finFmt(bk.billed)+'</span></div>'
-      +'<div style="display:flex;justify-content:space-between;gap:14px"><span style="color:var(--muted)">Received</span><span style="color:var(--green);font-weight:600">'+finFmt(bk.received)+'</span></div>';
+      +'<div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px"><span style="color:var(--muted)">Billed</span><span style="color:rgba(74,222,128,0.6);font-weight:600">'+finFmt(bk.billed)+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;gap:14px"><span style="color:var(--muted)">Received</span><span style="color:#4ade80;font-weight:600">'+finFmt(bk.received)+'</span></div>';
     _finTip.style.display='block';_finTip.style.left=(e.clientX+14)+'px';_finTip.style.top=(e.clientY-10)+'px';
   });
   canvas.addEventListener('mouseleave',function(){if(_finTip)_finTip.style.display='none';});
