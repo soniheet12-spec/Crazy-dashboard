@@ -646,6 +646,7 @@ window.SettingsDB = (function(){
     <div class="overflow-menu" style="right:0;top:calc(100% + 6px);z-index:200">
       <button onclick="exportMatchesCsv();document.getElementById('mob-overflow').classList.remove('open')">Export CSV</button>
       <button onclick="window.print();document.getElementById('mob-overflow').classList.remove('open')">Print / PDF</button>
+      <button onclick="goToTab('finances');document.getElementById('mob-overflow').classList.remove('open')">💰 Finances</button>
       <button onclick="goToTab('backup');document.getElementById('mob-overflow').classList.remove('open')">💾 Backup</button>
     </div>
   </div>
@@ -661,6 +662,7 @@ window.SettingsDB = (function(){
     <button class="nav-tab" id="nav-tab-network" data-tab="network" onclick="showTab('network',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span><span class="tab-label">Network<span id="net-nav-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:700;vertical-align:middle"></span></span></button>
     <div class="sb-section-label">Deal Flow</div>
     <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="tab-label">Pipeline</span></button>
+    <button class="nav-tab" data-tab="finances" onclick="showTab('finances',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><rect x="2" y="13" width="4" height="8" rx="1"/><rect x="9" y="8" width="4" height="13" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/></svg></span><span class="tab-label">Finances</span></button>
     <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="tab-label">Outreach</span></button>
     <div class="sb-section-label">Research</div>
     <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><span class="tab-label">Diligence</span></button>
@@ -758,6 +760,7 @@ window.SettingsDB = (function(){
     <div class="overflow-menu">
       <button onclick="exportMatchesCsv();document.getElementById('topbar-overflow').classList.remove('open')">Export CSV</button>
       <button onclick="window.print();document.getElementById('topbar-overflow').classList.remove('open')">Print / PDF</button>
+      <button onclick="showTab('finances',document.querySelector('.nav-tab[data-tab=\'finances\']'));document.getElementById('topbar-overflow').classList.remove('open')">💰 Finances</button>
       <button onclick="showTab('backup',document.querySelector('.nav-tab[data-tab=\'backup\']'));document.getElementById('topbar-overflow').classList.remove('open')">&#128190; Backup</button>
     </div>
   </div>
@@ -1286,6 +1289,139 @@ window.SettingsDB = (function(){
   <div id="add-deal-modal" class="hidden" style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Add Deal to Pipeline</div><button class="action-btn danger" onclick="closeAddDealModal()" style="padding:4px 10px">&#x2715;</button></div><div id="add-deal-content"></div></div></div>
   <div id="simulator-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Score Simulator</div><button class="action-btn danger" onclick="closeSimulator()" style="padding:4px 10px">&#x2715;</button></div><div id="simulator-content"></div></div></div>
   <div id="objection-modal" class="hidden" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px"><div style="max-width:680px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto"><div class="card-header"><div class="card-title">Q&amp;A Simulator / Analysis</div><button class="action-btn danger" onclick="closeObjectionModal()" style="padding:4px 10px">&#x2715;</button></div><div id="objection-content"><div class="empty">Select a startup and investor, then run the simulator.</div></div></div></div>
+  <!-- ═══ FINANCES ═══ -->
+  <div id="page-finances" class="page">
+    <div class="section-bar">
+      <div class="section-title">Finances</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="ghost-btn" onclick="openFinImportModal()">Import from Pipeline</button>
+        <button class="action-btn primary" onclick="openAddPaymentModal()">+ Add Payment</button>
+      </div>
+    </div>
+    <div class="module-banner">
+      <strong>Revenue &amp; payments tracker.</strong>
+      Track pending payments, register revenue, generate invoices and send them to clients.
+    </div>
+    <div id="fin-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px"></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <div class="card-title">Revenue</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="pill-btn fin-range-btn active" onclick="setFinChartRange('month',this)">Month</button>
+          <button class="pill-btn fin-range-btn" onclick="setFinChartRange('quarter',this)">Quarter</button>
+          <button class="pill-btn fin-range-btn" onclick="setFinChartRange('year',this)">Year</button>
+          <button class="pill-btn fin-range-btn" onclick="setFinChartRange('custom',this)">Custom</button>
+        </div>
+      </div>
+      <div id="fin-custom-range" style="display:none;gap:8px;align-items:center;padding-bottom:12px">
+        <label style="font-size:12px;color:var(--muted)">From</label>
+        <input type="date" id="fin-range-from" onchange="renderFinChart()" style="background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;font-family:'Poppins',sans-serif">
+        <label style="font-size:12px;color:var(--muted)">To</label>
+        <input type="date" id="fin-range-to" onchange="renderFinChart()" style="background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;font-family:'Poppins',sans-serif">
+      </div>
+      <canvas id="fin-chart" style="width:100%;display:block" height="220"></canvas>
+      <div style="display:flex;gap:16px;padding-top:10px;font-size:11px;color:var(--muted)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Billed</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Received</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)">
+      <button class="fin-subtab" data-ftab="payments" onclick="switchFinTab('payments',this)" style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--text);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;margin-bottom:-1px">Payments</button>
+      <button class="fin-subtab" data-ftab="invoices" onclick="switchFinTab('invoices',this)" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Poppins',sans-serif;margin-bottom:-1px">Invoices</button>
+      <button class="fin-subtab" data-ftab="revenue" onclick="switchFinTab('revenue',this)" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:'Poppins',sans-serif;margin-bottom:-1px">Revenue</button>
+    </div>
+    <div id="fin-tab-payments"></div>
+    <div id="fin-tab-invoices" style="display:none"></div>
+    <div id="fin-tab-revenue" style="display:none"></div>
+  </div>
+
+  <!-- ── Finances: Add Payment Modal ── -->
+  <div id="fin-add-payment-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:480px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header"><div class="card-title">Add Payment</div><button class="action-btn danger" onclick="closeAddPaymentModal()" style="padding:4px 10px">&#x2715;</button></div>
+      <input type="hidden" id="fap-deal-ref">
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Startup / Client *</label><input id="fap-startup" type="text" placeholder="Company name" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Contact Name</label><input id="fap-client-name" type="text" placeholder="Contact person" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Client Email</label><input id="fap-client-email" type="email" placeholder="client@company.com" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Type</label><select id="fap-type" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"><option value="retainer">Retainer</option><option value="success_fee">Success Fee</option><option value="advisory">Advisory</option><option value="other">Other</option></select></div>
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Amount (₹) *</label><input id="fap-amount" type="number" min="0" placeholder="500000" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        </div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Due Date</label><input id="fap-due-date" type="date" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Notes</label><textarea id="fap-notes" rows="2" placeholder="Optional notes…" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif;resize:vertical"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="action-btn secondary" onclick="closeAddPaymentModal()">Cancel</button>
+          <button class="action-btn primary" onclick="submitAddPayment()">Add Payment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Finances: Receipt Modal ── -->
+  <div id="fin-receipt-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:400px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header"><div class="card-title">Register Payment</div><button class="action-btn danger" onclick="closeFinReceiptModal()" style="padding:4px 10px">&#x2715;</button></div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+        <input type="hidden" id="frm-pay-id">
+        <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px">
+          Startup: <strong id="frm-startup"></strong><br>
+          <span style="color:var(--muted)">Total billed: <strong id="frm-total"></strong></span>
+        </div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Amount Received (₹) *</label><input id="frm-amount" type="number" min="0" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Date Received *</label><input id="frm-date" type="date" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Notes</label><input id="frm-notes" type="text" placeholder="e.g. NEFT, ref no." style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="action-btn secondary" onclick="closeFinReceiptModal()">Cancel</button>
+          <button class="action-btn primary" onclick="submitFinReceipt()">Register Revenue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Finances: Invoice Modal ── -->
+  <div id="fin-invoice-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:500px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header"><div class="card-title">Generate Invoice</div><button class="action-btn danger" onclick="closeFinInvoiceModal()" style="padding:4px 10px">&#x2715;</button></div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+        <input type="hidden" id="fim-pay-id">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Startup</label><input id="fim-startup" type="text" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Client Name</label><input id="fim-client-name" type="text" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Client Email</label><input id="fim-client-email" type="email" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Client Address</label><input id="fim-client-address" type="text" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        </div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Description</label><input id="fim-description" type="text" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Amount (₹)</label><input id="fim-amount" type="number" min="0" oninput="updateInvoicePreview()" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+          <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">GST %</label><input id="fim-gst" type="number" value="18" min="0" max="100" oninput="updateInvoicePreview()" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        </div>
+        <div id="fim-preview-total" style="font-size:12px;color:var(--accent);font-weight:600;padding:8px 12px;background:var(--s2);border-radius:7px"></div>
+        <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Notes</label><input id="fim-notes" type="text" placeholder="Optional notes on invoice…" style="width:100%;box-sizing:border-box;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Poppins',sans-serif"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="action-btn secondary" onclick="closeFinInvoiceModal()">Cancel</button>
+          <button class="action-btn primary" onclick="submitFinInvoice()">Generate Invoice</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Finances: Import from Pipeline Modal ── -->
+  <div id="fin-import-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;padding:20px">
+    <div style="max-width:560px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px;max-height:90vh;overflow-y:auto">
+      <div class="card-header"><div class="card-title">Import Deal from Pipeline</div><button class="action-btn danger" onclick="closeFinImportModal()" style="padding:4px 10px">&#x2715;</button></div>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 14px">Select a pipeline deal to pre-fill a new payment.</p>
+      <div id="fin-import-list" style="max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button class="action-btn secondary" onclick="closeFinImportModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ BACKUP ═══ -->
   <div id="page-backup" class="page">
     <div class="section-bar">
@@ -1805,6 +1941,7 @@ function showTab(name,btn){
     refreshHome();
   }
   if(name==='outreach'){ outInit(); }
+  if(name==='finances' && window.renderFinancesTab) { renderFinancesTab(); setTimeout(renderFinChart,60); }
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
 }
 function toggleSettings(){
@@ -7605,6 +7742,603 @@ var _l7SearchDebounce = null;
     } catch(e) {}
     _origPick.apply(this, arguments);
   };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// FINANCES TAB
+// ═══════════════════════════════════════════════════════════════
+(function(){
+'use strict';
+function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _toast(msg,k){if(typeof showToast==='function')showToast(msg,k);else console.log('[Fin]',msg);}
+
+// ── Storage ─────────────────────────────────────────────────────
+function getFinPayments(){try{return JSON.parse(localStorage.getItem('l7_fin_payments')||'[]');}catch(e){return[];}}
+function saveFinPayments(d){localStorage.setItem('l7_fin_payments',JSON.stringify(d));}
+function getFinInvoices(){try{return JSON.parse(localStorage.getItem('l7_fin_invoices')||'[]');}catch(e){return[];}}
+function saveFinInvoices(d){localStorage.setItem('l7_fin_invoices',JSON.stringify(d));}
+function getFinRevenue(){try{return JSON.parse(localStorage.getItem('l7_fin_revenue')||'[]');}catch(e){return[];}}
+function saveFinRevenue(d){localStorage.setItem('l7_fin_revenue',JSON.stringify(d));}
+function nextInvoiceNum(){
+  var seq=parseInt(localStorage.getItem('l7_fin_invoice_seq')||'0',10)+1;
+  localStorage.setItem('l7_fin_invoice_seq',String(seq));
+  return 'LOG7-'+new Date().getFullYear()+'-'+String(seq).padStart(3,'0');
+}
+
+// ── Formatting ──────────────────────────────────────────────────
+function finFmt(n){
+  n=Number(n)||0;
+  if(n>=10000000)return'₹'+(n/10000000).toFixed(2)+' Cr';
+  if(n>=100000)return'₹'+(n/100000).toFixed(2)+' L';
+  if(n>=1000)return'₹'+(n/1000).toFixed(1)+'K';
+  return'₹'+n.toLocaleString('en-IN');
+}
+function finFmtFull(n){return'₹'+(Number(n)||0).toLocaleString('en-IN');}
+function finFmtCompact(n){
+  n=Number(n)||0;
+  if(n>=10000000)return(n/10000000).toFixed(1)+'Cr';
+  if(n>=100000)return(n/100000).toFixed(1)+'L';
+  if(n>=1000)return(n/1000).toFixed(0)+'K';
+  return Math.round(n).toString();
+}
+
+// ── Auto-status update ─────────────────────────────────────────
+function syncPaymentStatuses(){
+  var pays=getFinPayments(),today=new Date(),changed=false;
+  today.setHours(0,0,0,0);
+  pays.forEach(function(p){
+    if(p.status==='paid'||p.status==='partial')return;
+    if(p.dueDate&&new Date(p.dueDate)<today&&p.status!=='overdue'){p.status='overdue';changed=true;}
+  });
+  if(changed)saveFinPayments(pays);
+}
+
+// ── KPI Cards ───────────────────────────────────────────────────
+function renderFinKPIs(){
+  var el=document.getElementById('fin-kpi-row');if(!el)return;
+  syncPaymentStatuses();
+  var pays=getFinPayments(),rev=getFinRevenue(),now=new Date();
+  var ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var ytd=rev.filter(function(r){return r.date&&r.date.startsWith(String(now.getFullYear()));}).reduce(function(s,r){return s+(Number(r.amount)||0);},0);
+  var mRev=rev.filter(function(r){return r.date&&r.date.startsWith(ym);}).reduce(function(s,r){return s+(Number(r.amount)||0);},0);
+  var pending=pays.filter(function(p){return p.status==='pending'||p.status==='partial';}).reduce(function(s,p){return s+(Number(p.amount)||0)-(Number(p.paidAmount)||0);},0);
+  var overdue=pays.filter(function(p){return p.status==='overdue';}).reduce(function(s,p){return s+(Number(p.amount)||0)-(Number(p.paidAmount)||0);},0);
+  var kpis=[
+    {l:'Revenue This Month',v:finFmt(mRev),c:'var(--accent)',s:'cash received'},
+    {l:'Revenue YTD',v:finFmt(ytd),c:'var(--green)',s:now.getFullYear()+' total'},
+    {l:'Pending',v:finFmt(pending),c:'var(--amber)',s:'awaiting payment'},
+    {l:'Overdue',v:finFmt(overdue),c:'var(--red)',s:'past due date'},
+  ];
+  el.innerHTML=kpis.map(function(k){
+    return'<div class="card" style="padding:14px 16px">'
+      +'<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">'+k.l+'</div>'
+      +'<div style="font-size:20px;font-weight:700;color:'+k.c+'">'+k.v+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+k.s+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+// ── Revenue Chart ───────────────────────────────────────────────
+var _finRange='month';
+var _finTip=null;
+
+function setFinChartRange(range,btn){
+  _finRange=range;
+  document.querySelectorAll('.fin-range-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  var cr=document.getElementById('fin-custom-range');
+  if(cr)cr.style.display=range==='custom'?'flex':'none';
+  renderFinChart();
+}
+
+function _buckets(){
+  var now=new Date(),buckets=[];
+  function mEnd(y,m){return new Date(y,m+1,0);}
+  if(_finRange==='month'){
+    for(var w=3;w>=0;w--){
+      var wE=new Date(now);wE.setDate(now.getDate()-w*7);
+      var wS=new Date(wE);wS.setDate(wE.getDate()-6);wS.setHours(0,0,0,0);wE.setHours(23,59,59,999);
+      buckets.push({l:(wS.getMonth()+1)+'/'+(wS.getDate()),s:wS,e:wE});
+    }
+  } else if(_finRange==='quarter'){
+    for(var mi=2;mi>=0;mi--){
+      var ms=new Date(now.getFullYear(),now.getMonth()-mi,1);
+      var me=mEnd(now.getFullYear(),now.getMonth()-mi);
+      buckets.push({l:ms.toLocaleString('en-IN',{month:'short',year:'2-digit'}),s:ms,e:me});
+    }
+  } else if(_finRange==='year'){
+    for(var yi=11;yi>=0;yi--){
+      var ys=new Date(now.getFullYear(),now.getMonth()-yi,1);
+      var ye=mEnd(now.getFullYear(),now.getMonth()-yi);
+      buckets.push({l:ys.toLocaleString('en-IN',{month:'short',year:'2-digit'}),s:ys,e:ye});
+    }
+  } else if(_finRange==='custom'){
+    var fi=document.getElementById('fin-range-from'),ti=document.getElementById('fin-range-to');
+    if(!fi||!ti||!fi.value||!ti.value)return buckets;
+    var cs=new Date(fi.value),ce=new Date(ti.value);
+    var diff=Math.round((ce-cs)/86400000);
+    if(diff<=31){
+      for(var di=0;di<=diff;di++){
+        var d=new Date(cs);d.setDate(cs.getDate()+di);
+        var de=new Date(d);de.setHours(23,59,59,999);d.setHours(0,0,0,0);
+        buckets.push({l:(d.getMonth()+1)+'/'+(d.getDate()),s:new Date(d),e:de});
+      }
+    } else {
+      var cur=new Date(cs.getFullYear(),cs.getMonth(),1);
+      while(cur<=ce){
+        var cme=mEnd(cur.getFullYear(),cur.getMonth());
+        buckets.push({l:cur.toLocaleString('en-IN',{month:'short',year:'2-digit'}),s:new Date(cur),e:cme});
+        cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+      }
+    }
+  }
+  var pays=getFinPayments(),rev=getFinRevenue();
+  buckets.forEach(function(b){
+    b.billed=pays.filter(function(p){var d=new Date(p.createdAt||p.dueDate||'');return d>=b.s&&d<=b.e;}).reduce(function(s,p){return s+(Number(p.amount)||0);},0);
+    b.received=rev.filter(function(r){var d=new Date(r.date||r.createdAt||'');return d>=b.s&&d<=b.e;}).reduce(function(s,r){return s+(Number(r.amount)||0);},0);
+  });
+  return buckets;
+}
+
+function renderFinChart(){
+  var canvas=document.getElementById('fin-chart');if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var W=canvas.offsetWidth||600,H=220,dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr;canvas.height=H*dpr;ctx.scale(dpr,dpr);
+  var buckets=_buckets();
+  var style=getComputedStyle(document.documentElement);
+  var clr={text:style.getPropertyValue('--text').trim()||'#e5e7eb',muted:style.getPropertyValue('--muted').trim()||'#9ca3af',border:style.getPropertyValue('--border').trim()||'rgba(255,255,255,0.08)',accent:style.getPropertyValue('--accent').trim()||'#3b82f6',green:style.getPropertyValue('--green').trim()||'#22c55e'};
+  ctx.clearRect(0,0,W,H);
+  if(!buckets.length){ctx.fillStyle=clr.muted;ctx.font='13px Poppins,sans-serif';ctx.textAlign='center';ctx.fillText('Set a date range to view data',W/2,H/2);return;}
+  var pL=60,pR=16,pT=16,pB=38,cW=W-pL-pR,cH=H-pT-pB;
+  var maxV=Math.max(1,...buckets.map(function(b){return Math.max(b.billed,b.received);}));
+  var mag=Math.pow(10,Math.floor(Math.log10(maxV)));maxV=Math.ceil(maxV/mag)*mag;
+  // Grid
+  for(var g=0;g<=4;g++){
+    var gy=pT+cH-(g/4)*cH;
+    ctx.strokeStyle=clr.border;ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(pL,gy);ctx.lineTo(pL+cW,gy);ctx.stroke();
+    ctx.fillStyle=clr.muted;ctx.font='9.5px Poppins,sans-serif';ctx.textAlign='right';
+    ctx.fillText(finFmtCompact((g/4)*maxV),pL-5,gy+3);
+  }
+  // Bars
+  var n=buckets.length,slotW=cW/n,bW=Math.min(slotW*0.28,16),gap=bW*0.55;
+  buckets.forEach(function(b,i){
+    var cx=pL+i*slotW+slotW/2;
+    var bH=maxV>0?(b.billed/maxV)*cH:0;
+    ctx.fillStyle=clr.accent;ctx.globalAlpha=0.82;
+    if(bH>0)ctx.fillRect(cx-gap-bW,pT+cH-bH,bW,bH);
+    var rH=maxV>0?(b.received/maxV)*cH:0;
+    ctx.fillStyle=clr.green;ctx.globalAlpha=0.9;
+    if(rH>0)ctx.fillRect(cx+gap,pT+cH-rH,bW,rH);
+    ctx.globalAlpha=1;
+    ctx.fillStyle=clr.muted;ctx.font='9px Poppins,sans-serif';ctx.textAlign='center';
+    ctx.fillText(b.l,cx,H-pB+14);
+  });
+  canvas._finBuckets=buckets;
+  canvas._finLayout={pL,pR,pT,pB,cW,cH,slotW,bW,gap,maxV,n};
+  _initChartTooltip(canvas);
+}
+
+function _initChartTooltip(canvas){
+  if(canvas._finTipInited)return;canvas._finTipInited=true;
+  if(!_finTip){
+    _finTip=document.createElement('div');
+    _finTip.style.cssText='position:fixed;display:none;background:var(--s1);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);pointer-events:none;z-index:9000;box-shadow:0 4px 16px rgba(0,0,0,.35);min-width:150px';
+    document.body.appendChild(_finTip);
+  }
+  canvas.addEventListener('mousemove',function(e){
+    var b=canvas._finBuckets,lay=canvas._finLayout;if(!b||!lay)return;
+    var r=canvas.getBoundingClientRect(),mx=e.clientX-r.left;
+    var idx=Math.floor((mx-lay.pL)/lay.slotW);
+    if(idx<0||idx>=lay.n){_finTip.style.display='none';return;}
+    var bk=b[idx];if(!bk){_finTip.style.display='none';return;}
+    _finTip.innerHTML='<div style="font-weight:600;margin-bottom:6px">'+bk.l+'</div>'
+      +'<div style="display:flex;justify-content:space-between;gap:14px;margin-bottom:3px"><span style="color:var(--muted)">Billed</span><span style="color:var(--accent);font-weight:600">'+finFmt(bk.billed)+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;gap:14px"><span style="color:var(--muted)">Received</span><span style="color:var(--green);font-weight:600">'+finFmt(bk.received)+'</span></div>';
+    _finTip.style.display='block';_finTip.style.left=(e.clientX+14)+'px';_finTip.style.top=(e.clientY-10)+'px';
+  });
+  canvas.addEventListener('mouseleave',function(){if(_finTip)_finTip.style.display='none';});
+}
+
+// ── Sub-tab switching ───────────────────────────────────────────
+var _finActiveTab='payments';
+function switchFinTab(tab,btn){
+  _finActiveTab=tab;
+  ['payments','invoices','revenue'].forEach(function(t){
+    var el=document.getElementById('fin-tab-'+t);if(el)el.style.display=t===tab?'block':'none';
+  });
+  document.querySelectorAll('.fin-subtab').forEach(function(b){
+    var active=b.dataset.ftab===tab;
+    b.style.borderBottom=active?'2px solid var(--accent)':'2px solid transparent';
+    b.style.color=active?'var(--text)':'var(--muted)';
+    b.style.fontWeight=active?'600':'500';
+  });
+  if(tab==='payments')renderFinPayments();
+  else if(tab==='invoices')renderFinInvoices();
+  else if(tab==='revenue')renderFinRevenueEntries();
+}
+
+// ── Payments table ──────────────────────────────────────────────
+function renderFinPayments(){
+  var el=document.getElementById('fin-tab-payments');if(!el)return;
+  syncPaymentStatuses();
+  var pays=getFinPayments();
+  if(!pays.length){el.innerHTML='<div class="empty">No payments yet. Use "+ Add Payment" or "Import from Pipeline".</div>';return;}
+  var ord={overdue:0,pending:1,partial:2,paid:3};
+  pays=pays.slice().sort(function(a,b){return(ord[a.status]||9)-(ord[b.status]||9)||(a.dueDate||'').localeCompare(b.dueDate||'');});
+  var sc={overdue:'var(--red)',pending:'var(--amber)',partial:'var(--accent)',paid:'var(--green)'};
+  var sl={overdue:'Overdue',pending:'Pending',partial:'Partial',paid:'Paid'};
+  el.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--border)">'
+    +['Startup','Type','Amount','Due Date','Status','Actions'].map(function(h,i){
+      return'<th style="text-align:'+(i>=2&&i<=3||i===5?'right':'left')+';padding:8px 10px;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">'+h+'</th>';
+    }).join('')
+    +'</tr></thead><tbody>'
+    +pays.map(function(p){
+      return'<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<td style="padding:10px 10px;font-weight:500">'+_esc(p.startup||'—')+'</td>'
+        +'<td style="padding:10px 10px;color:var(--muted);text-transform:capitalize">'+_esc((p.type||'').replace(/_/g,' '))+'</td>'
+        +'<td style="padding:10px 10px;text-align:right;font-weight:600">'+finFmt(p.amount)+'</td>'
+        +'<td style="padding:10px 10px;text-align:right;color:var(--muted)">'+(p.dueDate?new Date(p.dueDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</td>'
+        +'<td style="padding:10px 10px"><span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:'+(sc[p.status]||'var(--muted)')+'22;color:'+(sc[p.status]||'var(--muted)')+'">'+_esc(sl[p.status]||p.status)+'</span></td>'
+        +'<td style="padding:10px 10px;text-align:right;white-space:nowrap">'
+        +(p.status!=='paid'?'<button onclick="openFinReceiptModal(\''+p.id+'\')" style="font-size:11px;padding:3px 8px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;margin-right:4px;font-family:\'Poppins\',sans-serif">Mark Paid</button>':'')
+        +'<button onclick="openFinInvoiceModal(\''+p.id+'\')" style="font-size:11px;padding:3px 8px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;margin-right:4px;font-family:\'Poppins\',sans-serif">Invoice</button>'
+        +'<button onclick="deleteFinPayment(\''+p.id+'\')" style="font-size:11px;padding:3px 8px;background:transparent;color:var(--red);border:1px solid rgba(240,101,101,.3);border-radius:5px;cursor:pointer;font-family:\'Poppins\',sans-serif">Del</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+function deleteFinPayment(id){
+  if(!confirm('Delete this payment?'))return;
+  saveFinPayments(getFinPayments().filter(function(p){return p.id!==id;}));
+  renderFinancesTab();
+}
+
+// ── Invoices table ──────────────────────────────────────────────
+function renderFinInvoices(){
+  var el=document.getElementById('fin-tab-invoices');if(!el)return;
+  var invs=getFinInvoices().slice().sort(function(a,b){return(b.createdAt||'').localeCompare(a.createdAt||'');});
+  if(!invs.length){el.innerHTML='<div class="empty">No invoices yet. Open a payment and click "Invoice".</div>';return;}
+  var sc={draft:'var(--muted)',sent:'var(--accent)',paid:'var(--green)'};
+  el.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--border)">'
+    +['Invoice #','Startup','Total','Status','Date','Actions'].map(function(h,i){
+      return'<th style="text-align:'+(i===2||i===5?'right':'left')+';padding:8px 10px;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">'+h+'</th>';
+    }).join('')
+    +'</tr></thead><tbody>'
+    +invs.map(function(inv){
+      return'<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<td style="padding:10px 10px;font-weight:600;color:var(--accent)">'+_esc(inv.invoiceNumber||'—')+'</td>'
+        +'<td style="padding:10px 10px;font-weight:500">'+_esc(inv.startup||'—')+'</td>'
+        +'<td style="padding:10px 10px;text-align:right;font-weight:600">'+finFmt(inv.total)+'</td>'
+        +'<td style="padding:10px 10px"><span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:'+(sc[inv.status]||'var(--muted)')+'22;color:'+(sc[inv.status]||'var(--muted)')+'">'+_esc(inv.status||'draft')+'</span></td>'
+        +'<td style="padding:10px 10px;color:var(--muted)">'+(inv.createdAt?new Date(inv.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</td>'
+        +'<td style="padding:10px 10px;text-align:right;white-space:nowrap">'
+        +'<button onclick="downloadInvoicePdf(\''+inv.id+'\')" style="font-size:11px;padding:3px 8px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;margin-right:4px;font-family:\'Poppins\',sans-serif">PDF</button>'
+        +(inv.clientEmail?'<button onclick="sendInvoiceEmail(\''+inv.id+'\')" style="font-size:11px;padding:3px 8px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;margin-right:4px;font-family:\'Poppins\',sans-serif">Send</button>':'')
+        +'<button onclick="deleteFinInvoice(\''+inv.id+'\')" style="font-size:11px;padding:3px 8px;background:transparent;color:var(--red);border:1px solid rgba(240,101,101,.3);border-radius:5px;cursor:pointer;font-family:\'Poppins\',sans-serif">Del</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+function deleteFinInvoice(id){
+  if(!confirm('Delete this invoice?'))return;
+  saveFinInvoices(getFinInvoices().filter(function(i){return i.id!==id;}));
+  renderFinInvoices();
+}
+
+// ── Revenue entries ────────────────────────────────────────────
+function renderFinRevenueEntries(){
+  var el=document.getElementById('fin-tab-revenue');if(!el)return;
+  var entries=getFinRevenue().slice().sort(function(a,b){return(b.date||b.createdAt||'').localeCompare(a.date||a.createdAt||'');});
+  if(!entries.length){el.innerHTML='<div class="empty">No revenue registered yet. Mark a payment as paid to log revenue here.</div>';return;}
+  var total=entries.reduce(function(s,r){return s+(Number(r.amount)||0);},0);
+  el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-bottom:12px">Total logged: <strong style="color:var(--green)">'+finFmt(total)+'</strong></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--border)">'
+    +['Date','Startup','Type','Amount','Notes'].map(function(h,i){
+      return'<th style="text-align:'+(i===3?'right':'left')+';padding:8px 10px;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">'+h+'</th>';
+    }).join('')
+    +'</tr></thead><tbody>'
+    +entries.map(function(r){
+      return'<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">'
+        +'<td style="padding:10px 10px;color:var(--muted)">'+(r.date?new Date(r.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—')+'</td>'
+        +'<td style="padding:10px 10px;font-weight:500">'+_esc(r.startup||'—')+'</td>'
+        +'<td style="padding:10px 10px;color:var(--muted);text-transform:capitalize">'+_esc((r.type||'').replace(/_/g,' '))+'</td>'
+        +'<td style="padding:10px 10px;text-align:right;font-weight:600;color:var(--green)">'+finFmt(r.amount)+'</td>'
+        +'<td style="padding:10px 10px;color:var(--muted)">'+_esc(r.notes||'')+'</td>'
+        +'</tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+// ── Add Payment Modal ──────────────────────────────────────────
+function openAddPaymentModal(pf){
+  var m=document.getElementById('fin-add-payment-modal');if(!m)return;
+  pf=pf||{};
+  ['startup','client-name','client-email','amount','due-date','notes'].forEach(function(f){
+    var el=document.getElementById('fap-'+f);if(el)el.value=pf[f.replace(/-([a-z])/g,function(_,c){return c.toUpperCase()})]||'';
+  });
+  var t=document.getElementById('fap-type');if(t)t.value=pf.type||'retainer';
+  var dr=document.getElementById('fap-deal-ref');if(dr)dr.value=pf.dealRef||'';
+  m.style.display='flex';
+}
+function closeAddPaymentModal(){var m=document.getElementById('fin-add-payment-modal');if(m)m.style.display='none';}
+
+function submitAddPayment(){
+  var startup=(document.getElementById('fap-startup').value||'').trim();
+  var amount=parseFloat(document.getElementById('fap-amount').value);
+  if(!startup){_toast('Startup name required','error');return;}
+  if(!amount||amount<=0){_toast('Enter a valid amount','error');return;}
+  var pays=getFinPayments();
+  pays.push({
+    id:'fpay_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    startup:startup,
+    clientName:(document.getElementById('fap-client-name').value||'').trim(),
+    clientEmail:(document.getElementById('fap-client-email').value||'').trim(),
+    type:document.getElementById('fap-type').value,
+    amount:amount,
+    dueDate:document.getElementById('fap-due-date').value,
+    status:'pending',paidAmount:0,paidDate:'',invoiceId:'',
+    notes:(document.getElementById('fap-notes').value||'').trim(),
+    dealRef:document.getElementById('fap-deal-ref').value,
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+  });
+  saveFinPayments(pays);closeAddPaymentModal();_toast('Payment added ✓');renderFinancesTab();
+}
+
+// ── Import from Pipeline ───────────────────────────────────────
+function openFinImportModal(){
+  var m=document.getElementById('fin-import-modal');if(!m)return;
+  var deals=typeof getPipeline==='function'?getPipeline():[];
+  var paidRefs=new Set(getFinPayments().map(function(p){return p.dealRef;}));
+  var listEl=document.getElementById('fin-import-list');
+  if(!deals.length){listEl.innerHTML='<div class="empty" style="padding:20px">No pipeline deals yet.</div>';m.style.display='flex';return;}
+  listEl.innerHTML=deals.filter(function(d){return d.startup;}).map(function(d){
+    var ref=d.startup+'|'+(d.investor||'');
+    var already=paidRefs.has(ref);
+    var rev=typeof computeDealRevenue==='function'?computeDealRevenue(d):{};
+    var hint=[];
+    if(d.stage)hint.push(d.stage);
+    if(d.investor)hint.push(d.investor);
+    if(rev.expectedFee)hint.push('Expected '+finFmt(rev.expectedFee*100000));
+    return'<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)'+(already?';opacity:.5':'')+'">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+_esc(d.startup)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+hint.map(_esc).join(' · ')+'</div></div>'
+      +(already?'<span style="font-size:11px;color:var(--muted)">Added</span>'
+        :'<button onclick="importDealToFinances(\''+_esc(d.startup)+'\',\''+_esc(d.investor||'')+'\',this)" style="font-size:12px;padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Poppins\',sans-serif">Import</button>')
+      +'</div>';
+  }).join('');
+  m.style.display='flex';
+}
+function closeFinImportModal(){var m=document.getElementById('fin-import-modal');if(m)m.style.display='none';}
+
+function importDealToFinances(startup,investor,btn){
+  var deals=typeof getPipeline==='function'?getPipeline():[];
+  var deal=deals.find(function(d){return d.startup===startup&&(d.investor||'')===(investor||'');});
+  var rev=deal&&typeof computeDealRevenue==='function'?computeDealRevenue(deal):{};
+  var defAmt='';
+  if(rev.retainerPending&&rev.retainerPending>0)defAmt=Math.round(rev.retainerPending*100000);
+  else if(rev.expectedFee&&rev.expectedFee>0)defAmt=Math.round(rev.expectedFee*100000);
+  if(btn){btn.disabled=true;btn.textContent='Imported ✓';}
+  closeFinImportModal();
+  openAddPaymentModal({startup:startup,clientName:startup,type:deal&&deal.mandateSigned?'success_fee':'retainer',amount:defAmt,notes:'From pipeline'+(investor?' — '+investor:''),dealRef:startup+'|'+(investor||'')});
+}
+
+// ── Mark Paid Modal ────────────────────────────────────────────
+function openFinReceiptModal(payId){
+  var pay=getFinPayments().find(function(p){return p.id===payId;});if(!pay)return;
+  var m=document.getElementById('fin-receipt-modal');if(!m)return;
+  document.getElementById('frm-pay-id').value=payId;
+  document.getElementById('frm-startup').textContent=pay.startup;
+  document.getElementById('frm-total').textContent=finFmt(pay.amount);
+  document.getElementById('frm-amount').value=pay.amount-(pay.paidAmount||0);
+  document.getElementById('frm-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('frm-notes').value='';
+  m.style.display='flex';
+}
+function closeFinReceiptModal(){var m=document.getElementById('fin-receipt-modal');if(m)m.style.display='none';}
+
+function submitFinReceipt(){
+  var payId=document.getElementById('frm-pay-id').value;
+  var amount=parseFloat(document.getElementById('frm-amount').value);
+  var date=document.getElementById('frm-date').value;
+  var notes=(document.getElementById('frm-notes').value||'').trim();
+  if(!amount||amount<=0){_toast('Enter valid amount','error');return;}
+  if(!date){_toast('Enter payment date','error');return;}
+  var pays=getFinPayments();
+  var pay=pays.find(function(p){return p.id===payId;});
+  if(!pay){_toast('Payment not found','error');return;}
+  pay.paidAmount=(pay.paidAmount||0)+amount;pay.paidDate=date;
+  pay.status=pay.paidAmount>=pay.amount?'paid':'partial';
+  pay.updatedAt=new Date().toISOString();
+  saveFinPayments(pays);
+  var rev=getFinRevenue();
+  rev.push({id:'frev_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),paymentId:payId,startup:pay.startup,type:pay.type,amount:amount,date:date,notes:notes,createdAt:new Date().toISOString()});
+  saveFinRevenue(rev);
+  closeFinReceiptModal();_toast('Revenue logged ✓');renderFinancesTab();
+}
+
+// ── Invoice Modal ──────────────────────────────────────────────
+function openFinInvoiceModal(payId){
+  var pay=getFinPayments().find(function(p){return p.id===payId;});if(!pay)return;
+  var existing=getFinInvoices().find(function(i){return i.paymentId===payId;});
+  if(existing){if(confirm('Invoice '+existing.invoiceNumber+' already exists. Download PDF?'))downloadInvoicePdf(existing.id);return;}
+  var m=document.getElementById('fin-invoice-modal');if(!m)return;
+  document.getElementById('fim-pay-id').value=payId;
+  document.getElementById('fim-startup').value=pay.startup;
+  document.getElementById('fim-client-name').value=pay.clientName||pay.startup;
+  document.getElementById('fim-client-email').value=pay.clientEmail||'';
+  document.getElementById('fim-client-address').value='';
+  document.getElementById('fim-description').value=(pay.type||'advisory').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})+' fee — '+pay.startup;
+  document.getElementById('fim-amount').value=pay.amount;
+  document.getElementById('fim-gst').value='18';
+  document.getElementById('fim-notes').value=pay.notes||'';
+  updateInvoicePreview();
+  m.style.display='flex';
+}
+function closeFinInvoiceModal(){var m=document.getElementById('fin-invoice-modal');if(m)m.style.display='none';}
+
+function updateInvoicePreview(){
+  var amt=parseFloat(document.getElementById('fim-amount').value)||0;
+  var gst=parseFloat(document.getElementById('fim-gst').value)||0;
+  var gstAmt=Math.round(amt*gst/100);
+  var el=document.getElementById('fim-preview-total');
+  if(el)el.textContent='Subtotal: '+finFmtFull(amt)+' + GST ('+gst+'%): '+finFmtFull(gstAmt)+' = Total: '+finFmtFull(amt+gstAmt);
+}
+
+function submitFinInvoice(){
+  var payId=document.getElementById('fim-pay-id').value;
+  var startup=(document.getElementById('fim-startup').value||'').trim();
+  var amt=parseFloat(document.getElementById('fim-amount').value)||0;
+  if(!startup||!amt){_toast('Startup and amount required','error');return;}
+  var gstPct=parseFloat(document.getElementById('fim-gst').value)||18;
+  var gstAmt=Math.round(amt*gstPct/100);
+  var inv={
+    id:'finv_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    invoiceNumber:nextInvoiceNum(),paymentId:payId,startup:startup,
+    clientName:(document.getElementById('fim-client-name').value||'').trim()||startup,
+    clientEmail:(document.getElementById('fim-client-email').value||'').trim(),
+    clientAddress:(document.getElementById('fim-client-address').value||'').trim(),
+    items:[{description:(document.getElementById('fim-description').value||'Advisory fees').trim(),amount:amt,qty:1}],
+    subtotal:amt,gstPercent:gstPct,gst:gstAmt,total:amt+gstAmt,
+    status:'draft',notes:(document.getElementById('fim-notes').value||'').trim(),
+    terms:'Payment due within 15 days of invoice date.',
+    createdAt:new Date().toISOString(),sentAt:'',
+  };
+  var invs=getFinInvoices();invs.push(inv);saveFinInvoices(invs);
+  var pays=getFinPayments();var p=pays.find(function(p){return p.id===payId;});
+  if(p){p.invoiceId=inv.id;p.updatedAt=new Date().toISOString();}saveFinPayments(pays);
+  closeFinInvoiceModal();_toast('Invoice '+inv.invoiceNumber+' created ✓');
+  if(confirm('Invoice created! Download PDF now?'))downloadInvoicePdf(inv.id);
+  renderFinancesTab();
+}
+
+// ── Send Invoice via Gmail ─────────────────────────────────────
+function sendInvoiceEmail(invId){
+  var inv=getFinInvoices().find(function(i){return i.id===invId;});
+  if(!inv){_toast('Invoice not found','error');return;}
+  if(!inv.clientEmail){_toast('No client email on this invoice','error');return;}
+  var subj=encodeURIComponent('Invoice '+inv.invoiceNumber+' — '+inv.startup+' | Log7 Capital');
+  var dt=new Date(inv.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  var body='Dear '+inv.clientName+',\n\nPlease find below Invoice '+inv.invoiceNumber+' from Log7 Capital.\n\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'Invoice No. : '+inv.invoiceNumber+'\n'
+    +'Date        : '+dt+'\n'
+    +'Company     : '+inv.startup+'\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +inv.items.map(function(it){return it.description+' : '+finFmtFull(it.amount);}).join('\n')+'\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'Subtotal    : '+finFmtFull(inv.subtotal)+'\n'
+    +'GST ('+inv.gstPercent+'%)  : '+finFmtFull(inv.gst)+'\n'
+    +'TOTAL       : '+finFmtFull(inv.total)+'\n\n'
+    +inv.terms+'\n\n'
+    +'Regards,\nLog7 Capital Team';
+  window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(inv.clientEmail)+'&su='+subj+'&body='+encodeURIComponent(body),'_blank');
+  var invs=getFinInvoices();var i=invs.find(function(i){return i.id===invId;});
+  if(i&&i.status==='draft'){i.status='sent';i.sentAt=new Date().toISOString();}
+  saveFinInvoices(invs);_toast('Gmail compose opened ✓');renderFinInvoices();
+}
+
+// ── PDF Invoice ────────────────────────────────────────────────
+function downloadInvoicePdf(invId){
+  var inv=getFinInvoices().find(function(i){return i.id===invId;});
+  if(!inv){_toast('Invoice not found','error');return;}
+  var jsPDF=(window.jspdf||window.jsPDF);
+  if(!jsPDF){_toast('PDF library not ready','error');return;}
+  if(jsPDF.jsPDF)jsPDF=jsPDF.jsPDF;
+  try{
+    var doc=new jsPDF({unit:'mm',format:'a4'});
+    var W=210,M=18,y=0;
+    // Header bar
+    doc.setFillColor(15,23,42);doc.rect(0,0,W,28,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont('helvetica','bold');
+    doc.text('LOG7 CAPITAL',M,11);
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text('Advisory & Venture Capital',M,17);
+    doc.setFontSize(11);doc.setFont('helvetica','bold');doc.text('INVOICE',W-M,11,{align:'right'});
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(inv.invoiceNumber,W-M,17,{align:'right'});
+    y=36;
+    // Date / due
+    doc.setTextColor(30,41,59);doc.setFontSize(8);
+    var dt=new Date(inv.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+    doc.text('Date: '+dt,W-M,y,{align:'right'});
+    doc.text(inv.terms,W-M,y+5,{align:'right'});
+    y+=8;
+    // Bill to
+    doc.setFontSize(7.5);doc.setTextColor(120,120,120);doc.text('BILLED TO',M,y);y+=4;
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(15,23,42);
+    doc.text(inv.clientName||inv.startup,M,y);y+=5;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    if(inv.clientName!==inv.startup&&inv.startup){doc.text(inv.startup,M,y);y+=4;}
+    if(inv.clientEmail){doc.text(inv.clientEmail,M,y);y+=4;}
+    if(inv.clientAddress){doc.text(inv.clientAddress,M,y);y+=4;}
+    y+=5;
+    // Table header
+    doc.setFillColor(248,250,252);doc.rect(M,y,W-2*M,8,'F');
+    doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(100,100,100);
+    doc.text('DESCRIPTION',M+4,y+5.5);doc.text('AMOUNT',W-M-4,y+5.5,{align:'right'});
+    y+=10;
+    // Items
+    inv.items.forEach(function(it){
+      doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(15,23,42);
+      doc.text(it.description,M+4,y);doc.text(finFmtFull(it.amount),W-M-4,y,{align:'right'});y+=7;
+    });
+    // Separator
+    doc.setDrawColor(220,220,220);doc.line(M,y,W-M,y);y+=5;
+    // Totals
+    var lx=W-M-50,rx=W-M-4;
+    doc.setFontSize(9);doc.setTextColor(80,80,80);
+    doc.text('Subtotal:',lx,y,{align:'right'});doc.setTextColor(15,23,42);doc.text(finFmtFull(inv.subtotal),rx,y,{align:'right'});y+=5;
+    doc.setTextColor(80,80,80);doc.text('GST ('+inv.gstPercent+'%):',lx,y,{align:'right'});doc.setTextColor(15,23,42);doc.text(finFmtFull(inv.gst),rx,y,{align:'right'});y+=5;
+    doc.setFillColor(15,23,42);doc.rect(W-M-66,y,66,10,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+    doc.text('TOTAL',W-M-60,y+6.5);doc.text(finFmtFull(inv.total),rx,y+6.5,{align:'right'});y+=14;
+    // Notes
+    if(inv.notes){doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(80,80,80);doc.text('Notes: '+inv.notes,M,y);y+=5;}
+    doc.setFontSize(7.5);doc.setTextColor(140,140,140);doc.text(inv.terms,M,y);
+    // Footer
+    doc.setFillColor(248,250,252);doc.rect(0,275,W,22,'F');
+    doc.setFontSize(7);doc.setTextColor(140,140,140);
+    doc.text('Log7 Capital | Ahmedabad, India',W/2,283,{align:'center'});
+    doc.text(inv.invoiceNumber,W/2,288,{align:'center'});
+    doc.save(inv.invoiceNumber+'.pdf');
+    _toast('PDF downloaded ✓');
+  }catch(e){console.error('[Finances] PDF:',e);_toast('PDF failed: '+e.message,'error');}
+}
+
+// ── Main renderer ──────────────────────────────────────────────
+function renderFinancesTab(){
+  renderFinKPIs();renderFinChart();
+  if(_finActiveTab==='payments')renderFinPayments();
+  else if(_finActiveTab==='invoices')renderFinInvoices();
+  else renderFinRevenueEntries();
+}
+
+// ── Global exports ─────────────────────────────────────────────
+window.renderFinancesTab=renderFinancesTab;
+window.renderFinChart=renderFinChart;
+window.setFinChartRange=setFinChartRange;
+window.switchFinTab=switchFinTab;
+window.openAddPaymentModal=openAddPaymentModal;
+window.closeAddPaymentModal=closeAddPaymentModal;
+window.submitAddPayment=submitAddPayment;
+window.openFinImportModal=openFinImportModal;
+window.closeFinImportModal=closeFinImportModal;
+window.importDealToFinances=importDealToFinances;
+window.openFinReceiptModal=openFinReceiptModal;
+window.closeFinReceiptModal=closeFinReceiptModal;
+window.submitFinReceipt=submitFinReceipt;
+window.openFinInvoiceModal=openFinInvoiceModal;
+window.closeFinInvoiceModal=closeFinInvoiceModal;
+window.updateInvoicePreview=updateInvoicePreview;
+window.submitFinInvoice=submitFinInvoice;
+window.sendInvoiceEmail=sendInvoiceEmail;
+window.downloadInvoicePdf=downloadInvoicePdf;
+window.deleteFinPayment=deleteFinPayment;
+window.deleteFinInvoice=deleteFinInvoice;
+window.renderFinPayments=renderFinPayments;
+window.renderFinInvoices=renderFinInvoices;
+window.renderFinRevenueEntries=renderFinRevenueEntries;
 })();
 
 // ═══════════════════════════════════════════════════════════════
