@@ -13,6 +13,13 @@ async function kvCmd(parts) {
   return r.json(); // { result: ... }
 }
 
+// Sanitize a value for a WhatsApp template variable. WhatsApp rejects newlines,
+// tabs, and runs of >4 spaces inside variables, so flatten to a single line.
+function tv(s) {
+  const out = String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, 900);
+  return out || '—';
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -104,6 +111,24 @@ module.exports = async function handler(req, res) {
   lines.push('', `_Sent by Log7 Dashboard · ${weekLabel}_`);
   const body = lines.join('\n');
 
+  // Structured single-line variables for an approved WhatsApp template.
+  // Template body (6 vars) — see TWILIO_CONTENT_SID_DIGEST docs:
+  //   {{1}} week label · {{2}} active count · {{3}} stage breakdown
+  //   {{4}} hot deals · {{5}} network counts · {{6}} note
+  const digestVars = {
+    1: tv(weekLabel),
+    2: tv(pipeline.length),
+    3: tv(stages.length ? stages.map(([s, n]) => `${s}: ${n}`).join(' · ') : '—'),
+    4: tv(hotDeals.length
+          ? hotDeals.slice(0, 5).map(d => {
+              const name = [d.investor, d.startup].filter(Boolean).join(' ↔ ');
+              return `${name}${d.stage ? ` (${d.stage})` : ''}`;
+            }).join('; ')
+          : 'none'),
+    5: tv(`${investors} investors · ${startups} startups · ${partners} partners`),
+    6: tv(digest.note || '—'),
+  };
+
   // ── Twilio config check ────────────────────────────────────────────
   const sid  = process.env.TWILIO_ACCOUNT_SID;
   const auth = process.env.TWILIO_AUTH_TOKEN;
@@ -117,12 +142,13 @@ module.exports = async function handler(req, res) {
 
   // ── Send (template if configured, else free-form body) ─────────────
   // Outside the 24h WhatsApp session window, providers require an APPROVED
-  // template. Set TWILIO_CONTENT_SID_DIGEST to a Twilio Content template whose
-  // body is a single {{1}} variable to send reliably from the unattended cron.
+  // template. Set TWILIO_CONTENT_SID_DIGEST to a Twilio Content template that
+  // takes the 6 structured variables in `digestVars` (see comment above) to
+  // send reliably from the unattended cron. Falls back to free-form in-window.
   const contentSid = process.env.TWILIO_CONTENT_SID_DIGEST;
   const client = twilio(sid, auth);
   const msg = contentSid
-    ? { from, to, contentSid, contentVariables: JSON.stringify({ 1: body }) }
+    ? { from, to, contentSid, contentVariables: JSON.stringify(digestVars) }
     : { from, to, body };
 
   try {
