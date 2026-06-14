@@ -283,6 +283,20 @@
     font-size:11.5px; font-weight:500; cursor:pointer; font-family:'Poppins',sans-serif; transition:opacity .15s; }
   .draft-resume-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   .draft-resume-btn:hover { opacity:.88; }
+  /* ── Error boundary fallback ── */
+  .err-boundary { margin:0 0 14px; }
+  .err-boundary-inner { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:8px;
+    background:rgba(227,97,97,0.07); border:1px solid rgba(227,97,97,0.25); }
+  .err-boundary .err-ic { font-size:20px; flex-shrink:0; line-height:1; }
+  .err-boundary .err-msg { flex:1; min-width:0; }
+  .err-boundary .err-title { font-size:13.5px; font-weight:600; color:var(--text); }
+  .err-boundary .err-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .err-boundary .err-retry { padding:7px 16px; border-radius:6px; border:1px solid var(--accent); background:var(--accent);
+    color:#fff; font-size:12.5px; font-weight:500; cursor:pointer; font-family:'Poppins',sans-serif; flex-shrink:0; transition:opacity .15s; }
+  .err-boundary .err-retry:hover { opacity:.88; }
+  .err-boundary .err-dismiss { padding:4px 8px; border:none; background:transparent; color:var(--muted);
+    font-size:15px; cursor:pointer; line-height:1; flex-shrink:0; }
+  .err-boundary .err-dismiss:hover { color:var(--text); }
   .error-box, .loading-box { border-radius:6px; padding:12px 14px; margin-bottom:14px; font-size:13px; }
   .error-box { color:var(--red); background:rgba(227,97,97,0.09); border:1px solid rgba(227,97,97,0.22); }
   .loading-box { color:var(--muted); background:rgba(255,255,255,0.03); border:1px solid var(--border); }
@@ -664,6 +678,21 @@
 @media(max-width:1100px){#home-week-bar{grid-template-columns:repeat(2,1fr) !important;}}
 @media(max-width:560px){#home-week-bar{grid-template-columns:1fr !important;}}
 
+/* ── Period comparison (this vs last) ── */
+.cmp-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); flex-wrap:wrap; }
+.cmp-toggle { display:inline-flex; gap:2px; background:var(--s2); border:1px solid var(--border); border-radius:var(--radius-pill); padding:2px; }
+.cmp-toggle button { border:none; background:transparent; color:var(--muted); font-size:11px; font-weight:var(--fw-semibold); padding:4px 13px; border-radius:var(--radius-pill); cursor:pointer; font-family:'Poppins',sans-serif; transition:background var(--t-fast), color var(--t-fast); }
+.cmp-toggle button:hover { color:var(--text); }
+.cmp-toggle button.active { background:var(--accent); color:#fff; }
+.cmp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--sp-2); margin-top:var(--sp-3); }
+.cmp-metric { border:1px solid var(--border); border-radius:var(--radius-sm); padding:var(--sp-3); background:var(--s1); }
+.cmp-metric-label { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:var(--fw-semibold); }
+.cmp-metric-cur { font-family:'Poppins',sans-serif; font-size:var(--fs-xl); font-weight:var(--fw-bold); color:var(--text); line-height:1.1; margin-top:4px; }
+.cmp-metric-prev { font-size:var(--fs-xs); color:var(--muted); margin-top:3px; }
+.cmp-metric .trend-chip { margin-top:7px; }
+.cmp-note { font-size:11px; color:var(--muted); margin-top:var(--sp-3); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.cmp-note .cmp-excluded { color:var(--warning); }
+
 /* ── KPI band (hero + secondary stats) ── */
 .kpi-band { display:grid; grid-template-columns:1.35fr 3fr; gap:var(--sp-3); margin-bottom:var(--sp-3); align-items:stretch; }
 .kpi-hero {
@@ -968,6 +997,9 @@ window.SettingsDB = (function(){
     <div id="home-sync-status" style="font-size:11px;color:var(--muted);text-align:right;margin-bottom:8px;min-height:14px"></div>
 
     <!-- Weekly summary bar (injected by JS as before) -->
+
+    <!-- Period comparison (this vs last) — read-only -->
+    <div id="home-comparison" style="margin-bottom:14px"></div>
 
     <div id="home-main-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:14px;align-items:start">
       <div id="home-left-col">
@@ -2013,6 +2045,7 @@ window.onload = async () => {
   } catch(ex){}
   const key=getApiKey();
   document.getElementById('api-key').value=key;
+  if(window.Log7Resilience) Log7Resilience.init();  // wrap view renderers before first render
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
   await loadData();
@@ -7280,6 +7313,88 @@ function uxLastOutreachHtml(contactName){
   };
 })();
 
+// ═══ PERIOD COMPARISON (this vs last — read-only) ═══
+var _cmpPeriod = 'week';
+function _cmpRanges(period){
+  var now = new Date(), curStart, prevStart;
+  if(period==='month'){
+    curStart  = new Date(now.getFullYear(), now.getMonth(), 1);
+    prevStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  } else if(period==='quarter'){
+    var q = Math.floor(now.getMonth()/3);
+    curStart  = new Date(now.getFullYear(), q*3, 1);
+    prevStart = new Date(now.getFullYear(), q*3-3, 1);
+  } else { // week (Monday-start)
+    curStart = new Date(now); var dow = curStart.getDay();
+    curStart.setDate(curStart.getDate() + (dow===0?-6:1-dow)); curStart.setHours(0,0,0,0);
+    prevStart = new Date(curStart); prevStart.setDate(prevStart.getDate()-7);
+  }
+  return { cur:curStart.toISOString(), prev:prevStart.toISOString(), now:now.toISOString() };
+}
+// Count records in [start,end); also tally records with no usable date (excluded, not fabricated).
+function _cmpCount(arr, field, start, end){
+  var n=0, excluded=0;
+  (arr||[]).forEach(function(r){
+    var d = r[field] || '';
+    if(!d){ excluded++; return; }
+    if(d>=start && d<end) n++;
+  });
+  return { n:n, excluded:excluded };
+}
+function _cmpDelta(cur, prev){
+  if(cur===prev) return { cls:'trend-flat', text:'0%' };
+  if(!prev) return { cls:'trend-up', text:'+'+cur };
+  var pct = Math.round((cur-prev)/prev*100);
+  return cur>prev ? { cls:'trend-up', text:'▲ +'+pct+'%' } : { cls:'trend-down', text:'▼ '+pct+'%' };
+}
+function renderPeriodComparison(){
+  var el = document.getElementById('home-comparison'); if(!el) return;
+  var r = _cmpRanges(_cmpPeriod);
+  var pipeline = getPipeline();
+  var closed = pipeline.filter(function(d){ return d.stage==='Closed Won'; })
+                       .map(function(d){ return { _d: d.lastUpdated || d.savedAt || '' }; });
+  var defs = [
+    { label:'Investors',    arr:netLoad('investors'),    field:'dateAdded' },
+    { label:'Startups',     arr:netLoad('startups'),     field:'dateAdded' },
+    { label:'Partners',     arr:netLoad('partnerships'), field:'dateAdded' },
+    { label:'New Deals',    arr:pipeline,                field:'savedAt' },
+    { label:'Deals Closed', arr:closed,                  field:'_d' }
+  ];
+  var periodLabel = { week:'week', month:'month', quarter:'quarter' }[_cmpPeriod];
+  var totalExcluded = 0;
+  var cards = defs.map(function(d){
+    var c = _cmpCount(d.arr, d.field, r.cur, r.now);   // current period, to date
+    var p = _cmpCount(d.arr, d.field, r.prev, r.cur);  // previous full period
+    totalExcluded += c.excluded;                       // excluded is whole-array, count once
+    var delta = _cmpDelta(c.n, p.n);
+    return '<div class="cmp-metric">'
+      + '<div class="cmp-metric-label">'+d.label+'</div>'
+      + '<div class="cmp-metric-cur">'+c.n+'</div>'
+      + '<div class="cmp-metric-prev">vs '+p.n+' last '+periodLabel+'</div>'
+      + '<span class="trend-chip '+delta.cls+'">'+delta.text+'</span>'
+      + '</div>';
+  }).join('');
+  function tBtn(val,txt){ return '<button class="'+(_cmpPeriod===val?'active':'')+'" onclick="setComparePeriod(\''+val+'\')">'+txt+'</button>'; }
+  el.className = 'card';
+  el.innerHTML =
+    '<div class="cmp-head">'
+      + '<div class="card-title">Period Comparison</div>'
+      + '<div class="cmp-toggle">'+tBtn('week','Week')+tBtn('month','Month')+tBtn('quarter','Quarter')+'</div>'
+    + '</div>'
+    + '<div class="cmp-grid">'+cards+'</div>'
+    + '<div class="cmp-note">'
+      + '<span>Current '+periodLabel+' to date vs the full previous '+periodLabel+'.</span>'
+      + (totalExcluded>0 ? '<span class="cmp-excluded">&#9888;&#65039; '+totalExcluded+' record'+(totalExcluded>1?'s':'')+' excluded (no date on record).</span>' : '')
+    + '</div>';
+}
+function setComparePeriod(p){ _cmpPeriod = p; renderPeriodComparison(); }
+
+// Refresh the comparison whenever Home renders.
+(function(){
+  var _orig = window.refreshHome;
+  window.refreshHome = function(){ _orig(); try { renderPeriodComparison(); } catch(e){} };
+})();
+
 // ─── ADD MODAL ANIMATION CLASSES ─────────────────────────────────
 (function(){
   var ids=['network-modal','followup-modal','add-deal-modal','net-entity-modal','tearsheet-modal','objection-modal','simulator-modal'];
@@ -9247,6 +9362,74 @@ window.Log7Drafts = (function(){
   }
 
   return { open:open, save:save, load:load, clear:clear, restore:restore };
+})();
+
+// ═══ ERROR BOUNDARIES + GRACEFUL FAILURE ═══
+// Wraps major view renderers so a render error shows a friendly retry banner
+// instead of a blank screen — never touches or loses data.
+window.Log7Resilience = (function(){
+  var _errors = [];
+  var _retries = {};
+
+  function log(where, err){
+    var rec = { when:new Date().toISOString(), where:where,
+      message:(err&&err.message)||String(err), stack:(err&&err.stack)||'' };
+    _errors.push(rec); if(_errors.length>50) _errors.shift();
+    window.__l7Errors = _errors;
+    try { console.error('[Log7] '+where+' failed:', err); } catch(e){}
+  }
+
+  function banner(pageId, name, fnName){
+    var page = document.getElementById(pageId); if(!page) return;
+    var id = 'errb-'+pageId;
+    var b = document.getElementById(id);
+    if(!b){ b = document.createElement('div'); b.id = id; page.insertBefore(b, page.firstChild); }
+    b.className = 'err-boundary';
+    b.innerHTML = '<div class="err-boundary-inner">'
+      + '<div class="err-ic">&#9888;&#65039;</div>'
+      + '<div class="err-msg"><div class="err-title">'+name+' couldn’t load</div>'
+      + '<div class="err-sub">Something went wrong rendering this view. Your data is safe — nothing was changed.</div></div>'
+      + '<button class="err-retry" onclick="Log7Resilience.retry(\''+pageId+'\',\''+fnName+'\')">Retry</button>'
+      + '<button class="err-dismiss" title="Dismiss" onclick="var p=this.closest(\'.err-boundary\'); if(p) p.remove();">&#10005;</button>'
+      + '</div>';
+  }
+  function clearBanner(pageId){ var b=document.getElementById('errb-'+pageId); if(b) b.remove(); }
+
+  function retry(pageId, fnName){
+    clearBanner(pageId);
+    var f = window[fnName];
+    if(typeof f === 'function'){ try { f(); } catch(e){ /* boundary re-shows banner */ } }
+  }
+
+  // Wrap a global function in a try/catch that renders the fallback on failure.
+  function wrapGlobal(fnName, name, pageId){
+    var orig = window[fnName];
+    if(typeof orig !== 'function') return;
+    window[fnName] = function(){
+      try {
+        var r = orig.apply(this, arguments);
+        clearBanner(pageId);   // success — clear any stale banner
+        return r;
+      } catch(err){
+        log(name, err);
+        banner(pageId, name, fnName);
+      }
+    };
+    _retries[pageId] = fnName;
+  }
+
+  function init(){
+    // Wrap the major view entry points (runs after all renderers + patches exist)
+    wrapGlobal('refreshHome',        'Home',          'page-home');
+    wrapGlobal('renderNetworkTab',   'Network',       'page-network');
+    wrapGlobal('renderKanban',       'Pipeline',      'page-pipeline');
+    wrapGlobal('renderPipelineList', 'Pipeline list', 'page-pipeline');
+    // Catch anything that escapes a boundary so it's logged, never silent.
+    window.addEventListener('error', function(e){ log('window.onerror', e.error||e.message); });
+    window.addEventListener('unhandledrejection', function(e){ log('unhandledrejection', e.reason); });
+  }
+
+  return { init:init, retry:retry, errors:function(){return _errors.slice();} };
 })();
 </script>
 </body>
