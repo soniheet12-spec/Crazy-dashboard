@@ -3,6 +3,10 @@
     {
       "path": "/api/send-followup-reminder",
       "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/weekly-digest",
+      "schedule": "30 3 * * 1"
     }
   ]
 }
