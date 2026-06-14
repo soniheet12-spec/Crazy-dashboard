@@ -2213,12 +2213,14 @@ window.onload = async () => {
   if(window.Log7Backup) Log7Backup.init();
   if(window._driveRestoreOnLoad) window._driveRestoreOnLoad();
   if(window.HomeLayout) HomeLayout.init();
+  try { if(typeof syncCronDataToCloud==='function') syncCronDataToCloud(); } catch(e){}  // push cron snapshots
   // Background sync from Sheets after local render is complete
   if(_gsConfigured()){
     Promise.all([
       netSync('investors'), netSync('startups'), netSync('partnerships')
     ]).then(function(){
       try { renderNetworkTab(); } catch(e){}
+      try { if(typeof syncCronDataToCloud==='function') syncCronDataToCloud(); } catch(e){}  // refresh after Sheets sync
     }).catch(function(){});
     pipelineSync().then(function(){
       try { renderKanban(); renderPipelineList(); } catch(e){}
@@ -4999,6 +5001,53 @@ async function sendWeeklyDigestNow(btn){
   btn.disabled=false; btn.textContent=orig;
 }
 
+// ═══ CRON DATA SYNC ═══
+// Pushes read-only snapshots to Upstash so the daily follow-up reminder and
+// weekly digest crons have fresh data to send. Reads existing data only —
+// never alters localStorage, schemas, or the Network data layer.
+function buildFollowupsPayload(){
+  var nameKeys = { partnerships:'partnerName', investors:'investorName', startups:'companyName' };
+  var out = [];
+  ['partnerships','investors','startups'].forEach(function(tab){
+    netLoad(tab).forEach(function(row){
+      if(row.deletedAt) return;                       // skip recycle-bin entries
+      var d = row.followUpDate ? String(row.followUpDate).split('T')[0].trim() : '';
+      if(!d) return;                                  // only entries with a follow-up date
+      if(row.followUpDone === true) return;           // pending only
+      out.push({
+        tab:          tab,
+        name:         row[nameKeys[tab]] || row.name || '',
+        followUpDate: d,
+        notes:        row.followUpNote || row.notes || '',
+        status:       'pending'
+      });
+    });
+  });
+  return out;
+}
+
+var _l7CronSyncTimer = null;
+function syncCronDataToCloud(){
+  // Debounced + best-effort; failures are swallowed (cron sync is non-critical).
+  if(_l7CronSyncTimer) clearTimeout(_l7CronSyncTimer);
+  _l7CronSyncTimer = setTimeout(function(){
+    try {
+      fetch('/api/save-followups', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ followups: buildFollowupsPayload() })
+      }).catch(function(){});
+    } catch(e){}
+    try {
+      if(typeof buildDigestPayload === 'function'){
+        fetch('/api/save-digest', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ digest: buildDigestPayload() })
+        }).catch(function(){});
+      }
+    } catch(e){}
+  }, 2500);
+}
+
 // ═══ WHATSAPP OUTREACH ═══
 
 // Legacy names kept so any cached page / old onclick handlers don't throw
@@ -6728,6 +6777,7 @@ function rebuildFollowupsStore(){
     });
   });
   localStorage.setItem('log7_followups', JSON.stringify(out));
+  try { if(typeof syncCronDataToCloud==='function') syncCronDataToCloud(); } catch(e){}
   return out;
 }
 function getPendingDueFollowups(){
