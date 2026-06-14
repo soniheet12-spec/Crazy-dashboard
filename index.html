@@ -11,10 +11,14 @@
 <meta name="apple-mobile-web-app-title" content="Log7 Capital">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <script>
-/* Flash prevention — runs before any CSS or render */
+/* Flash prevention — runs before any CSS or render.
+   Respect a saved preference; on first visit fall back to the OS colour scheme. */
 (function(){
-  if(localStorage.getItem('dark_mode')==='1')
-    document.documentElement.setAttribute('data-theme','dark');
+  var saved = localStorage.getItem('dark_mode');
+  var dark = saved===null
+    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    : (saved==='1');
+  if(dark) document.documentElement.setAttribute('data-theme','dark');
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -36,6 +40,21 @@
     --settings-menu-bg: rgba(255,255,255,0.99);
     --card-radius: 10px;
     --font-base: 13px;
+
+    /* ── Design tokens (spacing / typography / radius / shadow / semantic) ── */
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+    --fs-xs:10.5px; --fs-sm:12px; --fs-md:13px; --fs-lg:15px; --fs-xl:20px; --fs-2xl:30px;
+    --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+    --lh-tight:1.2; --lh-normal:1.5; --lh-relaxed:1.7;
+    --radius-sm:6px; --radius-md:10px; --radius-lg:16px; --radius-pill:999px;
+    --shadow-sm:0 1px 2px rgba(16,24,40,0.06);
+    --shadow-md:0 2px 10px rgba(16,24,40,0.08), 0 1px 2px rgba(16,24,40,0.04);
+    --shadow-lg:0 10px 30px rgba(16,24,40,0.12), 0 2px 6px rgba(16,24,40,0.06);
+    /* semantic aliases — meaning-based colour usage */
+    --success:var(--green); --warning:var(--amber); --danger:var(--red); --neutral:var(--muted);
+    --ring:0 0 0 3px var(--accent-soft);
+    --t-fast:120ms cubic-bezier(.4,0,.2,1);
+    --t-base:180ms cubic-bezier(.4,0,.2,1);
   }
 
   /* ── Dark mode variable overrides (midnight palette) ── */
@@ -48,6 +67,10 @@
     --body-bg: linear-gradient(135deg,#060a10 0%,#080c12 60%);
     --topbar-bg: rgba(14,20,32,0.97);
     --settings-menu-bg: rgba(14,20,32,0.99);
+    /* deeper shadows on dark surfaces */
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md:0 3px 12px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-lg:0 12px 34px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4);
   }
 
   .kanban-col[data-stage="Money in the Bank"] .kanban-col-header{color:var(--green)!important;font-weight:700;}
@@ -611,12 +634,93 @@
 #rev-edit-modal .rev-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 @media(max-width:600px){#rev-edit-modal .rev-modal-grid{grid-template-columns:1fr;}}
 
-/* ── Weekly summary (override injected 3-col) ── */
-#home-week-bar { display:grid !important; grid-template-columns:repeat(5,1fr) !important; gap:8px !important; margin-bottom:12px !important; }
-.ux-week-card { padding:10px 12px; }
-.ux-week-val  { font-size:1.4rem; }
-@media(max-width:900px){#home-week-bar{grid-template-columns:repeat(3,1fr) !important;}}
-@media(max-width:600px){#home-week-bar{grid-template-columns:repeat(2,1fr) !important;}}
+/* ── Metric summary cards (Investors / Partners / Startups / Deals) ── */
+#home-week-bar { display:grid !important; grid-template-columns:repeat(4,1fr) !important; gap:var(--sp-3) !important; margin-bottom:var(--sp-4) !important; }
+.ux-week-card {
+  position:relative; background:var(--s1); border:1px solid var(--border);
+  border-radius:var(--radius-md); padding:var(--sp-4) var(--sp-4) var(--sp-3);
+  box-shadow:var(--shadow-sm); overflow:hidden;
+  transition:transform var(--t-base), box-shadow var(--t-base), border-color var(--t-base);
+}
+.ux-week-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--mc-accent,var(--accent)); opacity:.85; }
+.ux-week-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:var(--border2); }
+.ux-week-val  { font-size:var(--fs-xl); font-weight:var(--fw-bold); color:var(--text); line-height:var(--lh-tight); font-family:'Poppins',sans-serif; }
+.ux-week-label { font-weight:var(--fw-semibold); color:var(--text); }
+.ux-week-sub { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-top:1px; }
+.mc-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); }
+.trend-chip { display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:var(--fw-semibold); padding:2px 6px; border-radius:var(--radius-pill); line-height:1; white-space:nowrap; }
+.trend-up { color:var(--success); background:color-mix(in srgb, var(--green) 14%, transparent); }
+.trend-down { color:var(--danger); background:color-mix(in srgb, var(--red) 14%, transparent); }
+.trend-flat { color:var(--neutral); background:var(--s2); }
+@media(max-width:1100px){#home-week-bar{grid-template-columns:repeat(2,1fr) !important;}}
+@media(max-width:560px){#home-week-bar{grid-template-columns:1fr !important;}}
+
+/* ── KPI band (hero + secondary stats) ── */
+.kpi-band { display:grid; grid-template-columns:1.35fr 3fr; gap:var(--sp-3); margin-bottom:var(--sp-3); align-items:stretch; }
+.kpi-hero {
+  position:relative; display:flex; flex-direction:column; justify-content:center;
+  background:linear-gradient(150deg, var(--accent-soft), transparent 70%), var(--s1);
+  border:1px solid var(--border); border-left:4px solid var(--accent);
+  border-radius:var(--radius-md); padding:var(--sp-4) var(--sp-5);
+  box-shadow:var(--shadow-sm); transition:transform var(--t-base), box-shadow var(--t-base);
+}
+.kpi-hero:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+.kpi-hero .kpi-hero-val { font-family:'Poppins',sans-serif; font-size:var(--fs-2xl); font-weight:var(--fw-bold); color:var(--accent); line-height:1; }
+.kpi-hero .kpi-hero-label { font-size:var(--fs-sm); font-weight:var(--fw-semibold); color:var(--text); margin-top:var(--sp-1); }
+.kpi-hero .kpi-hero-sub { font-size:var(--fs-xs); color:var(--muted); margin-top:2px; }
+.kpi-others { display:grid; grid-template-columns:repeat(5,1fr); gap:var(--sp-2); }
+.kpi-card {
+  position:relative; background:var(--s1); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:var(--sp-3) var(--sp-3) var(--sp-3) calc(var(--sp-3) + 3px);
+  box-shadow:var(--shadow-sm); overflow:hidden;
+  transition:transform var(--t-base), box-shadow var(--t-base), border-color var(--t-base);
+}
+.kpi-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--kpi-accent,var(--neutral)); opacity:.8; }
+.kpi-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:var(--border2); }
+.kpi-card .stat-value { font-family:'Poppins',sans-serif; font-size:var(--fs-xl); font-weight:var(--fw-bold); color:var(--text); line-height:var(--lh-tight); }
+.kpi-card .stat-label { color:var(--muted); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.08em; margin-top:2px; font-weight:var(--fw-medium); }
+.kpi-card.accent-green { --kpi-accent:var(--success); }
+.kpi-card.accent-amber { --kpi-accent:var(--warning); }
+.kpi-card.accent-blue  { --kpi-accent:var(--blue); }
+@media(max-width:980px){ .kpi-band{grid-template-columns:1fr;} .kpi-others{grid-template-columns:repeat(3,1fr);} }
+@media(max-width:560px){ .kpi-others{grid-template-columns:repeat(2,1fr);} }
+
+/* ── Command palette (Cmd/Ctrl+K) ── */
+#cmdk-overlay { position:fixed; inset:0; z-index:9500; background:rgba(8,12,18,0.55); backdrop-filter:blur(2px); display:flex; align-items:flex-start; justify-content:center; padding-top:12vh; }
+#cmdk-overlay.hidden { display:none; }
+.cmdk-box { width:min(620px,92vw); max-height:64vh; display:flex; flex-direction:column; background:var(--s1); border:1px solid var(--border2); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; animation:cmdk-in var(--t-base); }
+@keyframes cmdk-in { from{opacity:0; transform:translateY(-8px) scale(.98);} to{opacity:1; transform:none;} }
+.cmdk-input-wrap { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-4) var(--sp-4); border-bottom:1px solid var(--border); }
+.cmdk-input-wrap svg { width:18px; height:18px; stroke:var(--muted); flex-shrink:0; }
+#cmdk-input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font-size:var(--fs-lg); font-family:'Poppins',sans-serif; }
+.cmdk-hint { font-size:10px; color:var(--muted); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:2px 6px; white-space:nowrap; }
+#cmdk-results { overflow-y:auto; padding:var(--sp-2); }
+.cmdk-group { font-size:10px; font-weight:var(--fw-bold); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); padding:var(--sp-2) var(--sp-3) var(--sp-1); }
+.cmdk-item { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-3); border-radius:var(--radius-sm); cursor:pointer; transition:background var(--t-fast); }
+.cmdk-item .cmdk-ic { width:26px; height:26px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); background:var(--s2); font-size:13px; }
+.cmdk-item .cmdk-main { flex:1; min-width:0; }
+.cmdk-item .cmdk-title { font-size:var(--fs-md); color:var(--text); font-weight:var(--fw-medium); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cmdk-item .cmdk-meta { font-size:var(--fs-xs); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cmdk-item .cmdk-kind { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); border:1px solid var(--border); border-radius:var(--radius-pill); padding:2px 7px; }
+.cmdk-item.active, .cmdk-item:hover { background:var(--accent-soft); }
+.cmdk-empty { padding:var(--sp-5); text-align:center; color:var(--muted); font-size:var(--fs-sm); }
+
+/* ── Micro-interactions & focus accessibility ── */
+.card { transition:box-shadow var(--t-base), border-color var(--t-base); }
+.card:hover { border-color:var(--border2); box-shadow:0 8px 26px rgba(16,24,40,0.14), 0 2px 8px rgba(16,24,40,0.07); }
+[data-theme="dark"] .card:hover { box-shadow:0 12px 32px rgba(0,0,0,0.5); }
+.action-btn, .pill-btn, .mini-btn, .ghost-btn, .subtab { transition:background var(--t-fast), color var(--t-fast), border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast); }
+.action-btn:hover, .pill-btn:hover, .mini-btn:hover, .ghost-btn:hover { transform:translateY(-1px); }
+.action-btn:active, .pill-btn:active, .mini-btn:active, .ghost-btn:active, .nav-tab:active { transform:translateY(0); }
+tbody tr { transition:background var(--t-fast); }
+/* visible keyboard-focus ring across interactive elements */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible, .nav-tab:focus-visible, .cmdk-item:focus-visible {
+  outline:none; box-shadow:var(--ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
+}
 
 /* ── Compact home stats ── */
 #page-home .stat { padding:10px 12px; }
@@ -793,7 +897,7 @@ window.SettingsDB = (function(){
 <div id="topbar">
   <button id="sb-hamburger" onclick="toggleSidebar()" title="Toggle menu">&#9776;</button>
   <div id="global-search-wrap" style="position:relative;margin-right:4px">
-    <input id="global-search" type="text" placeholder="Search… (Ctrl+K)" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
+    <input id="global-search" type="text" placeholder="Search…" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
     <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
   </div>
   <div class="topbar-actions" style="display:flex;gap:8px;align-items:center">
@@ -826,14 +930,20 @@ window.SettingsDB = (function(){
   <div id="page-home" class="page active">
     <div id="home-notifications" style="margin-bottom:8px"></div>
 
-    <!-- Pipeline + activity stats row -->
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px">
-      <div class="stat"><div class="stat-value" id="home-stat-startups">0</div><div class="stat-label">Startups</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-investors">0</div><div class="stat-label">Investors</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-pipeline">0</div><div class="stat-label">Pipeline</div></div>
-      <div class="stat"><div class="stat-value" id="home-stat-contacted">0</div><div class="stat-label">Contacted</div></div>
-      <div class="stat"><div class="stat-value" id="home-followups" style="color:var(--amber)">0</div><div class="stat-label">Follow-ups Due</div></div>
-      <div class="stat"><div class="stat-value" id="home-hot-deals" style="color:var(--green)">0</div><div class="stat-label">Hot Deals</div></div>
+    <!-- Pipeline + activity stats row (hero + secondary) -->
+    <div class="kpi-band">
+      <div class="kpi-hero" title="Active deals in pipeline">
+        <div class="kpi-hero-val" id="home-stat-pipeline">0</div>
+        <div class="kpi-hero-label">Active Pipeline</div>
+        <div class="kpi-hero-sub">Deals currently in play</div>
+      </div>
+      <div class="kpi-others">
+        <div class="kpi-card"><div class="stat-value" id="home-stat-startups">0</div><div class="stat-label">Startups</div></div>
+        <div class="kpi-card"><div class="stat-value" id="home-stat-investors">0</div><div class="stat-label">Investors</div></div>
+        <div class="kpi-card accent-blue"><div class="stat-value" id="home-stat-contacted">0</div><div class="stat-label">Contacted</div></div>
+        <div class="kpi-card accent-amber"><div class="stat-value" id="home-followups">0</div><div class="stat-label">Follow-ups Due</div></div>
+        <div class="kpi-card accent-green"><div class="stat-value" id="home-hot-deals">0</div><div class="stat-label">Hot Deals</div></div>
+      </div>
     </div>
 
     <!-- Needs Attention strip -->
@@ -2023,7 +2133,7 @@ function applyStyleOptions(){
 function loadPreferences(){
   var savedTheme=localStorage.getItem('l7_theme');
   if(savedTheme&&THEMES[savedTheme]){applyTheme(savedTheme);}
-  applyDarkModeState(localStorage.getItem('dark_mode')==='1');
+  applyDarkModeState(darkModePref());
   applyStyleOptions();
   initThemeChips();
   var mm=SettingsDB.get('l7_matching_mode','auto');
@@ -4838,7 +4948,7 @@ document.addEventListener('DOMContentLoaded', function(){
   renderBulkOutreachPanel();
   if(localStorage.getItem('l7_sb_collapsed')==='1') document.body.classList.add('sb-collapsed');
   // Sync dark mode icon state (data-theme already applied in <head>)
-  applyDarkModeState(localStorage.getItem('dark_mode')==='1');
+  applyDarkModeState(darkModePref());
   // Migrate IC Review stage (one-time)
   migrateIcReviewStage();
   // Hide Network Pipeline card if already merged
@@ -4928,6 +5038,118 @@ function globalSearchPick(payload){
 }
 function closeGlobalSearch(){var b=document.getElementById('global-search-results');if(b){b.style.display='none';}}
 
+// ═══ COMMAND PALETTE (Cmd/Ctrl+K) ═══
+// Read-only over existing data sources. Actions route to existing flows only.
+var _cmdkIndex = 0;
+var _cmdkItems = [];
+function cmdkActions(){
+  return [
+    {kind:'action', icon:'＋', title:'Add deal', meta:'Open the new-deal form', run:function(){ if(window.openAddDealModal) openAddDealModal(); }},
+    {kind:'action', icon:'💼', title:'Add investor', meta:'Open the investor form', run:function(){ if(window.openNetworkModal) openNetworkModal('investors'); }},
+    {kind:'action', icon:'🏢', title:'Add startup', meta:'Open the startup form', run:function(){ if(window.openNetworkModal) openNetworkModal('startups'); }},
+    {kind:'nav', icon:'🏠', title:'Go to Home', meta:'Dashboard', run:function(){ goToTab('home'); }},
+    {kind:'nav', icon:'🌐', title:'Go to Network', meta:'Investors · Startups · Partners', run:function(){ goToTab('network'); }},
+    {kind:'nav', icon:'📈', title:'Go to Pipeline', meta:'Deal board', run:function(){ goToTab('pipeline'); }},
+    {kind:'nav', icon:'💰', title:'Go to Finances', meta:'Revenue & payments', run:function(){ goToTab('finances'); }},
+    {kind:'nav', icon:'✉️', title:'Go to Outreach', meta:'Messaging', run:function(){ goToTab('outreach'); }},
+    {kind:'nav', icon:'📄', title:'Go to Docs', meta:'Document vault', run:function(){ goToTab('docs'); }},
+    {kind:'nav', icon:'📋', title:'Go to Mandate', meta:'Mandate generator', run:function(){ goToTab('mandate'); }},
+    {kind:'nav', icon:'🗂️', title:'Go to Audit Log', meta:'Activity trail', run:function(){ goToTab('audit'); }},
+    {kind:'nav', icon:'☁️', title:'Go to Backup', meta:'Google Drive backup', run:function(){ goToTab('backup'); }}
+  ];
+}
+function cmdkEntityMatches(q){
+  // Same read-only sources as the topbar global search — never mutate.
+  var sources=[
+    {label:'Investor', icon:'💼', tab:'network', subtab:'investors', items:netLoad('investors'), nameFn:function(r){return r.investorName||r.name||'';}, metaFn:function(r){return [r.fundName,r.sectorFocus,r.stageFocus].filter(Boolean).join(' · ');}},
+    {label:'Partner',  icon:'🤝', tab:'network', subtab:'partnerships', items:netLoad('partnerships'), nameFn:function(r){return r.partnerName||r.name||'';}, metaFn:function(r){return [r.organisation,r.role].filter(Boolean).join(' · ');}},
+    {label:'Startup',  icon:'🏢', tab:'network', subtab:'startups', items:netLoad('startups'), nameFn:function(r){return r.companyName||r.name||'';}, metaFn:function(r){return [r.founderName,r.sector,r.stage].filter(Boolean).join(' · ');}},
+    {label:'Deal',     icon:'📈', tab:'pipeline', items:getPipeline(), nameFn:function(r){return (r.investor||'')+' ↔ '+(r.startup||'');}, metaFn:function(r){return [r.stage,r.score!=null?'Score '+r.score:''].filter(Boolean).join(' · ');}}
+  ];
+  var out=[];
+  sources.forEach(function(src){
+    (src.items||[]).filter(function(r){return JSON.stringify(r).toLowerCase().indexOf(q)>=0;}).slice(0,6).forEach(function(r){
+      var name=src.nameFn(r)||'(unnamed)';
+      out.push({kind:'entity', icon:src.icon, title:name, meta:src.metaFn(r), kindLabel:src.label,
+        run:(function(tab,subtab,nm){return function(){ cmdkJump(tab,subtab,nm); };})(src.tab,src.subtab,name)});
+    });
+  });
+  return out;
+}
+function cmdkJump(tab,subtab,name){
+  goToTab(tab);
+  if(tab==='network'&&subtab){ var btn=document.getElementById('net-tab-'+subtab); if(btn&&typeof switchNetTab==='function') switchNetTab(subtab,btn); }
+  setTimeout(function(){
+    var rows=document.querySelectorAll('#page-'+tab+' tr, #page-'+tab+' .kanban-card');
+    rows.forEach(function(row){
+      if(row.textContent && row.textContent.toLowerCase().indexOf(String(name).toLowerCase())>=0){
+        row.style.transition='background 0.4s'; var orig=row.style.background; row.style.background='var(--accent-soft)';
+        setTimeout(function(){row.style.background=orig;},1600);
+      }
+    });
+  },140);
+}
+function cmdkRender(q){
+  var box=document.getElementById('cmdk-results'); if(!box) return;
+  q=(q||'').trim().toLowerCase();
+  var actions=cmdkActions();
+  var filteredActions = q ? actions.filter(function(a){return (a.title+' '+a.meta).toLowerCase().indexOf(q)>=0;}) : actions;
+  var entities = q ? cmdkEntityMatches(q) : [];
+  _cmdkItems = filteredActions.concat(entities);
+  _cmdkIndex = 0;
+  if(!_cmdkItems.length){ box.innerHTML='<div class="cmdk-empty">No matches for &ldquo;'+escapeHtml(q)+'&rdquo;</div>'; return; }
+  var html='';
+  if(filteredActions.length){
+    html+='<div class="cmdk-group">'+(q?'Commands':'Quick actions')+'</div>';
+    filteredActions.forEach(function(it,i){ html+=cmdkItemHtml(it, i); });
+  }
+  if(entities.length){
+    html+='<div class="cmdk-group">Results</div>';
+    entities.forEach(function(it,i){ html+=cmdkItemHtml(it, filteredActions.length+i); });
+  }
+  box.innerHTML=html;
+  cmdkHighlight();
+}
+function cmdkItemHtml(it, idx){
+  return '<div class="cmdk-item" data-idx="'+idx+'" onmousedown="cmdkActivate('+idx+')" onmousemove="cmdkSetActive('+idx+')">'
+    +'<span class="cmdk-ic">'+it.icon+'</span>'
+    +'<span class="cmdk-main"><span class="cmdk-title">'+escapeHtml(it.title)+'</span>'
+    +(it.meta?'<span class="cmdk-meta">'+escapeHtml(it.meta)+'</span>':'')+'</span>'
+    +(it.kindLabel?'<span class="cmdk-kind">'+escapeHtml(it.kindLabel)+'</span>':'')
+    +'</div>';
+}
+function cmdkHighlight(){
+  var box=document.getElementById('cmdk-results'); if(!box) return;
+  box.querySelectorAll('.cmdk-item').forEach(function(el){
+    var on = parseInt(el.dataset.idx,10)===_cmdkIndex;
+    el.classList.toggle('active', on);
+    if(on) el.scrollIntoView({block:'nearest'});
+  });
+}
+function cmdkSetActive(i){ _cmdkIndex=i; cmdkHighlight(); }
+function cmdkActivate(i){
+  var it=_cmdkItems[i]; if(!it) return;
+  closeCmdPalette();
+  try{ it.run(); }catch(e){}
+}
+function cmdkKey(e){
+  if(e.key==='ArrowDown'){ e.preventDefault(); _cmdkIndex=Math.min(_cmdkIndex+1,_cmdkItems.length-1); cmdkHighlight(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _cmdkIndex=Math.max(_cmdkIndex-1,0); cmdkHighlight(); }
+  else if(e.key==='Enter'){ e.preventDefault(); cmdkActivate(_cmdkIndex); }
+  else if(e.key==='Escape'){ e.preventDefault(); closeCmdPalette(); }
+}
+function openCmdPalette(){
+  var ov=document.getElementById('cmdk-overlay'); if(!ov) return;
+  ov.classList.remove('hidden');
+  var inp=document.getElementById('cmdk-input'); if(inp){ inp.value=''; }
+  cmdkRender('');
+  setTimeout(function(){ if(inp) inp.focus(); },20);
+}
+function closeCmdPalette(){
+  var ov=document.getElementById('cmdk-overlay'); if(ov) ov.classList.add('hidden');
+}
+function cmdkIsOpen(){ var ov=document.getElementById('cmdk-overlay'); return ov && !ov.classList.contains('hidden'); }
+
 // ═══ KEYBOARD SHORTCUTS ═══
 function openShortcutsModal(){var m=document.getElementById('shortcuts-modal');if(m){m.classList.remove('hidden');m.style.display='flex';}}
 function closeShortcutsModal(){var m=document.getElementById('shortcuts-modal');if(m){m.classList.add('hidden');m.style.display='none';}}
@@ -4935,12 +5157,14 @@ function closeShortcutsModal(){var m=document.getElementById('shortcuts-modal');
 document.addEventListener('keydown', function(e){
   var tag=(e.target&&e.target.tagName)||'';
   var typing=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable));
-  // Ctrl/Cmd + K → focus search (works even while typing)
+  // Ctrl/Cmd + K → open command palette (works even while typing)
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==='k'||e.key==='K')){
-    e.preventDefault();var s=document.getElementById('global-search');if(s){s.focus();s.select();}
+    e.preventDefault();
+    if(cmdkIsOpen()){ closeCmdPalette(); } else { openCmdPalette(); }
     return;
   }
   if(e.key==='Escape'){
+    if(cmdkIsOpen()){ closeCmdPalette(); e.preventDefault(); return; }
     var modals=['net-entity-modal','add-deal-modal','simulator-modal','objection-modal','tearsheet-modal','network-modal','shortcuts-modal','quick-note-modal'];
     var any=false;
     modals.forEach(function(id){var m=document.getElementById(id);if(m&&!m.classList.contains('hidden')){m.classList.add('hidden');m.style.display='none';any=true;}});
@@ -5484,6 +5708,18 @@ function mandSelectStartup(idx){
   </div>
 </div>
 
+<!-- ── Command Palette (Cmd/Ctrl+K) ──────────────────────────────────────── -->
+<div id="cmdk-overlay" class="hidden" onclick="if(event.target===this)closeCmdPalette()">
+  <div class="cmdk-box" role="dialog" aria-label="Command palette">
+    <div class="cmdk-input-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input id="cmdk-input" type="text" placeholder="Search deals, investors, startups… or type a command" autocomplete="off" spellcheck="false" oninput="cmdkRender(this.value)" onkeydown="cmdkKey(event)">
+      <span class="cmdk-hint">Esc</span>
+    </div>
+    <div id="cmdk-results"></div>
+  </div>
+</div>
+
 <!-- ── Shortcuts Modal ───────────────────────────────────────────────────── -->
 <div id="shortcuts-modal" class="hidden" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeShortcutsModal()">
   <div style="max-width:460px;width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:24px">
@@ -5501,7 +5737,7 @@ function mandSelectStartup(idx){
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">O</kbd></td><td style="padding:8px 10px">Go to Outreach</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">M</kbd></td><td style="padding:8px 10px">Go to Mandate</td></tr>
 
-        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Ctrl+K</kbd></td><td style="padding:8px 10px">Focus global search</td></tr>
+        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Ctrl+K</kbd></td><td style="padding:8px 10px">Open command palette</td></tr>
         <tr><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Esc</kbd></td><td style="padding:8px 10px">Close any open modal</td></tr>
       </tbody>
     </table>
@@ -5541,6 +5777,12 @@ function toggleDarkMode(){
   var newDark = !isDark;
   localStorage.setItem('dark_mode', newDark?'1':'0');
   applyDarkModeState(newDark);
+}
+// Resolve the dark-mode preference: saved value wins; first visit follows the OS.
+function darkModePref(){
+  var s=localStorage.getItem('dark_mode');
+  if(s===null) return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  return s==='1';
 }
 function applyDarkModeState(dark){
   if(dark){
@@ -7370,15 +7612,31 @@ function getMetricSummary() {
   weekStart.setDate(weekStart.getDate() + diff);
   weekStart.setHours(0,0,0,0);
   var ws = weekStart.toISOString();
+  // Previous week window [pws, ws)
+  var prevWeekStart = new Date(weekStart); prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+  var pws = prevWeekStart.toISOString();
   // Month start
   var ms = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   // Year start
   var ys = new Date(now.getFullYear(), 0, 1).toISOString();
 
-  function countByDate(arr, field) {
-    var w=0,m=0,y=0;
-    arr.forEach(function(r){ var d=r[field]||r.dateAdded||r.createdAt||''; if(!d)return; if(d>=ys)y++; if(d>=ms)m++; if(d>=ws)w++; });
-    return {w:w,m:m,y:y};
+  // Count records whose date falls in [start, end). end null = open-ended (up to now).
+  function countWindow(arr, field, start, end) {
+    var c = 0;
+    arr.forEach(function(r){
+      var d = r[field] || r.dateAdded || r.createdAt || '';
+      if(!d) return;
+      if(d >= start && (!end || d < end)) c++;
+    });
+    return c;
+  }
+  function buildMetric(arr, field) {
+    return {
+      w: countWindow(arr, field, ws, null),
+      m: countWindow(arr, field, ms, null),
+      y: countWindow(arr, field, ys, null),
+      pw: countWindow(arr, field, pws, ws)   // previous full week, for trend
+    };
   }
 
   var invs = netLoad('investors');
@@ -7386,46 +7644,56 @@ function getMetricSummary() {
   var sts = netLoad('startups');
   var pipeline = getPipeline();
 
-  var invAdded = countByDate(invs, 'dateAdded');
-  var partAdded = countByDate(parts, 'dateAdded');
-  var stAdded = countByDate(sts, 'dateAdded');
+  var invAdded = buildMetric(invs, 'dateAdded');
+  var partAdded = buildMetric(parts, 'dateAdded');
+  var stAdded = buildMetric(sts, 'dateAdded');
 
-  // Deals closed = stage "Closed Won", date from lastUpdated or savedAt
-  var closed = pipeline.filter(function(d){ return d.stage==='Closed Won'; });
-  var dealsClosed = countByDate(closed, 'lastUpdated');
-  // fallback to savedAt for deals without lastUpdated
-  pipeline.filter(function(d){ return d.stage==='Closed Won' && !d.lastUpdated && d.savedAt; }).forEach(function(d){
-    var dt = d.savedAt;
-    if(dt>=ys) dealsClosed.y++;
-    if(dt>=ms) dealsClosed.m++;
-    if(dt>=ws) dealsClosed.w++;
+  // Deals closed = stage "Closed Won"; date = lastUpdated, falling back to savedAt
+  var closed = pipeline.filter(function(d){ return d.stage==='Closed Won'; }).map(function(d){
+    return { _d: d.lastUpdated || d.savedAt || '' };
   });
+  var dealsClosed = buildMetric(closed, '_d');
 
   return { invAdded:invAdded, partAdded:partAdded, stAdded:stAdded, dealsClosed:dealsClosed };
 }
 
-// Override the existing uxRenderWeekBar to show 4 metrics with week/month/year
+// Trend (week-over-week) — returns {cls,arrow,text}. Neutral "—" when no prior data.
+function metricTrend(vals) {
+  var cur = vals.w, prev = vals.pw;
+  if(!prev && !cur) return { cls:'trend-flat', arrow:'', text:'—' };
+  if(!prev && cur > 0) return { cls:'trend-up', arrow:'▲', text:'+'+cur };
+  var delta = cur - prev;
+  if(delta === 0) return { cls:'trend-flat', arrow:'', text:'0%' };
+  var pct = Math.round(delta / prev * 100);
+  if(delta > 0) return { cls:'trend-up', arrow:'▲', text:'+'+pct+'%' };
+  return { cls:'trend-down', arrow:'▼', text:pct+'%' };
+}
+
+// Override the existing uxRenderWeekBar to show 4 metrics with week/month/year + trend
 (function() {
   function l7RenderWeekBar() {
     var el = document.getElementById('home-week-bar');
     if (!el) return;
     var s = getMetricSummary();
-    function card(label, vals) {
-      return '<div class="ux-week-card" style="flex-direction:column;align-items:flex-start;gap:6px">'
-        +'<div class="ux-week-label" style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">'+label+'</div>'
-        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%">'
-          +'<div style="text-align:center"><div class="ux-week-val" style="font-size:1.15rem">'+vals.w+'</div><div class="ux-week-sub">week</div></div>'
-          +'<div style="text-align:center;border-left:1px solid var(--border2);border-right:1px solid var(--border2)"><div class="ux-week-val" style="font-size:1.15rem">'+vals.m+'</div><div class="ux-week-sub">month</div></div>'
-          +'<div style="text-align:center"><div class="ux-week-val" style="font-size:1.15rem">'+vals.y+'</div><div class="ux-week-sub">year</div></div>'
+    function card(label, vals, accent) {
+      var t = metricTrend(vals);
+      return '<div class="ux-week-card" style="--mc-accent:'+accent+'">'
+        +'<div class="mc-head">'
+          +'<div class="ux-week-label" style="font-size:10px;text-transform:uppercase;letter-spacing:.08em">'+label+'</div>'
+          +'<span class="trend-chip '+t.cls+'" title="vs. previous week">'+(t.arrow?t.arrow+' ':'')+t.text+'</span>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%;margin-top:8px">'
+          +'<div style="text-align:center"><div class="ux-week-val">'+vals.w+'</div><div class="ux-week-sub">week</div></div>'
+          +'<div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)"><div class="ux-week-val">'+vals.m+'</div><div class="ux-week-sub">month</div></div>'
+          +'<div style="text-align:center"><div class="ux-week-val">'+vals.y+'</div><div class="ux-week-sub">year</div></div>'
         +'</div>'
         +'</div>';
     }
     el.innerHTML =
-      card('Investors Added', s.invAdded) +
-      card('Partners Added', s.partAdded) +
-      card('Startups Added', s.stAdded) +
-      card('Deals Closed', s.dealsClosed);
-    el.style.gridTemplateColumns = 'repeat(4,1fr)';
+      card('Investors Added', s.invAdded, 'var(--blue)') +
+      card('Partners Added', s.partAdded, 'var(--accent)') +
+      card('Startups Added', s.stAdded, 'var(--amber)') +
+      card('Deals Closed', s.dealsClosed, 'var(--green)');
   }
   window.uxRenderWeekBar = l7RenderWeekBar;
 })();
