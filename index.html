@@ -807,17 +807,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: none; }
   }
-  .net-subtab-panel { animation: l7PageIn 140ms ease both; }
-}
-
-/* ═══ SUCCESS FLASH ═══ */
-@keyframes l7SaveFlash {
-  0%   { box-shadow: 0 0 0 0 rgba(24,154,94,.55); }
-  55%  { box-shadow: 0 0 0 7px rgba(24,154,94,0); }
-  100% { box-shadow: none; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .save-flash { animation: l7SaveFlash .65s ease; }
 }
 
 /* ═══ TOAST SYSTEM (unified bottom-right) ═══ */
@@ -869,81 +858,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     to { opacity: 0; transform: translateX(18px); }
   }
 }
-
-/* ═══ NETWORK TABLE — sticky header + frozen column ═══ */
-.net-table-wrap {
-  overflow-x: auto; overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  position: relative; border-radius: var(--radius-md,10px);
-}
-.net-tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
-.net-tbl th, .net-tbl td {
-  padding: 9px 12px; border-bottom: 1px solid var(--border);
-  text-align: left; vertical-align: middle; white-space: nowrap;
-}
-.net-tbl thead th {
-  background: var(--s1); color: var(--muted); font-weight: 600;
-  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-  position: sticky; top: 0; z-index: 2;
-  border-bottom: 2px solid var(--border2);
-}
-/* Frozen expand-toggle column */
-.net-th-exp {
-  width: 30px; padding: 6px 4px !important;
-  position: sticky; left: 0; z-index: 3;
-  background: var(--s1);
-}
-.net-td-expand {
-  width: 30px; padding: 6px 4px !important;
-  position: sticky; left: 0; z-index: 1;
-  background: var(--s1);
-}
-/* Frozen name column (2nd child — after expand toggle) */
-.net-tbl thead th.net-th-name { position: sticky; left: 30px; z-index: 3; background: var(--s1); box-shadow: 2px 0 5px rgba(0,0,0,.06); }
-.net-tbl tbody td.net-td-name  { position: sticky; left: 30px; z-index: 1; background: var(--s1); box-shadow: 2px 0 5px rgba(0,0,0,.06); }
-/* Row hover syncs sticky cells */
-.net-tr:hover td { background: var(--s2) !important; }
-.net-expand-btn {
-  background: transparent; border: none; cursor: pointer;
-  color: var(--muted); font-size: 11px; padding: 3px 6px;
-  border-radius: 4px; line-height: 1; transition: color var(--t-fast), background var(--t-fast);
-  display: flex; align-items: center; justify-content: center;
-}
-.net-expand-btn:hover { color: var(--accent); background: var(--accent-soft); }
-/* Expanded detail row */
-.net-detail-row td { padding: 0 !important; white-space: normal; }
-@media (prefers-reduced-motion: no-preference) {
-  .net-detail-row { display: none; }
-  .net-detail-row.open { display: table-row; animation: l7PageIn 150ms ease; }
-}
-.net-detail-panel {
-  padding: 14px 16px 16px;
-  background: color-mix(in srgb, var(--accent) 4%, var(--s2));
-  border-top: 1px solid var(--border);
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px 18px;
-}
-.net-detail-kv { display: flex; flex-direction: column; gap: 2px; }
-.net-detail-k  { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
-.net-detail-v  { color: var(--text); font-size: 12.5px; word-break: break-word; white-space: normal; }
-/* Due-date row highlight */
-.net-tr.net-row-due td:nth-child(2) { border-left: 3px solid var(--red); }
-
-/* ═══ ENHANCED EMPTY STATES ═══ */
-.l7-empty { text-align: center; padding: 48px 20px; }
-.l7-empty-icon { font-size: 36px; margin-bottom: 10px; opacity: .75; }
-.l7-empty-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.l7-empty-sub { font-size: 13px; color: var(--muted); line-height: 1.65; }
-
-/* ═══ BREADCRUMB ═══ */
-.l7-breadcrumb {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 11.5px; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap;
-}
-.l7-breadcrumb a { color: var(--accent); text-decoration: none; }
-.l7-breadcrumb a:hover { text-decoration: underline; }
-.l7-breadcrumb-sep { color: var(--border2); }
-.l7-breadcrumb-cur { color: var(--text); font-weight: 600; }
 
 /* ═══ DATE PICKER PRESETS ═══ */
 .l7-datepick-wrap { position: relative; }
@@ -1576,7 +1490,6 @@ window.SettingsDB = (function(){
 
   <!-- NETWORK PAGE -->
   <div id="page-network" class="page">
-    <nav id="l7-breadcrumb" class="l7-breadcrumb" aria-label="Breadcrumb"><a href="#" onclick="showTab('home',document.querySelector('.nav-tab[data-tab=home]'));return false" style="color:var(--accent);text-decoration:none">Home</a><span class="l7-breadcrumb-sep">›</span><span class="l7-breadcrumb-cur">Network</span></nav>
     <div class="section-bar">
       <div class="section-title">Network</div>
       <input type="text" id="net-search" placeholder="Search..." style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--s2);color:var(--text);width:180px" oninput="renderNetworkTab()">
@@ -2330,8 +2243,6 @@ function showTab(name,btn){
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   var _pg=document.getElementById('page-'+name); if(!_pg) return; _pg.classList.add('active');
   if(btn) btn.classList.add('active');
-  // Update breadcrumb for top-level navigation
-  l7BreadcrumbSet(name);
   if(name==='pipeline'){
     renderKanban();renderPipelineList();renderNetPipelineSection();
   }
@@ -2346,16 +2257,6 @@ function showTab(name,btn){
   if(name==='outreach'){ outInit(); }
   if(name==='finances' && window.renderFinancesTab) { renderFinancesTab(); setTimeout(renderFinChart,60); }
   if(name==='backup' && window.Log7Backup) Log7Backup.renderPanel('backup-panel-container');
-}
-// Breadcrumb helper
-function l7BreadcrumbSet(tab, entity){
-  var el=document.getElementById('l7-breadcrumb');
-  if(!el) return;
-  var TAB_LABELS={home:'Home',network:'Network',pipeline:'Pipeline',finances:'Finances',outreach:'Outreach',docs:'Docs',audit:'Audit Log',backup:'Backup',mandate:'Mandate'};
-  var parts=['<a href="#" onclick="showTab(\'home\',document.querySelector(\'.nav-tab[data-tab=home]\'));return false" style="color:var(--accent);text-decoration:none">Home</a>'];
-  if(tab&&tab!=='home') parts.push('<span class="l7-breadcrumb-sep">›</span>','<span class="l7-breadcrumb-cur">'+(TAB_LABELS[tab]||tab)+'</span>');
-  if(entity) parts.push('<span class="l7-breadcrumb-sep">›</span>','<span class="l7-breadcrumb-cur">'+escapeHtml(entity)+'</span>');
-  el.innerHTML=parts.join('');
 }
 function toggleSettings(){
   var wrap = document.getElementById('settings-wrap');
@@ -4108,15 +4009,6 @@ function switchNetTab(tab, btn){
   document.querySelectorAll('[id^="net-tab-"]').forEach(b=>b.classList.remove('active'));
   document.getElementById('net-panel-'+tab).style.display='block';
   if(btn) btn.classList.add('active');
-  var TAB_BC={partnerships:'Partnerships',investors:'Investors',startups:'Startups',recyclebin:'Recycle Bin'};
-  l7BreadcrumbSet('network', TAB_BC[tab]||tab);
-  var bc = document.getElementById('net-breadcrumb');
-  var bct = document.getElementById('net-breadcrumb-tab');
-  var bcs = document.getElementById('net-breadcrumb-sep');
-  var bcn = document.getElementById('net-breadcrumb-name');
-  if(bc && bct){ bc.style.display='flex'; bct.textContent = tab==='recyclebin'?'Recycle Bin': tab.charAt(0).toUpperCase()+tab.slice(1); }
-  if(bcs) bcs.style.display='none';
-  if(bcn) bcn.textContent='';
   if(tab==='recyclebin'){ renderRecycleBin(); return; }
   renderNetworkTab();
   if(tab==='investors') netFetchInvestors();
@@ -4219,9 +4111,7 @@ function renderNetList(tab){
     });
   }
   if(!rows.length){
-    el.innerHTML = _srch.trim()
-      ? '<div class="l7-empty"><div class="l7-empty-icon">🔍</div><div class="l7-empty-title">No results</div><div class="l7-empty-sub">No entries match "<strong>'+escapeHtml(_srch.trim())+'</strong>".</div></div>'
-      : netEmptyState(tab);
+    el.innerHTML = '<div class="empty" style="padding:20px">No entries yet. Click + Add New to get started.</div>';
     return;
   }
   var fields = netFields(tab);
@@ -4232,190 +4122,112 @@ function renderNetList(tab){
   var showNotes = tab==='investors'||tab==='partnerships';
   var today = new Date().toISOString().slice(0,10);
   var matchScores = tab==='investors' ? JSON.parse(localStorage.getItem('l7_match_scores')||'{}') : {};
-  // Count total columns for detail-row colspan
-  var colCount = 1 /*expand*/ + visibleFields.length + 1 /*phone*/ + (showEmail?1:0) + (showNotes?1:0) + 2 /*followup+added*/
-    + ((tab==='investors'||tab==='startups')?1:0) + (tab==='investors'?2:0) + 1 /*actions*/;
-
-  var html = '<div class="net-table-wrap"><table class="net-tbl" role="table">'
-    + '<thead><tr>'
-    + '<th class="net-th-exp" aria-label="Expand"></th>'
-    + visibleFields.map((f,i)=>'<th'+(i===0?' class="net-th-name"':'')+' scope="col">'+f.label+'</th>').join('')
-    + '<th scope="col">Contact No.</th>'
-    + (showEmail?'<th scope="col">Email</th>':'')
-    + (showNotes?'<th scope="col">Notes</th>':'')
-    + '<th scope="col">Follow-up</th>'
-    + '<th scope="col">Added</th>'
-    + ((tab==='investors'||tab==='startups')?'<th scope="col">Docs</th>':'')
-    + (tab==='investors'?'<th scope="col">Match</th>':'')
-    + (tab==='investors'?'<th scope="col">Source</th>':'')
-    + '<th scope="col"><span class="sr-only">Actions</span></th>'
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    + '<thead><tr style="border-bottom:1px solid var(--border)">'
+    + visibleFields.map(f=>'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">'+f.label+'</th>').join('')
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Contact No.</th>'
+    + (showEmail?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Email</th>':'')
+    + (showNotes?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600;max-width:160px">Notes</th>':'')
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Follow-up</th>'
+    + '<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Added</th>'
+    + ((tab==='investors'||tab==='startups')?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Docs</th>':'')
+    + (tab==='investors'?'<th style="padding:8px 10px;text-align:left;color:var(--muted);font-weight:600">Match</th>':'')
+    + (tab==='investors'?'<th style="padding:8px 10px"></th>':'')
+    + '<th style="padding:8px 10px"></th>'
     + '</tr></thead><tbody>';
 
   var _nkRender = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
   rows.forEach(function(row){
     var isDue = row.followUpDate && normalizeDateStr(row.followUpDate) <= today;
+    // Use primary name as the edit key — immune to id corruption (null/NaN/'')
     var _epn = escapeQ(String(row[_nkRender]||row.name||''));
-    var rowId = String(row.id||row[_nkRender]||Math.random());
-    var safeRowId = rowId.replace(/[^a-zA-Z0-9_-]/g,'_');
-    html += '<tr class="net-tr'+(isDue?' net-row-due':'')+'" data-row-id="'+safeRowId+'"'
-      + ' tabindex="0" role="row" onkeydown="netTableKeyNav(event)"'
-      + ' title="Press Enter to expand · Double-click to edit"'
-      + ' ondblclick="editNetEntry(\''+tab+'\',\''+_epn+'\')">';
-    // Expand toggle cell
-    html += '<td class="net-td-expand"><button class="net-expand-btn" aria-label="Expand row" aria-expanded="false" onclick="netToggleExpand(this)">▸</button></td>';
-    // First visible field (name) — frozen column
-    var firstField = visibleFields[0];
-    if(firstField){
-      var val0 = row[firstField.key]||'—';
-      html += '<td class="net-td-name">';
-      if(firstField.key==='status'){
-        var sc0 = val0==='Active'||val0==='Portfolio'?'var(--green)':val0==='Prospecting'||val0==='Evaluating'||val0==='Warm'?'var(--amber)':val0==='Closed'||val0==='Passed'||val0==='Cold'?'var(--red)':'var(--muted)';
-        html += '<span class="badge" style="background:transparent;border-color:'+sc0+';color:'+sc0+'">'+escapeHtml(val0)+'</span>';
-      } else { html += '<strong style="font-weight:600">'+escapeHtml(String(val0).slice(0,40))+'</strong>'; }
-      html += '</td>';
-    }
-    // Remaining visible fields
-    visibleFields.slice(1).forEach(function(f){
+    html += '<tr style="border-bottom:1px solid var(--border);cursor:pointer" title="Double-click to edit"'+(isDue?' class="net-row-due"':'')+' ondblclick="editNetEntry(\''+tab+'\',\''+_epn+'\')" onmouseenter="this.style.background=\'var(--s2)\'" onmouseleave="this.style.background=\'\'">';
+    visibleFields.forEach(function(f){
       var val = row[f.key]||'—';
-      html += '<td>';
+      var cell = '<td style="padding:8px 10px;white-space:nowrap">';
       if(f.key==='status'){
         var sc = val==='Active'||val==='Portfolio'?'var(--green)':val==='Prospecting'||val==='Evaluating'||val==='Warm'?'var(--amber)':val==='Closed'||val==='Passed'||val==='Cold'?'var(--red)':'var(--muted)';
-        html += '<span class="badge" style="background:transparent;border-color:'+sc+';color:'+sc+'">'+escapeHtml(val)+'</span>';
-      } else { html += escapeHtml(String(val).slice(0,40)); }
-      html += '</td>';
+        cell += '<span class="badge" style="background:transparent;border-color:'+sc+';color:'+sc+'">'+escapeHtml(val)+'</span>';
+      } else {
+        cell += escapeHtml(String(val).slice(0,40));
+      }
+      html += cell + '</td>';
     });
-    // Phone
+    // Phone cell
     var phone = row[phoneKey]||'—';
-    html += '<td style="color:var(--muted)">'+(phone!=='—'?'<a href="tel:'+escapeHtml(phone)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(phone)+'</a>':'—')+'</td>';
-    // Email
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+(phone!=='—'?'<a href="tel:'+escapeHtml(phone)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(phone)+'</a>':'—')+'</td>';
+    // Email cell
     if(showEmail){
       var email = row[emailKey]||'';
-      html += '<td style="color:var(--muted)">'+(email?'<a href="mailto:'+escapeHtml(email)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(email)+'</a>':'—')+'</td>';
+      html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'
+        +(email?'<a href="mailto:'+escapeHtml(email)+'" style="color:var(--muted);text-decoration:none">'+escapeHtml(email)+'</a>':'—')
+        +'</td>';
     }
-    // Notes
+    // Notes cell
     if(showNotes){
       var notesVal = row.notes||'';
       var notesTrunc = notesVal.slice(0,60)+(notesVal.length>60?'…':'');
-      html += '<td style="max-width:160px;color:var(--muted);font-size:11.5px;white-space:normal" title="'+escapeHtml(notesVal)+'">'+escapeHtml(notesTrunc||'—')+'</td>';
+      html += '<td style="padding:8px 10px;max-width:160px;color:var(--muted);font-size:11.5px" title="'+escapeHtml(notesVal)+'">'+escapeHtml(notesTrunc||'—')+'</td>';
     }
-    // Follow-up
+    // Follow-up date cell (normalized to YYYY-MM-DD on read)
     var fuDate = row.followUpDate ? normalizeDateStr(row.followUpDate) : '';
     var fuColor = !fuDate ? 'var(--muted)' : fuDate < today ? 'var(--red)' : fuDate === today ? 'var(--amber)' : 'var(--green)';
-    var fuCell = row.followUpDone ? '<span style="color:var(--green);font-weight:600;font-size:11px">✓ Done</span>' : (fuDate||'—')+(isDue?' ⚑':'');
-    html += '<td style="color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+fuCell+'</td>';
-    html += '<td style="color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
-    // Docs
+    var fuCell = row.followUpDone
+      ? '<span style="color:var(--green);font-weight:600;font-size:11px">&#10003; Done</span>'
+      : (fuDate||'—')+(isDue?' ⚑':'');
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:'+fuColor+';font-weight:'+(isDue?'600':'400')+'">'+fuCell+'</td>';
+    html += '<td style="padding:8px 10px;white-space:nowrap;color:var(--muted)">'+formatDate(row.dateAdded)+'</td>';
     if(tab==='investors'||tab==='startups'){
       var entType = tab==='investors' ? 'investor' : 'startup';
       var entName = tab==='investors' ? (row.investorName||row.name||'') : (row.companyName||row.name||'');
       var docCount = (window._docCounts||{})[entType+':'+entName] || 0;
-      html += '<td>'+(docCount>0?'<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+entType+'\',\''+escapeQ(entName)+'\')">📁 '+docCount+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>';
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (docCount>0
+            ? '<span class="badge" style="cursor:pointer;background:var(--accent);color:#fff;border-color:transparent" onclick="filterDocsByEntity(\''+entType+'\',\''+escapeQ(entName)+'\')">📁 '+docCount+'</span>'
+            : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
     }
-    // Match score
     if(tab==='investors'){
       var invName = row.investorName||row.name||'';
       var ms = matchScores[invName];
       var msColor = ms!=null ? (ms>=70?'#4caf50':ms>=40?'#ff9800':'#f44336') : '';
       var msData = ms!=null ? matchScores[invName] : null;
       var msTip = msData ? escapeHtml((msData.verdict||'')+(msData.reasons&&msData.reasons.length?'\nWhy: '+msData.reasons.slice(0,2).join('; '):'')+(msData.concerns&&msData.concerns.length?'\nConcerns: '+msData.concerns.slice(0,2).join('; '):'')) : '';
-      html += '<td>'+(ms!=null?'<span title="'+msTip+'" style="display:inline-block;padding:2px 8px;border-radius:10px;background:'+msColor+';color:#fff;font-size:11px;font-weight:700;cursor:help">'+ms+'/100</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>';
+      html += '<td style="padding:8px 10px;white-space:nowrap">'
+        + (ms!=null ? '<span title="'+msTip+'" style="display:inline-block;padding:2px 8px;border-radius:10px;background:'+msColor+';color:#fff;font-size:11px;font-weight:700;cursor:help">'+ms+'/100</span>' : '<span style="color:var(--muted);font-size:11px">—</span>')
+        + '</td>';
     }
-    // Source badge
     if(tab==='investors'){
       var badge = row._fromSheet
-        ? (row._localOverride ? '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--amber);color:var(--amber)">Edited</span>'
+        ? (row._localOverride
+            ? '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--amber);color:var(--amber)">Edited</span>'
             : '<span class="badge" style="font-size:9px;padding:2px 5px;opacity:0.6">Sheet</span>')
         : '<span class="badge" style="font-size:9px;padding:2px 5px;background:transparent;border-color:var(--muted);color:var(--muted)">Manual</span>';
-      html += '<td>'+badge+'</td>';
+      html += '<td style="padding:8px 10px;white-space:nowrap">'+badge+'</td>';
     }
-    // Actions
     var resetBtn = (tab==='investors'&&row._fromSheet&&row._localOverride)
-      ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="netResetToSheet(\''+row.id+'\')">Reset</button>' : '';
+      ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="netResetToSheet(\''+row.id+'\')">Reset</button>'
+      : '';
     var rowPrimaryName = tab==='investors'?(row.investorName||row.name||''):tab==='startups'?(row.companyName||row.name||''):(row.partnerName||row.name||'');
     var rowEmail = row[emailKey]||'';
-    var emailBtn = '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px'+(rowEmail?'':';opacity:0.45;cursor:default')+'"'
-      + ' aria-label="'+(rowEmail?'Email '+escapeHtml(rowEmail):'No email on file')+'"'
-      + ' onclick="netEmailContact(\''+escapeQ(rowEmail)+'\',\''+escapeQ(rowPrimaryName)+'\')"'
-      + ' title="'+(rowEmail?'Email '+escapeHtml(rowEmail):'No email on file')+'">✉ Email</button>';
-    html += '<td style="white-space:nowrap">'
+    var emailBtn = '<button class="action-btn secondary" '
+      + 'style="padding:3px 8px;font-size:11px;margin-right:4px'+(rowEmail?'':';opacity:0.45;cursor:default')+'" '
+      + 'onclick="netEmailContact(\''+escapeQ(rowEmail)+'\',\''+escapeQ(rowPrimaryName)+'\')" '
+      + 'title="'+(rowEmail?'Email '+escapeHtml(rowEmail):'No email on file')+'"'
+      + '>&#x2709; Email</button>';
+    html += '<td style="padding:8px 10px;white-space:nowrap">'
       + resetBtn
       + (isInNetPipeline(tab, row.id)
-          ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px;color:var(--green);border-color:var(--green)" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">✓ Pipeline</button>'
+          ? '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px;color:var(--green);border-color:var(--green)" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">&#x2713; In Pipeline</button>'
           : '<button class="action-btn secondary" style="padding:3px 8px;font-size:10px;margin-right:4px" onclick="openNetPipelineModal(\''+tab+'\',\''+row.id+'\')">+ Pipeline</button>')
       + emailBtn
-      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openFollowupModal(\''+tab+'\',\''+row.id+'\')" aria-label="Set follow-up">⚑ Follow-up</button>'
+      + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="openFollowupModal(\''+tab+'\',\''+row.id+'\')">&#9873; Follow-up</button>'
       + '<button class="action-btn secondary" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editNetEntry(\''+tab+'\',\''+_epn+'\')">Edit</button>'
-      + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')" aria-label="Delete '+escapeHtml(rowPrimaryName)+'">Delete</button>'
+      + '<button class="action-btn danger" style="padding:3px 8px;font-size:11px" onclick="deleteNetEntry(\''+tab+'\',\''+row.id+'\')">Delete</button>'
       + '</td></tr>';
-    // ── Expandable detail row ──
-    var detailKVs = fields.map(function(f){
-      var v = row[f.key]||'';
-      return '<div class="net-detail-kv"><span class="net-detail-k">'+f.label+'</span><span class="net-detail-v">'+(v?escapeHtml(String(v)):'<span style="color:var(--muted)">—</span>')+'</span></div>';
-    }).join('');
-    html += '<tr class="net-detail-row" id="net-detail-'+safeRowId+'">'
-      + '<td colspan="'+colCount+'"><div class="net-detail-panel">'+detailKVs+'</div></td>'
-      + '</tr>';
   });
-  html += '</tbody></table></div>';
+  html += '</tbody></table>';
   el.innerHTML = html;
-}
-
-function netToggleExpand(btn){
-  var row = btn.closest('tr');
-  if(!row) return;
-  var table = btn.closest('table');
-  var rowId = row.dataset.rowId;
-  var detail = document.getElementById('net-detail-'+rowId);
-  if(!detail) return;
-  var isOpen = detail.classList.contains('open');
-  // Close all
-  if(table){
-    table.querySelectorAll('.net-detail-row.open').forEach(function(d){ d.classList.remove('open'); d.style.display='none'; });
-    table.querySelectorAll('.net-expand-btn').forEach(function(b){ b.textContent='▸'; b.setAttribute('aria-expanded','false'); });
-  }
-  if(!isOpen){
-    detail.classList.add('open');
-    detail.style.display='table-row';
-    btn.textContent='▾';
-    btn.setAttribute('aria-expanded','true');
-  }
-}
-
-function netTableKeyNav(e){
-  if(!['ArrowUp','ArrowDown','Enter','Escape'].includes(e.key)) return;
-  var row = e.target.closest('tr.net-tr');
-  if(!row) return;
-  e.preventDefault();
-  if(e.key==='ArrowDown'){
-    var next = row.nextElementSibling;
-    while(next && !next.classList.contains('net-tr')) next = next.nextElementSibling;
-    if(next) next.focus();
-  } else if(e.key==='ArrowUp'){
-    var prev = row.previousElementSibling;
-    while(prev && !prev.classList.contains('net-tr')) prev = prev.previousElementSibling;
-    if(prev) prev.focus();
-  } else if(e.key==='Enter'){
-    var expBtn = row.querySelector('.net-expand-btn');
-    if(expBtn) netToggleExpand(expBtn);
-  } else if(e.key==='Escape'){
-    var expBtn2 = row.querySelector('.net-expand-btn[aria-expanded="true"]');
-    if(expBtn2) netToggleExpand(expBtn2);
-    row.focus();
-  }
-}
-
-function netEmptyState(tab, msg){
-  var icons = {investors:'🏦',startups:'🚀',partnerships:'🤝',recyclebin:'🗑️'};
-  var titles = {investors:'No investors yet',startups:'No startups yet',partnerships:'No partnerships yet',recyclebin:'Recycle bin is empty'};
-  var icon = icons[tab]||'📂';
-  var title = titles[tab]||'No entries yet';
-  var sub = msg || (tab==='recyclebin' ? 'Deleted items will appear here.' : 'Click <strong>+ Add New</strong> to add your first '+tab.slice(0,-1)+'.');
-  return '<div class="l7-empty">'
-    + '<div class="l7-empty-icon">'+icon+'</div>'
-    + '<div class="l7-empty-title">'+title+'</div>'
-    + '<div class="l7-empty-sub">'+sub+'</div>'
-    + (tab!=='recyclebin' ? '<button class="action-btn primary" style="margin-top:14px" onclick="openNetworkModal(\''+tab+'\')">+ Add '+tab.slice(0,-1).replace(/^\w/,function(c){return c.toUpperCase();})+'</button>' : '')
-    + '</div>';
 }
 
 // ── MODAL ──────────────────────────────────────────────────────
@@ -4541,20 +4353,6 @@ function saveNetworkEntry(){
   if(typeof uxResetDirty==='function') uxResetDirty();
   closeNetworkModal();
   renderNetList(tab);
-  // Flash the saved row to confirm success
-  (function(){
-    var nameKey = tab==='investors'?'investorName':tab==='startups'?'companyName':'partnerName';
-    var savedName = entry[nameKey]||'';
-    var rows2 = document.querySelectorAll('#net-list-'+tab+' .net-tr');
-    for(var _i=0;_i<rows2.length;_i++){
-      var btn = rows2[_i].querySelector('.net-td-name strong, .net-td-name .badge');
-      if(btn && (btn.textContent||'').slice(0,40).toLowerCase().indexOf((savedName||'').slice(0,40).toLowerCase())!==-1){
-        rows2[_i].classList.add('save-flash');
-        rows2[_i].addEventListener('animationend',function(){ this.classList.remove('save-flash'); },{once:true});
-        break;
-      }
-    }
-  })();
   if(typeof rebuildFollowupsStore==='function') rebuildFollowupsStore();
   refreshNetFollowups();
   addAuditEntry('network', (_netEditId?'Updated':'Added')+' '+tab.slice(0,-1)+': '+netPrimaryKey(tab, entry), tab);
@@ -4587,7 +4385,7 @@ function renderRecycleBin(){
   getPipeline().filter(function(i){ return !!i.deletedAt; }).forEach(function(i){
     items.push({_tab:'pipeline',_type:'pipeline',_name:(i.investor||'')+(i.investor&&i.startup?' ↔ ':'' )+(i.startup||''),_label:'Pipeline Deal',_deletedAt:i.deletedAt,_startup:i.startup,_investor:i.investor,_id:i.id});
   });
-  if(!items.length){ el.innerHTML=netEmptyState('recyclebin'); return; }
+  if(!items.length){ el.innerHTML='<div class="empty" style="padding:20px">Nothing in the recycle bin.</div>'; return; }
   items.sort(function(a,b){ return (b._deletedAt||'').localeCompare(a._deletedAt||''); });
   var html = items.map(function(item){
     var dt = item._deletedAt ? new Date(item._deletedAt).toLocaleString('en-IN') : '—';
