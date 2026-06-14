@@ -682,8 +682,6 @@ window.SettingsDB = (function(){
     <button class="nav-tab" data-tab="pipeline" onclick="showTab('pipeline',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span class="tab-label">Pipeline</span></button>
     <button class="nav-tab" data-tab="finances" onclick="showTab('finances',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><rect x="2" y="13" width="4" height="8" rx="1"/><rect x="9" y="8" width="4" height="13" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/></svg></span><span class="tab-label">Finances</span></button>
     <button class="nav-tab" data-tab="outreach" onclick="showTab('outreach',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="tab-label">Outreach</span></button>
-    <div class="sb-section-label">Research</div>
-    <button class="nav-tab" data-tab="diligence" onclick="showTab('diligence',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><span class="tab-label">Diligence</span></button>
     <div class="sb-section-label">Admin</div>
     <button class="nav-tab" data-tab="docs" onclick="showTab('docs',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span><span class="tab-label">Docs</span></button>
     <button class="nav-tab" data-tab="audit" onclick="showTab('audit',this)"><span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span><span class="tab-label">Audit Log</span></button>
@@ -838,26 +836,6 @@ window.SettingsDB = (function(){
       <div class="stat"><div class="stat-value" id="home-hot-deals" style="color:var(--green)">0</div><div class="stat-label">Hot Deals</div></div>
     </div>
 
-    <!-- Revenue dashboard -->
-    <div id="rev-dashboard" data-home-block="rev-dashboard" class="card" style="margin-bottom:12px;padding:14px 16px">
-      <div class="card-header" style="padding-bottom:10px;margin-bottom:10px">
-        <div class="card-title">Revenue &amp; Mandate Tracker</div>
-        <div style="display:flex;gap:6px">
-          <button class="mini-btn" onclick="renderRevenueDashboard()">Refresh</button>
-          <button class="mini-btn" onclick="goToTab('mandate')">Mandates &#8599;</button>
-        </div>
-      </div>
-      <div class="rev-grid" id="rev-stats-grid">
-        <div class="rev-stat accent"><div class="rev-val" id="rev-active-mandates">—</div><div class="rev-lbl">Active Mandates</div></div>
-        <div class="rev-stat green"><div class="rev-val" id="rev-signed">—</div><div class="rev-lbl">Signed</div></div>
-        <div class="rev-stat"><div class="rev-val" id="rev-expected-fees">—</div><div class="rev-lbl">Expected Fees</div></div>
-        <div class="rev-stat"><div class="rev-val" id="rev-weighted-fees">—</div><div class="rev-lbl">Weighted Fees</div></div>
-        <div class="rev-stat amber"><div class="rev-val" id="rev-retainer-pending">—</div><div class="rev-lbl">Retainer Pending</div></div>
-        <div class="rev-stat green"><div class="rev-val" id="rev-this-month">—</div><div class="rev-lbl">Closing This Month</div></div>
-      </div>
-      <div id="rev-deal-flags" style="margin-top:8px"></div>
-    </div>
-
     <!-- Needs Attention strip -->
     <div id="home-needs-attention" data-home-block="needs-attention" style="margin-bottom:10px">
       <div class="na-strip" id="na-items">
@@ -892,7 +870,6 @@ window.SettingsDB = (function(){
             <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('outreach')">Send Outreach</button>
             <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('network')">Network</button>
             <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('mandate')">Generate Mandate</button>
-            <button class="action-btn secondary" style="width:100%;text-align:left;padding:7px 12px;font-size:12px" onclick="goToTab('diligence')">Diligence</button>
           </div>
         </div>
         <div class="card" data-home-block="overdue-followups" style="margin-bottom:12px">
@@ -1130,42 +1107,6 @@ window.SettingsDB = (function(){
 
 
   <!-- ═══ DILIGENCE ═══ -->
-  <div id="page-diligence" class="page">
-    <div class="section-bar">
-      <div class="section-title">Diligence Workspace</div>
-      <button class="ghost-btn" onclick="refreshDiligence()">Refresh</button>
-      <button class="ghost-btn" onclick="exportDiligenceCsv()">Export CSV</button>
-    </div>
-    <div class="module-banner">
-      <strong>Structured diligence tracker.</strong>
-      Track legal, finance, product, market, team, and customer validation across multiple sections. Assign owners and record notes per item.
-    </div>
-    <div id="diligence-ic-ready" style="margin-bottom:12px"></div>
-    <div class="grid-two">
-      <div>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Checklist</div>
-            <span class="badge" id="diligence-progress-badge"></span>
-          </div>
-          <div id="diligence-checklist"><div class="empty">Select a startup to begin diligence tracking.</div></div>
-        </div>
-      </div>
-      <div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Summary & Notes</div></div>
-          <div id="diligence-summary"><div class="empty">Checklist completion and diligence notes will appear here.</div></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Diligence Notes</div></div>
-          <div class="field">
-            <textarea id="diligence-notes" placeholder="Add team-level diligence notes..." oninput="saveDiligenceNotes()" style="min-height:140px"></textarea>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ AUDIT LOG ═══ -->
   <div id="page-audit" class="page">
     <div class="section-bar">
@@ -1192,7 +1133,7 @@ window.SettingsDB = (function(){
             <option value="match">Match runs</option>
             <option value="outreach">Outreach</option>
             <option value="pipeline">Pipeline changes</option>
-            <option value="diligence">Diligence</option>
+
             <option value="ic">IC votes</option>
             <option value="doc">Documents</option>
           </select>
@@ -1957,7 +1898,7 @@ window.onload = async () => {
   await initDocsDb();
   await loadData();
   refreshDocsSelectors();refreshHome();
-  refreshDiligence();renderKanban();renderPipelineList();renderNetPipelineSection();
+  renderKanban();renderPipelineList();renderNetPipelineSection();
   renderAuditLog();renderICVotes();
   refreshCapitalDisplay();
   if(key) setKeyStatus('Saved');
@@ -2166,9 +2107,7 @@ function refreshHome(){
   const pipeline=getPipeline(),today=new Date().toISOString().slice(0,10);
   // Startups: in-memory array loaded from Google Sheets (Match Studio), fallback to Network tab startups
   const netStartups=netLoad('startups');
-  // Item 7: prefer unique company count from pipeline; fall back to network/match studio counts
-  var pipelineCompanies=new Set(pipeline.map(function(i){return i.startup||'';}).filter(Boolean));
-  const startupCount=pipelineCompanies.size||((typeof startups!=='undefined'&&startups.length)?startups.length:netStartups.length);
+  const startupCount=netStartups.length;
   // Investors: merge manual Network entries + Google Sheet cache rows via netLoad
   const netInvestors=netLoad('investors');
   const netPartners=netLoad('partnerships');
@@ -2985,13 +2924,13 @@ function openAddDealModal(){
       + '</div>';
   } else {
     _addDealTags=[];
-    var stOpts  = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
-    var invOpts = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join('');
+    var stNames = sts.map(function(s){var n=s.companyName||s.name||'';return '<option value="'+escapeHtml(n)+'">';}).join('');
+    var invNames = invs.map(function(i){var n=i.investorName||i.name||'';return '<option value="'+escapeHtml(n)+'">';}).join('');
     var stageOpts = PIPELINE_STAGES.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
     var presetTags=['Hot 🔥','Waiting on docs','Partner intro needed','On hold','Follow up','Term sheet out'];
     var presetHtml=presetTags.map(function(t){return '<span onclick="addDealTag(\''+escapeQ(t)+'\')" style="cursor:pointer;display:inline-block;background:'+tagColor(t)+';color:#fff;border-radius:10px;padding:2px 9px;font-size:10px;margin:2px">'+escapeHtml(t)+'</span>';}).join('');
-    body.innerHTML = '<div class="field"><label>Startup</label><select id="add-deal-startup">'+stOpts+'</select></div>'
-      + '<div class="field"><label>Investor</label><select id="add-deal-investor">'+invOpts+'</select></div>'
+    body.innerHTML = '<div class="field"><label>Startup</label><input id="add-deal-startup" list="ad-startup-list" placeholder="Type to search startups…" autocomplete="off" style="width:100%"><datalist id="ad-startup-list">'+stNames+'</datalist></div>'
+      + '<div class="field"><label>Investor</label><input id="add-deal-investor" list="ad-investor-list" placeholder="Type to search investors…" autocomplete="off" style="width:100%"><datalist id="ad-investor-list">'+invNames+'</datalist></div>'
       + '<div class="field"><label>Stage</label><select id="add-deal-stage">'+stageOpts+'</select></div>'
       + '<div class="field"><label>Tags</label><div id="add-deal-tag-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:20px;margin-bottom:6px"></div><input id="add-deal-tag-input" placeholder="Type a tag, press Enter or comma" style="font-size:12px;width:100%" onkeydown="addDealTagOnKey(event)"><div style="margin-top:6px">'+presetHtml+'</div></div>'
       + '<button class="action-btn primary" style="width:100%;margin-top:8px" onclick="submitAddDeal()">Add to Pipeline</button>';
@@ -5014,7 +4953,7 @@ document.addEventListener('keydown', function(e){
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   if(key==='?'||e.key==='/'){ e.preventDefault(); openShortcutsModal(); return; }
   if(key==='n'){ e.preventDefault(); openAddDealModal(); return; }
-  var map={h:'home',p:'pipeline',d:'diligence',o:'outreach',m:'mandate'};
+  var map={h:'home',p:'pipeline',o:'outreach',m:'mandate'};
   if(map[key]){e.preventDefault();goToTab(map[key]);}
 });
 </script>
@@ -5561,7 +5500,7 @@ function mandSelectStartup(idx){
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">P</kbd></td><td style="padding:8px 10px">Go to Pipeline</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">O</kbd></td><td style="padding:8px 10px">Go to Outreach</td></tr>
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">M</kbd></td><td style="padding:8px 10px">Go to Mandate</td></tr>
-        <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">D</kbd></td><td style="padding:8px 10px">Go to Diligence</td></tr>
+
         <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Ctrl+K</kbd></td><td style="padding:8px 10px">Focus global search</td></tr>
         <tr><td style="padding:8px 10px"><kbd style="background:var(--s2);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px">Esc</kbd></td><td style="padding:8px 10px">Close any open modal</td></tr>
       </tbody>
@@ -7422,59 +7361,72 @@ function renderNeedsAttention() {
 
 // ── B2. WEEKLY SUMMARY (enhance existing week bar) ───────────────
 
-function getWeeklySummary() {
-  var ws = (function() {
-    var n = new Date(); var day = n.getDay(); var diff = (day === 0 ? -6 : 1 - day);
-    n.setDate(n.getDate() + diff); n.setHours(0, 0, 0, 0); return n.toISOString();
-  })();
+function getMetricSummary() {
+  var now = new Date();
+  // Week start (Monday)
+  var weekStart = new Date(now);
+  var dayOfWeek = weekStart.getDay();
+  var diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  weekStart.setDate(weekStart.getDate() + diff);
+  weekStart.setHours(0,0,0,0);
+  var ws = weekStart.toISOString();
+  // Month start
+  var ms = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  // Year start
+  var ys = new Date(now.getFullYear(), 0, 1).toISOString();
 
-  // New startups this week
-  var allSt = netLoad('startups');
-  var newStartups = allSt.filter(function(r) { return r.dateAdded && r.dateAdded >= ws; }).length;
+  function countByDate(arr, field) {
+    var w=0,m=0,y=0;
+    arr.forEach(function(r){ var d=r[field]||r.dateAdded||r.createdAt||''; if(!d)return; if(d>=ys)y++; if(d>=ms)m++; if(d>=ws)w++; });
+    return {w:w,m:m,y:y};
+  }
 
-  // New investors contacted
-  var allInv = netLoad('investors');
-  var newContacted = allInv.filter(function(r) {
-    return r.dateAdded && r.dateAdded >= ws && r.status && r.status !== 'Cold' && r.status !== '';
-  }).length;
-
-  // Outreach log
-  var outLog = [];
-  try { outLog = JSON.parse(localStorage.getItem('log7_outreach_log') || '[]'); } catch(e) {}
-  var emailsSent = outLog.filter(function(e) { return e.ts && e.ts >= ws; }).length;
-
-  // Mandates signed this week
-  var mandateLog = [];
-  try { mandateLog = JSON.parse(localStorage.getItem('mandate_log') || '[]'); } catch(e) {}
-  var mandatesSigned = mandateLog.filter(function(m) { return m.timestamp && m.timestamp >= ws; }).length;
-
-  // Deals moved this week
+  var invs = netLoad('investors');
+  var parts = netLoad('partnerships');
+  var sts = netLoad('startups');
   var pipeline = getPipeline();
-  var dealsMoved = pipeline.filter(function(d) { return d.lastUpdated && d.lastUpdated >= ws; }).length;
 
-  return {
-    newStartups: newStartups,
-    newContacted: newContacted,
-    emailsSent: emailsSent,
-    mandatesSigned: mandatesSigned,
-    dealsMoved: dealsMoved
-  };
+  var invAdded = countByDate(invs, 'dateAdded');
+  var partAdded = countByDate(parts, 'dateAdded');
+  var stAdded = countByDate(sts, 'dateAdded');
+
+  // Deals closed = stage "Closed Won", date from lastUpdated or savedAt
+  var closed = pipeline.filter(function(d){ return d.stage==='Closed Won'; });
+  var dealsClosed = countByDate(closed, 'lastUpdated');
+  // fallback to savedAt for deals without lastUpdated
+  pipeline.filter(function(d){ return d.stage==='Closed Won' && !d.lastUpdated && d.savedAt; }).forEach(function(d){
+    var dt = d.savedAt;
+    if(dt>=ys) dealsClosed.y++;
+    if(dt>=ms) dealsClosed.m++;
+    if(dt>=ws) dealsClosed.w++;
+  });
+
+  return { invAdded:invAdded, partAdded:partAdded, stAdded:stAdded, dealsClosed:dealsClosed };
 }
 
-// Override the existing uxRenderWeekBar to show 5 columns
+// Override the existing uxRenderWeekBar to show 4 metrics with week/month/year
 (function() {
   function l7RenderWeekBar() {
     var el = document.getElementById('home-week-bar');
     if (!el) return;
-    var s = getWeeklySummary();
+    var s = getMetricSummary();
+    function card(label, vals) {
+      return '<div class="ux-week-card" style="flex-direction:column;align-items:flex-start;gap:6px">'
+        +'<div class="ux-week-label" style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">'+label+'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%">'
+          +'<div style="text-align:center"><div class="ux-week-val" style="font-size:1.15rem">'+vals.w+'</div><div class="ux-week-sub">week</div></div>'
+          +'<div style="text-align:center;border-left:1px solid var(--border2);border-right:1px solid var(--border2)"><div class="ux-week-val" style="font-size:1.15rem">'+vals.m+'</div><div class="ux-week-sub">month</div></div>'
+          +'<div style="text-align:center"><div class="ux-week-val" style="font-size:1.15rem">'+vals.y+'</div><div class="ux-week-sub">year</div></div>'
+        +'</div>'
+        +'</div>';
+    }
     el.innerHTML =
-      '<div class="ux-week-card"><div class="ux-week-val">' + s.newStartups + '</div><div class="ux-week-label">Startups added</div><div class="ux-week-sub">this week</div></div>' +
-      '<div class="ux-week-card"><div class="ux-week-val">' + s.newContacted + '</div><div class="ux-week-label">Investors reached</div><div class="ux-week-sub">this week</div></div>' +
-      '<div class="ux-week-card"><div class="ux-week-val">' + s.emailsSent + '</div><div class="ux-week-label">Emails sent</div><div class="ux-week-sub">this week</div></div>' +
-      '<div class="ux-week-card"><div class="ux-week-val">' + s.mandatesSigned + '</div><div class="ux-week-label">Mandates signed</div><div class="ux-week-sub">this week</div></div>' +
-      '<div class="ux-week-card"><div class="ux-week-val">' + s.dealsMoved + '</div><div class="ux-week-label">Deals moved</div><div class="ux-week-sub">this week</div></div>';
+      card('Investors Added', s.invAdded) +
+      card('Partners Added', s.partAdded) +
+      card('Startups Added', s.stAdded) +
+      card('Deals Closed', s.dealsClosed);
+    el.style.gridTemplateColumns = 'repeat(4,1fr)';
   }
-  // Replace uxRenderWeekBar
   window.uxRenderWeekBar = l7RenderWeekBar;
 })();
 
