@@ -13,6 +13,13 @@ async function kvCmd(parts) {
   return r.json(); // { result: ... }
 }
 
+// Sanitize a value for a WhatsApp template variable. WhatsApp rejects newlines,
+// tabs, and runs of >4 spaces inside variables, so flatten to a single line.
+function tv(s) {
+  const out = String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim().slice(0, 900);
+  return out || '—';
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -68,12 +75,13 @@ module.exports = async function handler(req, res) {
   const sendWhenEmpty = /^(1|true|yes)$/i.test(process.env.FOLLOWUP_SEND_WHEN_EMPTY || '');
   const dateLabel = istDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-  let body;
+  let body, listLine;
   if (!followups.length) {
     if (!sendWhenEmpty) {
       return res.status(200).json({ ok: true, sent: false, reason: 'No follow-ups due today' });
     }
     body = `📋 *Log7 Capital — Follow-ups for ${dateLabel}*\n\n✅ No follow-ups due today.`;
+    listLine = 'none';
   } else {
     // Group by tab
     const groups = { investors: [], startups: [], partnerships: [] };
@@ -82,6 +90,7 @@ module.exports = async function handler(req, res) {
       groups[tab].push(f);
     });
     const lines = [`📋 *Log7 Capital — Follow-ups for ${dateLabel}*\n`];
+    const flat  = [];
     [
       { key: 'investors',    label: 'Investors' },
       { key: 'startups',     label: 'Startups' },
@@ -94,10 +103,20 @@ module.exports = async function handler(req, res) {
         lines.push(`• ${f.name}${snippet ? ` — ${snippet}` : ''}`);
       });
       lines.push('');
+      // single-line flattened version for the structured template variable
+      flat.push(`${label}: ` + groups[key].map(f => {
+        const sn = (f.notes || '').trim().slice(0, 40);
+        return f.name + (sn ? ` (${sn})` : '');
+      }).join(', '));
     });
     lines.push(`Total: ${followups.length} follow-up${followups.length > 1 ? 's' : ''} today.`);
     body = lines.join('\n');
+    listLine = flat.join(' · ');
   }
+
+  // Structured single-line variables for an approved WhatsApp template.
+  // Template body (3 vars): {{1}} date · {{2}} count · {{3}} flattened list
+  const followupVars = { 1: tv(dateLabel), 2: tv(followups.length), 3: tv(listLine || 'none') };
 
   // ── Twilio config check ────────────────────────────────────────────
   const sid  = process.env.TWILIO_ACCOUNT_SID;
@@ -112,12 +131,13 @@ module.exports = async function handler(req, res) {
 
   // ── Send (template if configured, else free-form body) ─────────────
   // Outside the 24h WhatsApp window an APPROVED template is required. Set
-  // TWILIO_CONTENT_SID_FOLLOWUP to a Twilio Content template with a single
-  // {{1}} body variable to send reliably from the unattended cron.
+  // TWILIO_CONTENT_SID_FOLLOWUP to a Twilio Content template taking the 3
+  // structured variables in `followupVars` to send reliably from the cron.
+  // Falls back to free-form body when in-window / sandbox.
   const contentSid = process.env.TWILIO_CONTENT_SID_FOLLOWUP;
   const client = twilio(sid, auth);
   const msg = contentSid
-    ? { from, to, contentSid, contentVariables: JSON.stringify({ 1: body }) }
+    ? { from, to, contentSid, contentVariables: JSON.stringify(followupVars) }
     : { from, to, body };
 
   try {
