@@ -274,6 +274,20 @@
 
   /* Feedback */
   .empty { text-align:center; padding:44px 18px; color:var(--muted); font-size:14px; }
+  /* ── Error boundary fallback ── */
+  .err-boundary { margin:0 0 14px; }
+  .err-boundary-inner { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:8px;
+    background:rgba(227,97,97,0.07); border:1px solid rgba(227,97,97,0.25); }
+  .err-boundary .err-ic { font-size:20px; flex-shrink:0; line-height:1; }
+  .err-boundary .err-msg { flex:1; min-width:0; }
+  .err-boundary .err-title { font-size:13.5px; font-weight:600; color:var(--text); }
+  .err-boundary .err-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .err-boundary .err-retry { padding:7px 16px; border-radius:6px; border:1px solid var(--accent); background:var(--accent);
+    color:#fff; font-size:12.5px; font-weight:500; cursor:pointer; font-family:'Poppins',sans-serif; flex-shrink:0; transition:opacity .15s; }
+  .err-boundary .err-retry:hover { opacity:.88; }
+  .err-boundary .err-dismiss { padding:4px 8px; border:none; background:transparent; color:var(--muted);
+    font-size:15px; cursor:pointer; line-height:1; flex-shrink:0; }
+  .err-boundary .err-dismiss:hover { color:var(--text); }
   .error-box, .loading-box { border-radius:6px; padding:12px 14px; margin-bottom:14px; font-size:13px; }
   .error-box { color:var(--red); background:rgba(227,97,97,0.09); border:1px solid rgba(227,97,97,0.22); }
   .loading-box { color:var(--muted); background:rgba(255,255,255,0.03); border:1px solid var(--border); }
@@ -2004,6 +2018,7 @@ window.onload = async () => {
   } catch(ex){}
   const key=getApiKey();
   document.getElementById('api-key').value=key;
+  if(window.Log7Resilience) Log7Resilience.init();  // wrap view renderers before first render
   loadPreferences();loadUserProfile();loadTemplates();
   await initDocsDb();
   await loadData();
@@ -9157,6 +9172,74 @@ window.HomeLayout = (function(){
   function init(){apply(load());}
 
   return{openPanel:openPanel,closePanel:closePanel,save:save,reset:reset,init:init,_toggle:_toggle};
+})();
+
+// ═══ ERROR BOUNDARIES + GRACEFUL FAILURE ═══
+// Wraps major view renderers so a render error shows a friendly retry banner
+// instead of a blank screen — never touches or loses data.
+window.Log7Resilience = (function(){
+  var _errors = [];
+  var _retries = {};
+
+  function log(where, err){
+    var rec = { when:new Date().toISOString(), where:where,
+      message:(err&&err.message)||String(err), stack:(err&&err.stack)||'' };
+    _errors.push(rec); if(_errors.length>50) _errors.shift();
+    window.__l7Errors = _errors;
+    try { console.error('[Log7] '+where+' failed:', err); } catch(e){}
+  }
+
+  function banner(pageId, name, fnName){
+    var page = document.getElementById(pageId); if(!page) return;
+    var id = 'errb-'+pageId;
+    var b = document.getElementById(id);
+    if(!b){ b = document.createElement('div'); b.id = id; page.insertBefore(b, page.firstChild); }
+    b.className = 'err-boundary';
+    b.innerHTML = '<div class="err-boundary-inner">'
+      + '<div class="err-ic">&#9888;&#65039;</div>'
+      + '<div class="err-msg"><div class="err-title">'+name+' couldn’t load</div>'
+      + '<div class="err-sub">Something went wrong rendering this view. Your data is safe — nothing was changed.</div></div>'
+      + '<button class="err-retry" onclick="Log7Resilience.retry(\''+pageId+'\',\''+fnName+'\')">Retry</button>'
+      + '<button class="err-dismiss" title="Dismiss" onclick="var p=this.closest(\'.err-boundary\'); if(p) p.remove();">&#10005;</button>'
+      + '</div>';
+  }
+  function clearBanner(pageId){ var b=document.getElementById('errb-'+pageId); if(b) b.remove(); }
+
+  function retry(pageId, fnName){
+    clearBanner(pageId);
+    var f = window[fnName];
+    if(typeof f === 'function'){ try { f(); } catch(e){ /* boundary re-shows banner */ } }
+  }
+
+  // Wrap a global function in a try/catch that renders the fallback on failure.
+  function wrapGlobal(fnName, name, pageId){
+    var orig = window[fnName];
+    if(typeof orig !== 'function') return;
+    window[fnName] = function(){
+      try {
+        var r = orig.apply(this, arguments);
+        clearBanner(pageId);   // success — clear any stale banner
+        return r;
+      } catch(err){
+        log(name, err);
+        banner(pageId, name, fnName);
+      }
+    };
+    _retries[pageId] = fnName;
+  }
+
+  function init(){
+    // Wrap the major view entry points (runs after all renderers + patches exist)
+    wrapGlobal('refreshHome',        'Home',          'page-home');
+    wrapGlobal('renderNetworkTab',   'Network',       'page-network');
+    wrapGlobal('renderKanban',       'Pipeline',      'page-pipeline');
+    wrapGlobal('renderPipelineList', 'Pipeline list', 'page-pipeline');
+    // Catch anything that escapes a boundary so it's logged, never silent.
+    window.addEventListener('error', function(e){ log('window.onerror', e.error||e.message); });
+    window.addEventListener('unhandledrejection', function(e){ log('unhandledrejection', e.reason); });
+  }
+
+  return { init:init, retry:retry, errors:function(){return _errors.slice();} };
 })();
 </script>
 </body>
