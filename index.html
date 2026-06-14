@@ -927,6 +927,21 @@ window.SettingsDB = (function(){
         <div class="template-help">The long ID from your Sheet&rsquo;s URL: /spreadsheets/d/<strong>ID</strong>/edit</div>
         <button id="gs-test-btn" onclick="gsTestConnection()" style="margin-top:8px;padding:6px 12px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;width:100%">Test Connection</button>
       </div>
+      <div class="settings-section">
+        <div class="settings-label">&#128202; Weekly Pipeline Digest (WhatsApp)</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer">
+            <input type="checkbox" id="digest-enabled" onchange="saveDigestSettings()" style="width:14px;height:14px;cursor:pointer">
+            Send weekly digest every Monday 9:00 AM IST
+          </label>
+        </div>
+        <div style="margin-bottom:6px">
+          <input type="text" id="digest-note" placeholder="Optional note to include in digest…" oninput="saveDigestSettings()" style="width:100%;box-sizing:border-box;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12px;font-family:'Poppins',sans-serif">
+        </div>
+        <button onclick="sendWeeklyDigestNow(this)" style="width:100%;padding:6px 12px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:'Poppins',sans-serif">&#128202; Send Digest Now</button>
+        <button onclick="syncDigestToCloud(this)" style="width:100%;padding:6px 12px;font-size:11px;background:var(--s2);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-family:'Poppins',sans-serif;margin-top:5px">&#8679; Sync Data for Weekly Cron</button>
+        <div class="template-help" id="digest-sync-status">Syncs pipeline snapshot to cloud so Monday auto-digest works.</div>
+      </div>
     </div>
   </div>
 </aside>
@@ -1368,6 +1383,7 @@ window.SettingsDB = (function(){
       <button class="subtab active" id="net-tab-partnerships" onclick="switchNetTab('partnerships',this)">Partnerships</button>
       <button class="subtab" id="net-tab-investors" onclick="switchNetTab('investors',this)">Investors</button>
       <button class="subtab" id="net-tab-startups" onclick="switchNetTab('startups',this)">Startups</button>
+      <button class="subtab" id="net-tab-recyclebin" onclick="switchNetTab('recyclebin',this)">&#128465; Recycle Bin</button>
     </div>
     <div id="net-panel-partnerships" class="net-panel">
       <div class="card" style="overflow-x:auto">
@@ -1386,6 +1402,18 @@ window.SettingsDB = (function(){
     <div id="net-panel-startups" class="net-panel" style="display:none">
       <div class="card" style="overflow-x:auto">
         <div id="net-list-startups"><div class="empty">No startups yet. Click + Add New to get started.</div></div>
+      </div>
+    </div>
+    <div id="net-panel-recyclebin" class="net-panel" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">&#128465; Recycle Bin</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Soft-deleted Network entries and Pipeline deals. Restore or permanently delete.</div>
+          </div>
+          <button class="action-btn danger" style="padding:5px 12px;font-size:12px" onclick="emptyRecycleBin()">Empty Bin</button>
+        </div>
+        <div id="net-list-recyclebin"><div class="empty">Nothing in the recycle bin.</div></div>
       </div>
     </div>
   </div>
@@ -2046,7 +2074,7 @@ window.onload = async () => {
   const key=getApiKey();
   document.getElementById('api-key').value=key;
   if(window.Log7Resilience) Log7Resilience.init();  // wrap view renderers before first render
-  loadPreferences();loadUserProfile();loadTemplates();
+  loadPreferences();loadUserProfile();loadTemplates();if(typeof loadDigestSettings==='function')loadDigestSettings();
   await initDocsDb();
   await loadData();
   refreshDocsSelectors();refreshHome();
@@ -2105,6 +2133,7 @@ function showTab(name,btn){
 }
 function toggleSettings(){
   document.getElementById('settings-wrap').classList.toggle('open');
+  if(typeof loadDigestSettings==='function') loadDigestSettings();
 }
 document.addEventListener('click',e=>{const w=document.getElementById('settings-wrap');if(w&&!w.contains(e.target))w.classList.remove('open');});
 
@@ -2256,7 +2285,7 @@ function exportAuditCsv(){exportRowsAsCsv('log7-audit.csv',getAuditLog().map(e=>
 // ═══ HOME ═══
 function refreshHome(){
   const dateEl=document.getElementById('home-date');if(dateEl) dateEl.textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const pipeline=getPipeline(),today=new Date().toISOString().slice(0,10);
+  const pipeline=getActivePipeline(),today=new Date().toISOString().slice(0,10);
   // Startups: in-memory array loaded from Google Sheets (Match Studio), fallback to Network tab startups
   const netStartups=netLoad('startups');
   const startupCount=netStartups.length;
@@ -2752,6 +2781,9 @@ function setPipeline(data){
   try { localStorage.setItem('l7_pipeline', JSON.stringify(data)); } catch(e){ console.error('[setPipeline]', e); }
   gsWrite('Pipeline', data);
 }
+function getActivePipeline(){
+  return getPipeline().filter(function(i){ return !i.deletedAt; });
+}
 // Re-render every surface that shows pipeline data, after any write.
 function refreshPipelineUI(){
   try { renderKanban(); } catch(e){}
@@ -2957,13 +2989,17 @@ function movePipelineStage(startup,investor,stage){
 }
 function removePipelineItem(startup,investor){
   const raw = getPipeline();
-  setPipeline(raw.filter(i=>!(i.startup===startup&&i.investor===investor)));
-  addAuditEntry('pipeline','Deal removed from pipeline',startup+' \u2194 '+investor);
+  const idx = raw.findIndex(i=>i.startup===startup&&i.investor===investor);
+  if(idx===-1){refreshPipelineUI();return;}
+  raw[idx].deletedAt = new Date().toISOString();
+  raw[idx].deletedBy = 'user';
+  setPipeline(raw);
+  addAuditEntry('pipeline','Deal moved to recycle bin',startup+' \u2194 '+investor);
   refreshPipelineUI();
 }
 function renderKanban(){
   const boardEl=document.getElementById('pipeline-board');if(!boardEl)return;
-  const pipeline=getPipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
+  const pipeline=getActivePipeline();const cEl=document.getElementById('pipeline-count');if(cEl)cEl.textContent=pipeline.length;
   const byStage={};PIPELINE_STAGES.forEach(s=>byStage[s]=[]);pipeline.forEach(item=>{const s=(item.stage&&PIPELINE_STAGES.includes(item.stage))?item.stage:PIPELINE_STAGES[0];byStage[s].push(item);});
   // Build investor\u2192fundName lookup for display
   var _kInvs=netLoad('investors');var _fundByInv={};_kInvs.forEach(function(r){var n=(r.investorName||r.name||'').toLowerCase();if(n)_fundByInv[n]=r.fundName||'';});
@@ -2990,7 +3026,7 @@ function handleKanbanDragStart(e,startup,investor){dragStartup=startup;dragInves
 function handleKanbanDrop(e,stage){e.preventDefault();document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));if(dragStartup||dragInvestor)movePipelineStage(dragStartup,dragInvestor,stage);dragStartup='';dragInvestor='';}
 function renderPipelineList(){
   var el=document.getElementById('pipeline-list'); if(!el)return;
-  var pipeline=getPipeline();
+  var pipeline=getActivePipeline();
   refreshTagFilter();
   if(!pipeline.length){el.innerHTML='<div class="empty">Save matches to see the full pipeline list here.</div>';return;}
   var tagFilter=document.getElementById('pipeline-tag-filter')?document.getElementById('pipeline-tag-filter').value:'';
@@ -3186,7 +3222,7 @@ function refreshDiligence(){
   // IC Ready badge banner
   var icEl=document.getElementById('diligence-ic-ready');
   if(icEl){
-    var pipeline=getPipeline();
+    var pipeline=getActivePipeline();
     var icReady=[...new Set(pipeline.filter(function(i){return i.stage==='IC Review';}).map(function(i){return i.startup;}))];
     icEl.innerHTML=icReady.length
       ? '<div style="padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px;font-size:12.5px"><strong style="color:var(--amber)">IC Ready:</strong> '+icReady.map(function(s){return '<span class="badge" style="background:var(--amber);color:#fff;border-color:transparent;margin-left:6px;cursor:pointer" onclick="(function(){var idx=startups.findIndex(function(x){return x.company===\''+escapeQ(s)+'\';});if(idx>=0)selectStartup(idx);})()">'+escapeHtml(s)+'</span>';}).join(' ')+'</div>'
@@ -3267,10 +3303,10 @@ async function downloadStoredDoc(id){const docs=await getAllDocuments(),doc=docs
 async function deleteStoredDoc(id){await deleteDocumentRecord(id);addAuditEntry('doc','Document deleted from vault');refreshDocsUI();}
 
 // ═══ EXPORT & UTILS ═══
-function updateStats(){const pl=getPipeline();['stat-matches'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=lastMatches.length;});['stat-pipeline','home-stat-pipeline'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});['pipeline-count'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});}
+function updateStats(){const pl=getActivePipeline();['stat-matches'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=lastMatches.length;});['stat-pipeline','home-stat-pipeline'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});['pipeline-count'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pl.length;});}
 function resetWorkflow(){lastMatches=[];lastPayload=null;deckInsightsCache=null;pdfText='';uploadedPdfName='';uploadedPdfFile=null;if(uploadedPdfBlobUrl){URL.revokeObjectURL(uploadedPdfBlobUrl);uploadedPdfBlobUrl='';};const pn=document.getElementById('pdf-name');if(pn)pn.textContent='';const mr=document.getElementById('match-results');if(mr)mr.innerHTML='<div class="empty">Workspace reset. Select a startup and run a new match.</div>';const dtc=document.getElementById('deck-tab-content');if(dtc)dtc.innerHTML='<div class="empty">Run a match to generate deck insights.</div>';updateStats();}
 function exportMatchesCsv(){exportRowsAsCsv('log7-matches.csv',lastMatches.map(m=>({startup:selectedStartup?.company||'',investor:m.name,score:m.score,verdict:m.verdict,reasons:(m.reasons||[]).join(' | '),concerns:(m.concerns||[]).join(' | '),objections:uniqueList(m.objections||predictObjections(m)).join(' | ')})));}
-function exportPipelineCsv(){exportRowsAsCsv('log7-pipeline.csv',getPipeline().map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return{startup:item.startup,investor:item.investor,score:item.score,verdict:item.verdict,stage:item.stage||'',status:crm.status,follow_up:crm.followUp,warm_intro:crm.warmIntro,tags:(crm.tags||[]).join(' | '),notes:crm.notes};}));}
+function exportPipelineCsv(){exportRowsAsCsv('log7-pipeline.csv',getActivePipeline().map(item=>{const crm=getInvestorCRM(item.startup,item.investor);return{startup:item.startup,investor:item.investor,score:item.score,verdict:item.verdict,stage:item.stage||'',status:crm.status,follow_up:crm.followUp,warm_intro:crm.warmIntro,tags:(crm.tags||[]).join(' | '),notes:crm.notes};}));}
 function exportRowsAsCsv(filename,rows){if(!rows.length)return showError('Nothing to export.');const headers=Object.keys(rows[0]);const csv=[headers.join(',')].concat(rows.map(r=>headers.map(h=>'"'+String(r[h]==null?'':r[h]).replace(/"/g,'""')+'"').join(','))).join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}
 function uniqueList(items){return[...new Set((items||[]).filter(Boolean))];}
 function initials(name){return(name||'?').split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();}
@@ -3829,6 +3865,7 @@ function switchNetTab(tab, btn){
   document.querySelectorAll('[id^="net-tab-"]').forEach(b=>b.classList.remove('active'));
   document.getElementById('net-panel-'+tab).style.display='block';
   if(btn) btn.classList.add('active');
+  if(tab==='recyclebin'){ renderRecycleBin(); return; }
   renderNetworkTab();
   if(tab==='investors') netFetchInvestors();
 }
@@ -3921,7 +3958,7 @@ function netEmailContact(email, name){
 function renderNetList(tab){
   var el = document.getElementById('net-list-'+tab);
   if(!el) return;
-  var rows = netLoad(tab);
+  var rows = netLoad(tab).filter(function(r){ return !r.deletedAt; });
   var _srch = (document.getElementById('net-search')||{}).value||'';
   if(_srch.trim()){
     var _q = _srch.trim().toLowerCase();
@@ -4178,11 +4215,104 @@ function saveNetworkEntry(){
 }
 
 function deleteNetEntry(tab, id){
-  if(!confirm('Delete this entry?')) return;
-  var rows = netLoad(tab).filter(function(r){return String(r.id)!==String(id);});
+  if(!confirm('Move this entry to the Recycle Bin?\n\nYou can restore it later from Network → Recycle Bin.')) return;
+  var rows = netLoad(tab);
+  var idx = rows.findIndex(function(r){ return String(r.id)===String(id); });
+  if(idx===-1) return;
+  rows[idx].deletedAt = new Date().toISOString();
+  rows[idx].deletedBy = 'user';
   netSave(tab, rows);
   renderNetList(tab);
-  addAuditEntry('network','Deleted '+tab.slice(0,-1),tab);
+  addAuditEntry('network','Moved '+tab.slice(0,-1)+' to recycle bin',tab);
+}
+
+function renderRecycleBin(){
+  var el = document.getElementById('net-list-recyclebin');
+  if(!el) return;
+  var tabs = ['investors','startups','partnerships'];
+  var tabLabels = {investors:'Investor',startups:'Startup',partnerships:'Partnership'};
+  var nameKeys = {investors:'investorName',startups:'companyName',partnerships:'partnerName'};
+  var items = [];
+  tabs.forEach(function(t){
+    netLoad(t).filter(function(r){ return !!r.deletedAt; }).forEach(function(r){
+      items.push({_tab:t,_type:'network',_name:r[nameKeys[t]]||r.name||'—',_label:tabLabels[t],_deletedAt:r.deletedAt,_id:r.id});
+    });
+  });
+  getPipeline().filter(function(i){ return !!i.deletedAt; }).forEach(function(i){
+    items.push({_tab:'pipeline',_type:'pipeline',_name:(i.investor||'')+(i.investor&&i.startup?' ↔ ':'' )+(i.startup||''),_label:'Pipeline Deal',_deletedAt:i.deletedAt,_startup:i.startup,_investor:i.investor,_id:i.id});
+  });
+  if(!items.length){ el.innerHTML='<div class="empty" style="padding:20px">Nothing in the recycle bin.</div>'; return; }
+  items.sort(function(a,b){ return (b._deletedAt||'').localeCompare(a._deletedAt||''); });
+  var html = items.map(function(item){
+    var dt = item._deletedAt ? new Date(item._deletedAt).toLocaleString('en-IN') : '—';
+    var restoreCall = item._type==='pipeline'
+      ? 'restoreRecyclePipeline(\''+escapeQ(item._startup||'')+'\',\''+escapeQ(item._investor||'')+'\')'
+      : 'restoreRecycleNet(\''+item._tab+'\',\''+escapeQ(String(item._id||''))+'\')';
+    var permDeleteCall = item._type==='pipeline'
+      ? 'permDeletePipeline(\''+escapeQ(item._startup||'')+'\',\''+escapeQ(item._investor||'')+'\')'
+      : 'permDeleteNet(\''+item._tab+'\',\''+escapeQ(String(item._id||''))+'\')';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:13px;width:22px;text-align:center;flex-shrink:0">&#128465;</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escapeHtml(item._name)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:1px">'+item._label+' · Deleted '+dt+'</div>'
+      +'</div>'
+      +'<button onclick="'+restoreCall+'" style="background:transparent;color:var(--green);border:1px solid var(--green);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:\'Poppins\',sans-serif;white-space:nowrap">&#8617; Restore</button>'
+      +'<button onclick="'+permDeleteCall+'" style="background:transparent;color:var(--red,#f44336);border:1px solid var(--red,#f44336);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:\'Poppins\',sans-serif;white-space:nowrap;margin-left:4px">&#128465; Delete</button>'
+      +'</div>';
+  }).join('');
+  el.innerHTML = html;
+}
+
+function restoreRecycleNet(tab, id){
+  var rows = netLoad(tab);
+  var idx = rows.findIndex(function(r){ return String(r.id)===String(id); });
+  if(idx===-1) return;
+  delete rows[idx].deletedAt;
+  delete rows[idx].deletedBy;
+  netSave(tab, rows);
+  addAuditEntry('network','Restored '+tab.slice(0,-1)+' from recycle bin',tab);
+  renderRecycleBin();
+  renderNetList(tab);
+}
+
+function restoreRecyclePipeline(startup, investor){
+  var raw = getPipeline();
+  var idx = raw.findIndex(function(i){ return i.startup===startup&&i.investor===investor; });
+  if(idx===-1) return;
+  delete raw[idx].deletedAt;
+  delete raw[idx].deletedBy;
+  setPipeline(raw);
+  addAuditEntry('pipeline','Restored deal from recycle bin',startup+' ↔ '+investor);
+  renderRecycleBin();
+  refreshPipelineUI();
+}
+
+function permDeleteNet(tab, id){
+  if(!confirm('Permanently delete this entry?\n\nThis CANNOT be undone.')) return;
+  var rows = netLoad(tab).filter(function(r){ return String(r.id)!==String(id); });
+  netSave(tab, rows);
+  addAuditEntry('network','Permanently deleted '+tab.slice(0,-1),tab);
+  renderRecycleBin();
+}
+
+function permDeletePipeline(startup, investor){
+  if(!confirm('Permanently delete this pipeline deal?\n\nThis CANNOT be undone.')) return;
+  setPipeline(getPipeline().filter(function(i){ return !(i.startup===startup&&i.investor===investor); }));
+  addAuditEntry('pipeline','Permanently deleted deal',startup+' ↔ '+investor);
+  renderRecycleBin();
+  refreshPipelineUI();
+}
+
+function emptyRecycleBin(){
+  if(!confirm('Permanently delete ALL items in the recycle bin?\n\nThis CANNOT be undone.')) return;
+  ['investors','startups','partnerships'].forEach(function(t){
+    netSave(t, netLoad(t).filter(function(r){ return !r.deletedAt; }));
+  });
+  setPipeline(getPipeline().filter(function(i){ return !i.deletedAt; }));
+  addAuditEntry('network','Emptied recycle bin','all');
+  renderRecycleBin();
+  refreshPipelineUI();
 }
 
 function closeNetworkModal(){
@@ -4658,6 +4788,72 @@ async function sendWhatsAppReminder(){
   if(btn){ btn.disabled=false; btn.textContent='📲 Send WhatsApp Reminder Now'; }
 }
 
+
+// ═══ WEEKLY DIGEST ═══
+function buildDigestPayload(){
+  var pipeline = getActivePipeline().map(function(d){
+    return {startup:d.startup||'',investor:d.investor||'',stage:d.stage||'',hot:!!d.hot};
+  });
+  var digestNote = (document.getElementById('digest-note')||{}).value||'';
+  var digestEnabled = (document.getElementById('digest-enabled')||{}).checked!==false;
+  return {
+    pipeline:      pipeline,
+    investors:     netLoad('investors').filter(function(r){return !r.deletedAt;}).length,
+    startups:      netLoad('startups').filter(function(r){return !r.deletedAt;}).length,
+    partners:      netLoad('partnerships').filter(function(r){return !r.deletedAt;}).length,
+    digestEnabled: digestEnabled,
+    note:          digestNote,
+    savedAt:       new Date().toISOString(),
+  };
+}
+
+function saveDigestSettings(){
+  var enabled = (document.getElementById('digest-enabled')||{}).checked;
+  var note    = (document.getElementById('digest-note')||{}).value||'';
+  var s = JSON.parse(localStorage.getItem('l7_digest_settings')||'{}');
+  s.enabled = !!enabled;
+  s.note    = note;
+  localStorage.setItem('l7_digest_settings', JSON.stringify(s));
+}
+
+function loadDigestSettings(){
+  var s = JSON.parse(localStorage.getItem('l7_digest_settings')||'{}');
+  var cb = document.getElementById('digest-enabled');
+  var ni = document.getElementById('digest-note');
+  if(cb) cb.checked = s.enabled !== false;
+  if(ni) ni.value   = s.note   || '';
+}
+
+async function syncDigestToCloud(btn){
+  var orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Syncing…';
+  try{
+    var payload = buildDigestPayload();
+    var r = await fetch('/api/save-digest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({digest:payload})});
+    if(!r.ok) throw new Error('Server error '+r.status);
+    var st = document.getElementById('digest-sync-status');
+    if(st) st.textContent = 'Last synced: '+new Date().toLocaleString('en-IN');
+    showToast('Pipeline digest synced to cloud ✓','success');
+  }catch(e){
+    showToast('Sync failed: '+e.message,'error');
+  }
+  btn.disabled=false; btn.textContent=orig;
+}
+
+async function sendWeeklyDigestNow(btn){
+  var orig = btn.textContent;
+  btn.disabled=true; btn.textContent='Sending…';
+  try{
+    var payload = buildDigestPayload();
+    var r = await fetch('/api/weekly-digest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({digest:payload})});
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.error||'Server error');
+    showToast('✅ Weekly digest sent ('+payload.pipeline.length+' deals)','success');
+  }catch(e){
+    showToast('❌ Digest failed: '+e.message,'error');
+  }
+  btn.disabled=false; btn.textContent=orig;
+}
 
 // ═══ WHATSAPP OUTREACH ═══
 
@@ -8835,7 +9031,8 @@ var TOKEN_KEY        = 'log7_gapi_token';
 var SETTINGS_KEY     = 'log7_backup_settings';
 var HISTORY_KEY      = 'log7_backup_history';
 var BACKUP_PREFIX    = 'log7_backup_';
-var MAX_HISTORY      = 20;
+var MAX_HISTORY      = 30;
+var MAX_DRIVE_BACKUPS= 30;
 
 function collectSnapshot(){
   var snap={version:'1.0',timestamp:new Date().toISOString(),source:window.location.hostname,data:{},meta:{totalKeys:0,sizeBytes:0}};
@@ -8887,8 +9084,16 @@ async function restoreFromDrive(fileId,filename){
     {headers:{Authorization:'Bearer '+token}});
   if(!r.ok)throw new Error('Download failed: '+r.status);
   var snap=await r.json();
-  if(!snap||!snap.data)throw new Error('Invalid backup format.');
-  localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(collectSnapshot()));
+  // Validate before applying
+  if(!snap||typeof snap!=='object')throw new Error('Invalid backup: not a JSON object.');
+  if(!snap.data||typeof snap.data!=='object')throw new Error('Invalid backup: missing data field.');
+  var l7keys=Object.keys(snap.data).filter(function(k){return k.startsWith('l7_');});
+  if(!l7keys.length)throw new Error('Invalid backup: no l7_ keys found.');
+  // Pre-restore safety: save current state to localStorage AND Drive
+  var safetySnap=collectSnapshot();
+  localStorage.setItem('l7_pre_restore_snapshot',JSON.stringify(safetySnap));
+  try{await uploadToDrive(safetySnap);}catch(e2){console.warn('[Backup] pre-restore safety upload failed:',e2.message);}
+  // Staged write: only after validation passes
   var n=0;
   Object.keys(snap.data).forEach(function(k){localStorage.setItem(k,snap.data[k]);n++;});
   addHistory({action:'restore',filename:filename,fileId:fileId,timestamp:new Date().toISOString(),keysRestored:n,fromTimestamp:snap.timestamp});
@@ -8903,16 +9108,30 @@ function saveSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}
 var _timer=null;
 function startAuto(){
   stopAuto();
-  var s=getSettings();var h=s.intervalHours||6;
+  var s=getSettings();var h=s.intervalHours||24;
   _timer=setInterval(async function(){try{await doBackup('auto');}catch(e){console.warn('[Backup] auto failed:',e.message);}},h*3600000);
 }
 function stopAuto(){if(_timer){clearInterval(_timer);_timer=null;}}
+
+async function pruneOldBackups(){
+  try{
+    var files=await listBackups();
+    if(files.length<=MAX_DRIVE_BACKUPS)return;
+    var toDelete=files.slice(MAX_DRIVE_BACKUPS);
+    var token=getToken();if(!token)return;
+    for(var i=0;i<toDelete.length;i++){
+      await fetch('https://www.googleapis.com/drive/v3/files/'+toDelete[i].id,
+        {method:'DELETE',headers:{Authorization:'Bearer '+token}});
+    }
+  }catch(e){console.warn('[Backup] prune failed:',e.message);}
+}
 
 async function doBackup(src){
   var snap=collectSnapshot();
   var file=await uploadToDrive(snap);
   addHistory({action:'backup',source:src||'manual',filename:file.name,fileId:file.id,timestamp:snap.timestamp,keys:snap.meta.totalKeys,sizeBytes:snap.meta.sizeBytes});
   var s=getSettings();s.lastBackupAt=snap.timestamp;s.lastBackupFile=file.name;saveSettings(s);
+  pruneOldBackups().catch(function(){});
   return{file:file,snapshot:snap};
 }
 
@@ -9031,12 +9250,12 @@ function renderPanel(containerId){
     +'<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px">Auto-backup interval</div>'
     +'<div style="display:flex;align-items:center;gap:12px">'
     +'<select onchange="window.Log7Backup._setInterval(this.value)" style="background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;font-family:\'Poppins\',sans-serif">'
-    +'<option value="2"'  +((s.intervalHours||6)==2 ?' selected':'')+'>Every 2 hours</option>'
-    +'<option value="6"'  +((s.intervalHours||6)==6 ?' selected':'')+'>Every 6 hours</option>'
-    +'<option value="12"' +((s.intervalHours||6)==12?' selected':'')+'>Every 12 hours</option>'
-    +'<option value="24"' +((s.intervalHours||6)==24?' selected':'')+'>Every 24 hours</option>'
+    +'<option value="2"'  +((s.intervalHours||24)==2 ?' selected':'')+'>Every 2 hours</option>'
+    +'<option value="6"'  +((s.intervalHours||24)==6 ?' selected':'')+'>Every 6 hours</option>'
+    +'<option value="12"' +((s.intervalHours||24)==12?' selected':'')+'>Every 12 hours</option>'
+    +'<option value="24"' +((s.intervalHours||24)==24?' selected':'')+'>Daily (every 24 hours)</option>'
     +'</select>'
-    +'<span style="font-size:12px;color:var(--muted)">Active every '+(s.intervalHours||6)+'h</span>'
+    +'<span style="font-size:12px;color:var(--muted)">Active every '+(s.intervalHours||24)+'h · keeps last 30 snapshots</span>'
     +'</div></div>'
     +'<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
     +'<div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted)">'
@@ -9096,26 +9315,57 @@ window.Log7Backup={
     try{
       var files=await listBackups();
       if(!files.length){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">No backups found in Drive folder.</div>';return;}
-      listEl.innerHTML=files.map(function(f){
+      listEl.innerHTML=files.map(function(f,i){
+        var ct=f.createdTime?new Date(f.createdTime).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+        var sz=f.size?(parseInt(f.size,10)>1048576?(parseInt(f.size,10)/1048576).toFixed(1)+' MB':(parseInt(f.size,10)/1024).toFixed(0)+' KB'):'';
+        var isPre=f.name.indexOf('pre_restore')>-1;
         return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">'
+          +'<div style="font-size:14px;width:22px;text-align:center;flex-shrink:0">'+(isPre?'&#9888;':i===0?'&#11088;':'&#128190;')+'</div>'
           +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name.replace(BACKUP_PREFIX,''))+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(f.description||'')+'</div>'
+          +'<div style="font-size:12px;color:var(--text);font-weight:600">'+ct+(i===0?' <span style="font-size:10px;background:rgba(62,207,142,.15);color:var(--green);padding:1px 5px;border-radius:4px;margin-left:4px">Latest</span>':isPre?' <span style="font-size:10px;background:rgba(245,166,35,.15);color:var(--amber);padding:1px 5px;border-radius:4px;margin-left:4px">Pre-restore</span>':'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-top:1px">'+esc(f.description||'')+(sz?' · '+sz:'')+'</div>'
           +'</div>'
           +'<button onclick="window.Log7Backup._doRestore(\''+f.id+'\',\''+esc(f.name)+'\',this)" style="background:var(--s2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif;flex-shrink:0">Restore</button>'
           +'</div>';
       }).join('');
     }catch(e){listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--red)">Error: '+esc(e.message)+'</div>';}
   },
-  _doRestore:async function(fileId,filename,btn){
-    if(!confirm('Restore from "'+filename+'"?\n\nYour current data will be saved as an emergency snapshot.'))return;
-    btn.disabled=true;btn.textContent='Restoring…';
-    try{
-      var r=await restoreFromDrive(fileId,filename);
-      document.getElementById('l7-restore-modal').style.display='none';
-      _toast('Restored '+r.restored+' keys. Reloading…');
-      setTimeout(function(){location.reload();},1800);
-    }catch(e){btn.disabled=false;btn.textContent='Restore';_toast('Restore failed: '+e.message,'error');}
+  _doRestore:function(fileId,filename,btn){
+    var modal=document.getElementById('l7-restore-modal');
+    if(!modal)return;
+    var existing=modal.querySelector('#l7-restore-confirm-box');
+    if(existing)existing.remove();
+    var displayName=filename.replace(BACKUP_PREFIX,'').replace('.json','').replace(/T(\d{2})-(\d{2})-(\d{2})/,' $1:$2:$3').replace(/-/g,'/').replace('/','-').replace('/','-');
+    var box=document.createElement('div');
+    box.id='l7-restore-confirm-box';
+    box.innerHTML='<div style="background:rgba(244,67,54,.08);border:1px solid rgba(244,67,54,.35);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">'
+      +'<div style="font-size:13px;font-weight:700;color:#f44336">&#9888; Confirm Restore</div>'
+      +'<div style="font-size:12px;color:var(--text);line-height:1.55">Restoring <b>'+esc(filename.replace(BACKUP_PREFIX,''))+'</b> will overwrite all current data. Your current state is automatically saved as a Drive safety snapshot first.</div>'
+      +'<div style="font-size:12px;color:var(--muted)">Type <code style="background:var(--s2);padding:2px 6px;border-radius:4px;letter-spacing:.05em">RESTORE</code> to confirm:</div>'
+      +'<input id="l7-rc-input" placeholder="Type RESTORE" autocomplete="off" spellcheck="false" style="background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:13px;width:100%;box-sizing:border-box;font-family:\'Poppins\',sans-serif;outline:none">'
+      +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+      +'<button id="l7-rc-cancel" style="background:var(--s2);color:var(--muted);border:1px solid var(--border);padding:7px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-family:\'Poppins\',sans-serif">Cancel</button>'
+      +'<button id="l7-rc-go" style="background:#f44336;color:#fff;border:none;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:\'Poppins\',sans-serif;opacity:.45" disabled>Confirm Restore</button>'
+      +'</div></div>';
+    var inner=modal.children[0];
+    inner.insertBefore(box,inner.lastElementChild);
+    var inp=document.getElementById('l7-rc-input');
+    var goBtn=document.getElementById('l7-rc-go');
+    document.getElementById('l7-rc-cancel').onclick=function(){box.remove();};
+    inp.addEventListener('input',function(){
+      var ok=this.value==='RESTORE';
+      goBtn.disabled=!ok;goBtn.style.opacity=ok?'1':'.45';
+    });
+    goBtn.onclick=async function(){
+      goBtn.disabled=true;goBtn.textContent='Restoring…';
+      try{
+        var r=await restoreFromDrive(fileId,filename);
+        document.getElementById('l7-restore-modal').style.display='none';
+        _toast('Restored '+r.restored+' keys. Reloading in 2s…');
+        setTimeout(function(){location.reload();},2200);
+      }catch(e){goBtn.disabled=false;goBtn.textContent='Confirm Restore';_toast('Restore failed: '+e.message,'error');}
+    };
+    inp.focus();
   },
   _setInterval:function(val){
     var s=getSettings();s.intervalHours=parseInt(val,10);saveSettings(s);stopAuto();startAuto();
