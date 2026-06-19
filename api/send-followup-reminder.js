@@ -82,10 +82,11 @@ module.exports = async function handler(req, res) {
       console.error(`[followup-reminder] failed to read follow-ups url=${target} err=${err.name}: ${err.message}`);
       return res.status(502).json({ error: 'Failed to read follow-ups from Upstash', detail: err.message });
     }
-    // Due today (IST), named, and not already marked done.
+    // Due today (IST) OR overdue, named, and not already marked done. Matches the
+    // dashboard badge + manual button (date <= today) so overdue follow-ups send.
     followups = all.filter(f =>
       f && f.name &&
-      String(f.followUpDate || '').slice(0, 10) === today &&
+      String(f.followUpDate || '').slice(0, 10) <= today &&
       f.status !== 'done' && f.followUpDone !== true
     );
   }

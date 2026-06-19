@@ -4898,19 +4898,24 @@ async function sendWhatsAppReminder(){
       +String(now.getMonth()+1).padStart(2,'0')+'-'
       +String(now.getDate()).padStart(2,'0');
 
-    // Read all network records and filter for today
+    // Collect follow-ups that are DUE — dated today OR overdue (date <= today)
+    // and not already done. Matches the "Network Follow-ups" badge (date <= today).
+    // The old code matched only an exact `=== today`, so overdue follow-ups (which
+    // the badge still flags as due) sent nothing — the "No follow-ups due today" bug.
     var nameKeys = { partnerships:'partnerName', investors:'investorName', startups:'companyName' };
     var followups = [];
     ['partnerships','investors','startups'].forEach(function(tab){
       var rows = netLoad(tab);
       rows.forEach(function(row){
-        var d = row.followUpDate ? String(row.followUpDate).split('T')[0].trim() : '';
-        if(d === today){
+        if(row.deletedAt) return;                       // skip recycle-bin entries
+        if(row.followUpDone === true) return;           // pending only
+        var d = row.followUpDate ? normalizeDateStr(row.followUpDate) : '';
+        if(d && d <= today){
           followups.push({
             tab:          tab,
             name:         row[nameKeys[tab]]||'',
             followUpDate: d,
-            notes:        row.notes||'',
+            notes:        row.followUpNote || row.notes || '',
           });
         }
       });
@@ -5011,7 +5016,7 @@ function buildFollowupsPayload(){
   ['partnerships','investors','startups'].forEach(function(tab){
     netLoad(tab).forEach(function(row){
       if(row.deletedAt) return;                       // skip recycle-bin entries
-      var d = row.followUpDate ? String(row.followUpDate).split('T')[0].trim() : '';
+      var d = row.followUpDate ? normalizeDateStr(row.followUpDate) : '';
       if(!d) return;                                  // only entries with a follow-up date
       if(row.followUpDone === true) return;           // pending only
       out.push({
