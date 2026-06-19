@@ -1,16 +1,32 @@
 const twilio = require('twilio');
 
+// Ensure the Upstash REST URL is an absolute https URL with no trailing slash.
+// A scheme-less host makes fetch() throw "TypeError: Failed to parse URL".
+function normalizeUpstashUrl(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  let u = raw.trim().replace(/\/+$/, '');
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try { new URL(u); } catch { return null; }
+  return u;
+}
+
 // ── Upstash REST helper (path-style command) ───────────────────────
 async function kvCmd(parts) {
-  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const url   = normalizeUpstashUrl(process.env.UPSTASH_REDIS_REST_URL);
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   const path = parts.map(encodeURIComponent).join('/');
-  const r = await fetch(`${url}/${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return r.json(); // { result: ... }
+  try {
+    const r = await fetch(`${url}/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return r.json(); // { result: ... }
+  } catch (err) {
+    console.error(`[followup-reminder] kvCmd failed cmd=${parts[0]} err=${err.message}`);
+    return null; // idempotency is best-effort; never crash the handler
+  }
 }
 
 // Sanitize a value for a WhatsApp template variable. WhatsApp rejects newlines,
@@ -26,6 +42,10 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // First line of real work — proves the cron actually invoked the function in
+  // Vercel runtime logs, even if a later step throws.
+  console.log(`[followup-reminder] invoked method=${req.method} at=${new Date().toISOString()}`);
+
   // Today's date in IST (UTC+5:30)
   const nowUtc  = new Date();
   const istMs   = nowUtc.getTime() + 5.5 * 60 * 60 * 1000;
@@ -40,17 +60,28 @@ module.exports = async function handler(req, res) {
     followups = req.body.followups;
   } else {
     // Cron job — read the snapshot the dashboard pushes to Upstash Redis
-    const url   = process.env.UPSTASH_REDIS_REST_URL;
+    const url   = normalizeUpstashUrl(process.env.UPSTASH_REDIS_REST_URL);
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!url || !token) {
-      console.error('[followup-reminder] Upstash env vars not configured');
-      return res.status(500).json({ error: 'Upstash env vars not configured' });
+      console.error('[followup-reminder] Upstash env vars not configured or URL invalid', {
+        hasUrl: !!process.env.UPSTASH_REDIS_REST_URL, urlValid: !!url, hasToken: !!token,
+      });
+      return res.status(500).json({ error: 'Upstash env vars not configured or URL is not a valid absolute https URL' });
     }
-    const kvRes  = await fetch(`${url}/get/network_followups`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const kvJson = await kvRes.json();
-    const all    = kvJson.result ? JSON.parse(kvJson.result) : [];
+    const target = `${url}/get/network_followups`;
+    let all = [];
+    try {
+      console.log(`[followup-reminder] reading snapshot ← ${target}`);
+      const kvRes  = await fetch(target, { headers: { Authorization: `Bearer ${token}` } });
+      const text   = await kvRes.text();
+      let kvJson;
+      try { kvJson = JSON.parse(text); }
+      catch { throw new Error(`Upstash returned non-JSON (status ${kvRes.status}): ${text.slice(0, 200)}`); }
+      all = kvJson.result ? JSON.parse(kvJson.result) : [];
+    } catch (err) {
+      console.error(`[followup-reminder] failed to read follow-ups url=${target} err=${err.name}: ${err.message}`);
+      return res.status(502).json({ error: 'Failed to read follow-ups from Upstash', detail: err.message });
+    }
     // Due today (IST), named, and not already marked done.
     followups = all.filter(f =>
       f && f.name &&
