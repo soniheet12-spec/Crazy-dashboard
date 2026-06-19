@@ -4,7 +4,7 @@ This dashboard sends two WhatsApp messages via Twilio:
 
 | Job | Endpoint | Schedule (cron) | IST time |
 |-----|----------|-----------------|----------|
-| Daily follow-up reminder | `/api/send-followup-reminder` | `30 1 * * *` (01:30 UTC) | **07:00 IST daily** |
+| Daily follow-up reminder | `/api/send-followup-reminder` | `30 12 * * *` (12:30 UTC) | **18:00 IST daily** |
 | Weekly pipeline digest | `/api/weekly-digest` | `30 3 * * 1` (03:30 UTC Mon) | **09:00 IST Monday** |
 
 Cron jobs run on **production only** and are invoked internally by Vercel (so
@@ -158,7 +158,7 @@ vercel --prod                                            # redeploy so the vars 
 
 - **In-window / sandbox:** use the dashboard buttons **"Send Digest Now"** and
   **"📲 Send WhatsApp Reminder Now"** — they surface the real Twilio error on failure.
-- **Scheduled:** follow-ups at **07:00 IST**, digest **Mon 09:00 IST**.
+- **Scheduled:** follow-ups at **18:00 IST** (6:00 PM), digest **Mon 09:00 IST**.
 
 ## Twilio error codes you may see
 

@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/send-followup-reminder",
-      "schedule": "30 1 * * *"
+      "schedule": "30 12 * * *"
     },
     {
       "path": "/api/weekly-digest",
