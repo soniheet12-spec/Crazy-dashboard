@@ -18,6 +18,12 @@ export interface Stat {
   color?: string; // hex, used by charts/bars
 }
 
+export interface HabitStreak {
+  current: number;
+  best: number;
+  lastDay: string; // YYYY-MM-DD of last completion
+}
+
 export interface Quest {
   id: string;
   title: string;
@@ -28,6 +34,18 @@ export interface Quest {
   done: boolean;
   completedAt?: string; // ISO timestamp
   daily?: boolean; // resets each local day
+  negative?: boolean; // "anti-habit" / debuff — logging it subtracts XP
+  habitStreak?: HabitStreak; // per-daily-quest streak tracking
+}
+
+export type Rarity = "common" | "rare" | "epic" | "legendary";
+
+export interface LootItem {
+  id: string;
+  name: string;
+  rarity: Rarity;
+  icon: string; // lucide-react icon name
+  acquiredAt: string; // ISO
 }
 
 export interface Achievement {
@@ -64,6 +82,13 @@ export interface GameSettings {
   streak7Multiplier: number; // default 1.5
   streak30Multiplier: number; // default 2
   seasonStartedAt: string; // ISO, used by "reset season"
+  accent: string; // hex accent color for theming
+  reminderHour: number | null; // local hour (0-23) for a daily nudge, or null = off
+}
+
+export interface Combo {
+  count: number;
+  lastAt: string; // ISO timestamp of the last completion in the combo
 }
 
 export interface GameState {
@@ -76,6 +101,12 @@ export interface GameState {
   settings: GameSettings;
   // Calendar event-id -> chosen stat mapping (persisted locally).
   calendarMappings: Record<string, StatKey>;
+  // Progression / collectibles
+  skillPoints: number; // earned on stat level-ups, spent on perks
+  perks: Record<string, number>; // perkId -> rank owned
+  inventory: LootItem[]; // collected loot
+  combo: Combo; // momentum meter
+  lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
   // Internal bookkeeping
   isSampleData: boolean; // true until the user clears the seed
   lastDailyReset: string; // YYYY-MM-DD

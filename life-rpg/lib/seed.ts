@@ -28,11 +28,15 @@ function buildStats(xpByKey: Partial<Record<StatKey, number>>): Record<StatKey, 
   return stats;
 }
 
+export const DEFAULT_ACCENT = "#38bdf8";
+
 function defaultSettings() {
   return {
     streak7Multiplier: 1.5,
     streak30Multiplier: 2,
     seasonStartedAt: new Date().toISOString(),
+    accent: DEFAULT_ACCENT,
+    reminderHour: null,
   };
 }
 
@@ -48,6 +52,11 @@ export function emptyState(): GameState {
     xpHistory: [],
     settings: defaultSettings(),
     calendarMappings: {},
+    skillPoints: 0,
+    perks: {},
+    inventory: [],
+    combo: { count: 0, lastAt: "" },
+    lastLoginBonus: "",
     isSampleData: false,
     lastDailyReset: today,
     version: STATE_VERSION,
@@ -113,6 +122,14 @@ export function sampleState(): GameState {
     xpHistory,
     settings: defaultSettings(),
     calendarMappings: {},
+    skillPoints: 3,
+    perks: {},
+    inventory: [
+      { id: genId("loot"), name: "Silver Sigil", rarity: "rare", icon: "Medal", acquiredAt: at(2, 15) },
+      { id: genId("loot"), name: "Copper Coin", rarity: "common", icon: "Coins", acquiredAt: at(3, 11) },
+    ],
+    combo: { count: 0, lastAt: "" },
+    lastLoginBonus: "",
     isSampleData: true,
     lastDailyReset: today,
     version: STATE_VERSION,
