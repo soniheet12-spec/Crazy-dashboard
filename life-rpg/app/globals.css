@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #0a0e1a;
+  color: #e2e8f0;
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(56, 189, 248, 0.08), transparent),
+    radial-gradient(900px 500px at -10% 110%, rgba(251, 191, 36, 0.06), transparent);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Pixel/retro font used sparingly for titles */
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Monospace numerals for stats */
+.tabular {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card with subtle glow on hover */
+.card {
+  background-color: #121a2e;
+  border: 1px solid #1e2a45;
+  border-radius: 0.9rem;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+.card:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2), 0 8px 40px -12px rgba(56, 189, 248, 0.25);
+}
+
+/* Thin custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2a45;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2b3a5c;
+}
+
+/* Progress bar fill animation */
+.bar-fill {
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
