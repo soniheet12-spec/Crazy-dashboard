@@ -1,0 +1,34 @@
+{
+  "name": "life-rpg",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Life RPG — a personal dashboard that turns goals and habits into a video-game character sheet.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "framer-motion": "^11.11.7",
+    "googleapis": "^144.0.0",
+    "lucide-react": "^0.451.0",
+    "next": "14.2.18",
+    "next-auth": "^4.24.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.13.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.18",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
+}
