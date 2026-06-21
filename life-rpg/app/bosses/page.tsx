@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Minus, Trash2, Skull, Crown } from "lucide-react";
+import { Plus, Minus, Trash2, Skull, Crown, TrendingUp } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
+import { localDay, dayDiff } from "@/lib/dates";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
-import type { StatKey } from "@/lib/types";
+import type { BossGoal, StatKey } from "@/lib/types";
+
+/** Estimate days-to-defeat from progress made since the season started. */
+function forecastDays(boss: BossGoal, seasonStartedAt: string): number | null {
+  if (boss.progress <= 0) return null;
+  const startDay = localDay(new Date(seasonStartedAt));
+  const elapsed = Math.max(1, dayDiff(startDay, localDay()));
+  const rate = boss.progress / elapsed; // progress per day
+  if (rate <= 0) return null;
+  return Math.max(1, Math.ceil((boss.target - boss.progress) / rate));
+}
 
 export default function BossesPage() {
   const { state, hydrated, addBoss, updateBossProgress, removeBoss } = useGameState();
@@ -90,6 +101,7 @@ export default function BossesPage() {
               const defeated = b.progress >= b.target;
               const color = state.stats[b.stat]?.color ?? statColor(b.stat);
               const step = steps[b.id] ?? Math.max(1, Math.round(b.target / 10));
+              const eta = !defeated ? forecastDays(b, state.settings.seasonStartedAt) : null;
               return (
                 <motion.div
                   key={b.id}
@@ -138,6 +150,12 @@ export default function BossesPage() {
                         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                       />
                     </div>
+
+                    {eta !== null && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                        <TrendingUp size={13} /> ~{eta} day{eta === 1 ? "" : "s"} to defeat at your current pace
+                      </p>
+                    )}
 
                     {!defeated && (
                       <div className="mt-3 flex items-center gap-2">

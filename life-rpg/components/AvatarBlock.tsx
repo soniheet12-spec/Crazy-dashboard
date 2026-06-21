@@ -2,17 +2,21 @@
 
 import { motion } from "framer-motion";
 import { Flame, Zap, Star } from "lucide-react";
+import { Icon } from "./Icon";
+import type { DerivedClass } from "@/lib/classes";
 
 export function AvatarBlock({
   characterLevel,
   totalXp,
   streakCurrent,
   energyPct,
+  klass,
 }: {
   characterLevel: number;
   totalXp: number;
   streakCurrent: number;
   energyPct: number;
+  klass: DerivedClass;
 }) {
   return (
     <div className="card flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
@@ -31,7 +35,14 @@ export function AvatarBlock({
 
       <div className="flex-1">
         <p className="font-pixel text-[10px] text-accent">CHARACTER SHEET</p>
-        <h2 className="mt-1 text-xl font-bold text-slate-100">Hero of the Everyday</h2>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
+            <Icon name={klass.icon} size={18} />
+          </span>
+          <h2 className="text-xl font-bold text-slate-100">
+            {klass.title} <span className="text-accent">{klass.name}</span>
+          </h2>
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <span className="flex items-center gap-1.5 text-slate-300">

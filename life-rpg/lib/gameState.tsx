@@ -11,10 +11,14 @@ import {
   type ReactNode,
 } from "react";
 import { useToast, type ToastSpec } from "@/components/Toast";
-import { emptyState, sampleState, STATE_VERSION } from "./seed";
+import { useCelebration, type CelebrationSpec } from "@/components/Celebration";
+import { emptyState, sampleState, STATE_VERSION, DEFAULT_ACCENT } from "./seed";
 import { evaluateAchievements } from "./achievements";
 import { levelFromXp, streakMultiplier } from "./leveling";
 import { localDay, dayDiff } from "./dates";
+import { comboActive, comboMultiplier } from "./combo";
+import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
+import { rollBossLoot, rollQuestLoot } from "./loot";
 import type {
   BossGoal,
   CalendarEvent,
@@ -27,12 +31,12 @@ import type {
 
 const STORAGE_KEY = "life-rpg:v1";
 
-// ─── New-quest input shape ───────────────────────────────────────────────────
 export interface NewQuestInput {
   title: string;
   stat: StatKey;
   xp: number;
   daily?: boolean;
+  negative?: boolean;
 }
 
 export interface NewBossInput {
@@ -57,11 +61,17 @@ export interface GameStateContextValue {
   addBoss: (b: NewBossInput) => void;
   updateBossProgress: (id: string, delta: number) => void;
   removeBoss: (id: string) => void;
+  // progression
+  claimDailyBonus: () => void;
+  buyPerk: (perkId: string) => void;
+  logFocus: (minutes: number) => void;
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
   removeStat: (key: StatKey) => void;
   updateSettings: (patch: Partial<GameSettings>) => void;
+  setAccent: (hex: string) => void;
+  setReminderHour: (hour: number | null) => void;
   // lifecycle / data
   resetSeason: () => void;
   clearSampleData: () => void;
@@ -75,99 +85,123 @@ const Ctx = createContext<GameStateContextValue | null>(null);
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 function genId(prefix = "q"): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 7)}`;
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function slugifyStatKey(label: string, existing: StatKey[]): StatKey {
   const base =
-    label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || "stat";
+    label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "stat";
   let key = base;
   let i = 2;
   while (existing.includes(key)) key = `${base}-${i++}`;
   return key;
 }
 
-/** Add `xp` to today's history bucket. */
 function addToHistory(state: GameState, gained: number) {
   const today = localDay();
   const point = state.xpHistory.find((p) => p.date === today);
   if (point) point.xp += gained;
   else state.xpHistory.push({ date: today, xp: gained });
-  // keep a rolling window large enough for charts/heatmap
-  if (state.xpHistory.length > 400) {
-    state.xpHistory = state.xpHistory.slice(-400);
-  }
+  if (state.xpHistory.length > 400) state.xpHistory = state.xpHistory.slice(-400);
 }
 
-/** Register activity for today and update the streak. Mutates draft. */
 function touchStreak(state: GameState) {
   const today = localDay();
   const last = state.streak.lastActiveDate;
-  if (last === today) return; // already counted today
-  if (last && dayDiff(last, today) === 1) {
-    state.streak.current += 1; // consecutive day
-  } else {
-    state.streak.current = 1; // first day or streak broken
-  }
+  if (last === today) return;
+  if (last && dayDiff(last, today) === 1) state.streak.current += 1;
+  else state.streak.current = 1;
   state.streak.lastActiveDate = today;
   state.streak.longest = Math.max(state.streak.longest, state.streak.current);
 }
 
-/**
- * Award XP to a stat, applying the streak multiplier. Mutates draft and returns
- * the toasts to surface (xp gain + any level-ups).
- */
-function awardXp(
+function bumpCombo(state: GameState) {
+  const now = Date.now();
+  if (!comboActive(state.combo, now)) state.combo.count = 0;
+  state.combo.count += 1;
+  state.combo.lastAt = new Date(now).toISOString();
+}
+
+function updateHabitStreak(quest: Quest, today: string) {
+  if (!quest.habitStreak) quest.habitStreak = { current: 0, best: 0, lastDay: "" };
+  const hs = quest.habitStreak;
+  if (hs.lastDay === today) return;
+  if (hs.lastDay && dayDiff(hs.lastDay, today) === 1) hs.current += 1;
+  else hs.current = 1;
+  hs.lastDay = today;
+  hs.best = Math.max(hs.best, hs.current);
+}
+
+function multiplierNote(streak: number, combo: number, perk: number): string | undefined {
+  const parts: string[] = [];
+  if (streak > 1.001) parts.push(`Streak ×${streak}`);
+  if (combo > 1.001) parts.push(`Combo ×${combo.toFixed(2)}`);
+  if (perk > 1.001) parts.push(`Perks ×${perk.toFixed(2)}`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
+/** Award XP with streak × combo × perk multipliers; handle level-ups + loot. */
+function gainXp(
   state: GameState,
   statKey: StatKey,
   baseXp: number,
+  celebrate: (c: CelebrationSpec) => void,
 ): ToastSpec[] {
   const stat = state.stats[statKey];
   if (!stat) return [];
 
-  const mult = streakMultiplier(state.streak.current, state.settings);
-  const gained = Math.round(baseXp * mult);
+  const streakMult = streakMultiplier(state.streak.current, state.settings);
+  const comboMult = comboMultiplier(state.combo.count, state.perks);
+  const perkMult = perkXpMultiplier(state.perks, statKey);
+  const total = streakMult * comboMult * perkMult;
+  const gained = Math.max(1, Math.round(baseXp * total));
 
   const prevLevel = stat.level;
   stat.xp += gained;
   stat.level = levelFromXp(stat.xp);
-
   addToHistory(state, gained);
 
   const toasts: ToastSpec[] = [
     {
       kind: "xp",
       title: `+${gained} XP · ${stat.label}`,
-      subtitle: mult > 1 ? `Streak bonus ×${mult}` : undefined,
+      subtitle: multiplierNote(streakMult, comboMult, perkMult),
     },
   ];
-  if (stat.level > prevLevel) {
-    toasts.push({
+
+  const levelsGained = stat.level - prevLevel;
+  if (levelsGained > 0) {
+    state.skillPoints += levelsGained;
+    celebrate({
       kind: "levelup",
       title: `${stat.label.toUpperCase()} reached Level ${stat.level}!`,
-      subtitle: "Keep the run going.",
+      subtitle: `+${levelsGained} skill point${levelsGained > 1 ? "s" : ""} earned`,
     });
   }
+
+  // Loot roll
+  const item = rollQuestLoot(0.18, perkLootChanceBonus(state.perks));
+  if (item) {
+    state.inventory.unshift(item);
+    if (item.rarity === "legendary") {
+      celebrate({ kind: "loot", title: item.name, subtitle: "A legendary drop!" });
+    } else {
+      toasts.push({ kind: "info", title: `Loot: ${item.name}`, subtitle: `${item.rarity} drop` });
+    }
+  }
+
   return toasts;
 }
 
-/** Reset dailies and break the streak if a day was fully missed. Mutates draft. */
 function applyDailyReset(state: GameState): boolean {
   const today = localDay();
   if (state.lastDailyReset === today) return false;
-
   for (const q of state.quests) {
     if (q.daily && q.done) {
       q.done = false;
       q.completedAt = undefined;
     }
   }
-  // Streak breaks if the last active day is more than one day in the past.
   if (state.streak.lastActiveDate && dayDiff(state.streak.lastActiveDate, today) > 1) {
     state.streak.current = 0;
   }
@@ -175,7 +209,6 @@ function applyDailyReset(state: GameState): boolean {
   return true;
 }
 
-/** Validate a parsed object looks like a GameState before adopting it. */
 function isGameState(v: unknown): v is GameState {
   if (!v || typeof v !== "object") return false;
   const s = v as Partial<GameState>;
@@ -189,17 +222,38 @@ function isGameState(v: unknown): v is GameState {
   );
 }
 
+/** Fill in fields added in later schema versions so old saves keep working. */
+function migrate(s: GameState): GameState {
+  s.skillPoints ??= 0;
+  s.perks ??= {};
+  s.inventory ??= [];
+  if (!s.combo) s.combo = { count: 0, lastAt: "" };
+  if (s.lastLoginBonus === undefined) s.lastLoginBonus = "";
+  if (!s.settings) {
+    s.settings = {
+      streak7Multiplier: 1.5,
+      streak30Multiplier: 2,
+      seasonStartedAt: new Date().toISOString(),
+      accent: DEFAULT_ACCENT,
+      reminderHour: null,
+    };
+  }
+  if (s.settings.accent === undefined) s.settings.accent = DEFAULT_ACCENT;
+  if (s.settings.reminderHour === undefined) s.settings.reminderHour = null;
+  return s;
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function GameStateProvider({ children }: { children: ReactNode }) {
   const { push } = useToast();
+  const { celebrate } = useCelebration();
   const [state, setState] = useState<GameState>(() => emptyState());
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load from localStorage on mount (client only).
   useEffect(() => {
     let initial: GameState;
     try {
@@ -208,12 +262,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(raw);
         initial = isGameState(parsed) ? parsed : sampleState();
       } else {
-        initial = sampleState(); // first load → seed sample data
+        initial = sampleState();
       }
     } catch {
       initial = sampleState();
     }
-    // Re-derive levels (in case math changed) and run a daily reset.
+    migrate(initial);
     for (const k of Object.keys(initial.stats)) {
       initial.stats[k].level = levelFromXp(initial.stats[k].xp);
     }
@@ -226,7 +280,6 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     setHydrated(true);
   }, []);
 
-  // Debounced persistence.
   useEffect(() => {
     if (!hydrated) return;
     if (writeTimer.current) clearTimeout(writeTimer.current);
@@ -234,7 +287,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
       } catch {
-        /* storage full / unavailable — ignore */
+        /* ignore */
       }
     }, 400);
     return () => {
@@ -242,15 +295,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     };
   }, [state, hydrated]);
 
-  /**
-   * Central commit: clone current state, run the recipe (which mutates the
-   * draft and returns toasts), re-evaluate achievements, then commit + notify.
-   */
   const commit = useCallback(
-    (recipe: (draft: GameState) => ToastSpec[] | void) => {
+    (recipe: (draft: GameState, celebrate: (c: CelebrationSpec) => void) => ToastSpec[] | void) => {
       const draft: GameState = structuredClone(stateRef.current);
       applyDailyReset(draft);
-      const toasts = recipe(draft) || [];
+      const celebrations: CelebrationSpec[] = [];
+      const toasts = recipe(draft, (c) => celebrations.push(c)) || [];
 
       const { achievements, newlyUnlocked } = evaluateAchievements(draft);
       draft.achievements = achievements;
@@ -264,13 +314,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
       stateRef.current = draft;
       setState(draft);
-      // Surface toasts after the state commit.
       toasts.forEach((t) => push(t));
+      celebrations.forEach((c) => celebrate(c));
     },
-    [push],
+    [push, celebrate],
   );
 
-  // ─── Actions ────────────────────────────────────────────────────────────────
+  // ─── Quests ────────────────────────────────────────────────────────────────
 
   const addQuest = useCallback(
     (q: NewQuestInput) => {
@@ -283,6 +333,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           source: "manual",
           done: false,
           daily: q.daily ?? false,
+          negative: q.negative ?? false,
         };
         d.quests.unshift(quest);
       });
@@ -292,13 +343,32 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   const completeQuest = useCallback(
     (id: string) => {
-      commit((d) => {
+      commit((d, cele) => {
         const quest = d.quests.find((q) => q.id === id);
         if (!quest || quest.done) return [];
         quest.done = true;
         quest.completedAt = new Date().toISOString();
+
+        if (quest.negative) {
+          const stat = d.stats[quest.stat];
+          const toasts: ToastSpec[] = [];
+          if (stat) {
+            stat.xp = Math.max(0, stat.xp - quest.xp);
+            stat.level = levelFromXp(stat.xp);
+            addToHistory(d, -quest.xp);
+            toasts.push({
+              kind: "info",
+              title: `−${quest.xp} XP · ${stat.label}`,
+              subtitle: "Anti-habit logged",
+            });
+          }
+          return toasts;
+        }
+
         touchStreak(d);
-        return awardXp(d, quest.stat, quest.xp);
+        if (quest.daily) updateHabitStreak(quest, localDay());
+        bumpCombo(d);
+        return gainXp(d, quest.stat, quest.xp, cele);
       });
     },
     [commit],
@@ -309,12 +379,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       commit((d) => {
         const quest = d.quests.find((q) => q.id === id);
         if (!quest || !quest.done) return [];
-        // Roll back the XP that was awarded (best-effort, no multiplier history).
         const stat = d.stats[quest.stat];
         if (stat) {
-          stat.xp = Math.max(0, stat.xp - quest.xp);
+          const delta = quest.negative ? quest.xp : -quest.xp;
+          stat.xp = Math.max(0, stat.xp + delta);
           stat.level = levelFromXp(stat.xp);
-          addToHistory(d, -quest.xp);
+          addToHistory(d, delta);
         }
         quest.done = false;
         quest.completedAt = undefined;
@@ -334,8 +404,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   const completeCalendarEvent = useCallback(
     (e: CalendarEvent, stat: StatKey, xp: number) => {
-      commit((d) => {
-        // Avoid double-awarding the same event.
+      commit((d, cele) => {
         if (d.quests.some((q) => q.calendarEventId === e.id && q.done)) return [];
         const quest: Quest = {
           id: genId("cal"),
@@ -350,7 +419,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         d.quests.unshift(quest);
         d.calendarMappings[e.id] = quest.stat;
         touchStreak(d);
-        return awardXp(d, quest.stat, quest.xp);
+        bumpCombo(d);
+        return gainXp(d, quest.stat, quest.xp, cele);
       });
     },
     [commit],
@@ -364,6 +434,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     },
     [commit],
   );
+
+  // ─── Bosses ──────────────────────────────────────────────────────────────────
 
   const addBoss = useCallback(
     (b: NewBossInput) => {
@@ -384,18 +456,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   const updateBossProgress = useCallback(
     (id: string, delta: number) => {
-      commit((d) => {
+      commit((d, cele) => {
         const boss = d.bosses.find((b) => b.id === id);
         if (!boss) return [];
+        const wasDone = boss.progress >= boss.target;
         boss.progress = Math.max(0, Math.min(boss.target, boss.progress + delta));
-        if (boss.progress >= boss.target) {
-          return [
-            {
-              kind: "levelup",
-              title: `Boss defeated: ${boss.title}!`,
-              subtitle: "Goal complete.",
-            },
-          ];
+        if (!wasDone && boss.progress >= boss.target) {
+          const item = rollBossLoot(perkLootChanceBonus(d.perks));
+          d.inventory.unshift(item);
+          cele({ kind: "boss", title: `${boss.title} defeated!`, subtitle: `Loot: ${item.name}` });
         }
       });
     },
@@ -410,6 +479,80 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     },
     [commit],
   );
+
+  // ─── Progression ──────────────────────────────────────────────────────────────
+
+  const claimDailyBonus = useCallback(() => {
+    commit((d) => {
+      const today = localDay();
+      if (d.lastLoginBonus === today) return [];
+      d.lastLoginBonus = today;
+      const stats = Object.values(d.stats);
+      if (stats.length === 0) return [];
+      const lowest = [...stats].sort((a, b) => a.xp - b.xp)[0];
+      const bonus = 40;
+      lowest.xp += bonus;
+      lowest.level = levelFromXp(lowest.xp);
+      addToHistory(d, bonus);
+      const toasts: ToastSpec[] = [
+        { kind: "xp", title: `Daily Blessing: +${bonus} XP · ${lowest.label}` },
+      ];
+      const item = rollQuestLoot(1, perkLootChanceBonus(d.perks)); // guaranteed drop
+      if (item) {
+        d.inventory.unshift(item);
+        toasts.push({ kind: "info", title: `Loot: ${item.name}`, subtitle: `${item.rarity} drop` });
+      }
+      return toasts;
+    });
+  }, [commit]);
+
+  const buyPerk = useCallback(
+    (perkId: string) => {
+      commit((d) => {
+        const perk = PERKS.find((p) => p.id === perkId);
+        if (!perk) return [];
+        const rank = d.perks[perkId] ?? 0;
+        if (rank >= perk.maxRank) return [];
+        const cost = perkCost(rank);
+        if (d.skillPoints < cost) return [];
+        d.skillPoints -= cost;
+        d.perks[perkId] = rank + 1;
+        return [
+          {
+            kind: "info",
+            title: `${perk.name} → Rank ${rank + 1}`,
+            subtitle: `−${cost} skill point${cost > 1 ? "s" : ""}`,
+          },
+        ];
+      });
+    },
+    [commit],
+  );
+
+  const logFocus = useCallback(
+    (minutes: number) => {
+      commit((d, cele) => {
+        const statKey = d.stats["mind"] ? "mind" : Object.keys(d.stats)[0];
+        if (!statKey) return [];
+        const quest: Quest = {
+          id: genId("focus"),
+          title: `Focus session · ${minutes} min`,
+          stat: statKey,
+          xp: Math.max(5, Math.round(minutes)),
+          source: "manual",
+          done: true,
+          completedAt: new Date().toISOString(),
+        };
+        d.quests.unshift(quest);
+        touchStreak(d);
+        bumpCombo(d);
+        return gainXp(d, statKey, quest.xp, cele);
+      });
+    },
+    [commit],
+  );
+
+  // ─── Stats / settings ──────────────────────────────────────────────────────────
 
   const addStat = useCallback(
     (label: string) => {
@@ -441,9 +584,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const removeStat = useCallback(
     (key: StatKey) => {
       commit((d) => {
-        if (Object.keys(d.stats).length <= 1) return []; // keep at least one
+        if (Object.keys(d.stats).length <= 1) return [];
         delete d.stats[key];
-        // Reassign orphaned quests/bosses to the first remaining stat.
         const fallback = Object.keys(d.stats)[0];
         d.quests.forEach((q) => {
           if (q.stat === key) q.stat = fallback;
@@ -465,19 +607,42 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const setAccent = useCallback(
+    (hex: string) => {
+      commit((d) => {
+        d.settings.accent = hex;
+      });
+    },
+    [commit],
+  );
+
+  const setReminderHour = useCallback(
+    (hour: number | null) => {
+      commit((d) => {
+        d.settings.reminderHour = hour;
+      });
+    },
+    [commit],
+  );
+
   const resetSeason = useCallback(() => {
     commit((d) => {
       for (const k of Object.keys(d.stats)) {
         d.stats[k].xp = 0;
         d.stats[k].level = 1;
       }
-      d.quests = d.quests.filter((q) => q.daily).map((q) => ({ ...q, done: false, completedAt: undefined }));
+      d.quests = d.quests
+        .filter((q) => q.daily)
+        .map((q) => ({ ...q, done: false, completedAt: undefined, habitStreak: undefined }));
       d.bosses.forEach((b) => (b.progress = 0));
       d.xpHistory = [];
       d.streak = { current: 0, longest: 0, lastActiveDate: "" };
+      d.combo = { count: 0, lastAt: "" };
+      d.skillPoints = 0;
+      d.perks = {};
       d.settings.seasonStartedAt = new Date().toISOString();
       d.isSampleData = false;
-      return [{ kind: "info", title: "New season started", subtitle: "Stats and history reset." }];
+      return [{ kind: "info", title: "New season started", subtitle: "Stats, perks, and history reset. Loot kept." }];
     });
   }, [commit]);
 
@@ -495,15 +660,14 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     push({ kind: "info", title: "Sample data loaded" });
   }, [push]);
 
-  const exportJSON = useCallback(() => {
-    return JSON.stringify(stateRef.current, null, 2);
-  }, []);
+  const exportJSON = useCallback(() => JSON.stringify(stateRef.current, null, 2), []);
 
   const importJSON = useCallback(
     (json: string) => {
       try {
         const parsed = JSON.parse(json);
         if (!isGameState(parsed)) return false;
+        migrate(parsed);
         for (const k of Object.keys(parsed.stats)) {
           parsed.stats[k].level = levelFromXp(parsed.stats[k].xp);
         }
@@ -534,10 +698,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       addBoss,
       updateBossProgress,
       removeBoss,
+      claimDailyBonus,
+      buyPerk,
+      logFocus,
       addStat,
       renameStat,
       removeStat,
       updateSettings,
+      setAccent,
+      setReminderHour,
       resetSeason,
       clearSampleData,
       loadSampleData,
@@ -556,10 +725,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       addBoss,
       updateBossProgress,
       removeBoss,
+      claimDailyBonus,
+      buyPerk,
+      logFocus,
       addStat,
       renameStat,
       removeStat,
       updateSettings,
+      setAccent,
+      setReminderHour,
       resetSeason,
       clearSampleData,
       loadSampleData,

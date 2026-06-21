@@ -10,6 +10,7 @@ import {
   Skull,
   Settings,
   Swords,
+  Sparkles,
 } from "lucide-react";
 
 const LINKS = [
@@ -18,6 +19,7 @@ const LINKS = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/achievements", label: "Achievements", icon: Award },
   { href: "/bosses", label: "Bosses", icon: Skull },
+  { href: "/skills", label: "Skills", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

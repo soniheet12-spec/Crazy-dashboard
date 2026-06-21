@@ -17,7 +17,7 @@ const config: Config = {
         },
         line: "#1e2a45",
         accent: {
-          DEFAULT: "#38bdf8", // electric blue
+          DEFAULT: "rgb(var(--accent-rgb) / <alpha-value>)", // dynamic, themeable
           dim: "#0ea5e9",
           glow: "#7dd3fc",
         },

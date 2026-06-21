@@ -9,9 +9,11 @@ import {
   RefreshCw,
   Sparkles,
   Database,
+  Bell,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
+import { ACCENT_PRESETS } from "@/lib/theme";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
 
 export default function SettingsPage() {
@@ -22,6 +24,8 @@ export default function SettingsPage() {
     renameStat,
     removeStat,
     updateSettings,
+    setAccent,
+    setReminderHour,
     resetSeason,
     clearSampleData,
     loadSampleData,
@@ -170,6 +174,58 @@ export default function SettingsPage() {
                 className="tabular w-24 rounded-lg border border-line bg-bg-soft px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
               />
             </label>
+          </div>
+        </Card>
+
+        {/* Appearance & reminders */}
+        <Card>
+          <CardTitle>Appearance &amp; Reminders</CardTitle>
+          <p className="mb-2 text-sm text-slate-400">Accent color</p>
+          <div className="flex flex-wrap gap-2">
+            {ACCENT_PRESETS.map((p) => (
+              <button
+                key={p.hex}
+                onClick={() => setAccent(p.hex)}
+                title={p.name}
+                aria-label={p.name}
+                className={`h-9 w-9 rounded-full border-2 transition-transform hover:scale-110 ${
+                  state.settings.accent === p.hex ? "border-slate-100" : "border-transparent"
+                }`}
+                style={{ backgroundColor: p.hex }}
+              />
+            ))}
+          </div>
+          <div className="mt-5">
+            <p className="mb-2 flex items-center gap-1.5 text-sm text-slate-400">
+              <Bell size={14} /> Daily reminder
+            </p>
+            <select
+              value={state.settings.reminderHour ?? ""}
+              onChange={async (e) => {
+                const v = e.target.value;
+                if (v === "") {
+                  setReminderHour(null);
+                  return;
+                }
+                if ("Notification" in window && Notification.permission !== "granted") {
+                  try {
+                    await Notification.requestPermission();
+                  } catch {
+                    /* ignore */
+                  }
+                }
+                setReminderHour(Number(v));
+              }}
+              className="rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+            >
+              <option value="">Off</option>
+              {Array.from({ length: 24 }).map((_, h) => (
+                <option key={h} value={h}>{`${String(h).padStart(2, "0")}:00`}</option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-500">
+              Best-effort nudge while the app is open if your dailies are unfinished.
+            </p>
           </div>
         </Card>
 

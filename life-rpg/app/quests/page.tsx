@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Trash2, RotateCcw, Repeat, Calendar } from "lucide-react";
+import { Plus, Check, Trash2, RotateCcw, Repeat, Calendar, Flame, Skull } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { localDay } from "@/lib/dates";
+import { FocusTimer } from "@/components/FocusTimer";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
 import type { Quest, StatKey } from "@/lib/types";
 
@@ -53,14 +54,26 @@ function QuestRow({
         <p className={`truncate text-sm ${quest.done ? "text-slate-500 line-through" : "text-slate-100"}`}>
           {quest.title}
         </p>
-        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
+        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
           <span style={{ color }}>{statLabel}</span>
-          <span className="tabular">+{quest.xp} XP</span>
+          <span className="tabular">
+            {quest.negative ? "−" : "+"}
+            {quest.xp} XP
+          </span>
           {quest.daily && (
             <span className="flex items-center gap-0.5"><Repeat size={10} /> daily</span>
           )}
+          {quest.negative && (
+            <span className="flex items-center gap-0.5 text-body"><Skull size={10} /> anti-habit</span>
+          )}
           {quest.source === "calendar" && (
             <span className="flex items-center gap-0.5"><Calendar size={10} /> calendar</span>
+          )}
+          {quest.habitStreak && quest.habitStreak.best > 0 && (
+            <span className="flex items-center gap-0.5 text-amber">
+              <Flame size={10} /> {quest.habitStreak.current}
+              <span className="text-slate-600">/{quest.habitStreak.best}</span>
+            </span>
           )}
         </div>
       </div>
@@ -88,6 +101,7 @@ export default function QuestsPage() {
   const [stat, setStat] = useState<StatKey>(statList[0]?.key ?? "body");
   const [xp, setXp] = useState(30);
   const [daily, setDaily] = useState(false);
+  const [negative, setNegative] = useState(false);
 
   const today = localDay();
   const active = state.quests.filter((q) => !q.done);
@@ -98,10 +112,11 @@ export default function QuestsPage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    addQuest({ title, stat, xp, daily });
+    addQuest({ title, stat, xp, daily, negative });
     setTitle("");
     setXp(30);
     setDaily(false);
+    setNegative(false);
   };
 
   const label = (key: StatKey) => state.stats[key]?.label ?? key;
@@ -112,8 +127,9 @@ export default function QuestsPage() {
       <PageHeader title="Quests" subtitle="Log actions to earn XP and level up your stats." />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* Add quest */}
-        <Card className="lg:col-span-1">
+        {/* Add quest + focus timer */}
+        <div className="flex flex-col gap-5 lg:col-span-1">
+        <Card>
           <CardTitle>New Quest</CardTitle>
           <form onSubmit={submit} className="flex flex-col gap-3">
             <input
@@ -141,15 +157,26 @@ export default function QuestsPage() {
                 aria-label="XP reward"
               />
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
-              <input
-                type="checkbox"
-                checked={daily}
-                onChange={(e) => setDaily(e.target.checked)}
-                className="h-4 w-4 accent-accent"
-              />
-              Repeats daily
-            </label>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={daily}
+                  onChange={(e) => setDaily(e.target.checked)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Repeats daily
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={negative}
+                  onChange={(e) => setNegative(e.target.checked)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Anti-habit (costs XP)
+              </label>
+            </div>
             <button
               type="submit"
               className="flex items-center justify-center gap-2 rounded-lg bg-accent/90 px-3 py-2.5 text-sm font-semibold text-bg transition-colors hover:bg-accent"
@@ -158,6 +185,8 @@ export default function QuestsPage() {
             </button>
           </form>
         </Card>
+        <FocusTimer />
+        </div>
 
         {/* Today / active */}
         <div className="flex flex-col gap-5 lg:col-span-2">
