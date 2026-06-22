@@ -45,9 +45,21 @@ export interface Quest {
   habitStreak?: HabitStreak; // per-daily-quest streak tracking
   subtasks?: SubTask[]; // optional checklist; all-done auto-completes the quest
   sideQuest?: boolean; // generated daily side quest
+  difficulty?: Difficulty; // scales XP & coins
+}
+
+export interface QuestTemplate {
+  id: string;
+  title: string;
+  stat: StatKey;
+  xp: number;
+  daily?: boolean;
+  difficulty?: Difficulty;
 }
 
 export type Rarity = "common" | "rare" | "epic" | "legendary";
+
+export type Difficulty = "easy" | "normal" | "hard";
 
 export interface LootItem {
   id: string;
@@ -122,6 +134,10 @@ export interface GameState {
   streakFreezes: number; // consumables that protect a missed day
   potionUntil: string; // ISO; active XP-potion expiry
   prestige: number; // prestige level (permanent XP bonus)
+  hp: number; // 0-100; drained by anti-habits, restored daily / by rest
+  templates: QuestTemplate[]; // saved quest templates / favorites
+  lastDailyChallenge: string; // YYYY-MM-DD daily challenge claimed
+  lastWeeklyChallenge: string; // ISO week key weekly challenge claimed
   combo: Combo; // momentum meter
   lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
   lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted

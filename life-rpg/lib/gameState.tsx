@@ -28,6 +28,15 @@ import {
   SHOP_ITEMS,
 } from "./shop";
 import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
+import {
+  DAILY_CHALLENGE,
+  WEEKLY_CHALLENGE,
+  dailyChallengeProgress,
+  weeklyChallengeProgress,
+  difficultyMult,
+  weekKey,
+  MAX_HP,
+} from "./gameplay";
 import { sideQuestForDay } from "./sidequests";
 import { playFx, vibrate, type Fx } from "./sound";
 import type {
@@ -35,12 +44,21 @@ import type {
   CalendarEvent,
   GameSettings,
   GameState,
+  Difficulty,
   Quest,
+  QuestTemplate,
   Rarity,
   Stat,
   StatKey,
   SubTask,
 } from "./types";
+
+/** Effective base XP after difficulty scaling. */
+function effXp(quest: Quest): number {
+  return Math.max(1, Math.round(quest.xp * difficultyMult(quest.difficulty)));
+}
+
+const REST_RE = /rest|recharge|sleep|heal|nap|meditat/i;
 
 /** Play sound + haptics for an event, respecting user settings. */
 function fx(state: GameState, kind: Fx) {
@@ -60,6 +78,7 @@ export interface NewQuestInput {
   negative?: boolean;
   days?: number[];
   subtasks?: string[];
+  difficulty?: Difficulty;
 }
 
 export interface NewBossInput {
@@ -98,6 +117,11 @@ export interface GameStateContextValue {
   buyShopItem: (id: string) => void;
   craft: (rarity: Rarity) => void;
   prestige: () => void;
+  claimDailyChallenge: () => void;
+  claimWeeklyChallenge: () => void;
+  respecPerks: () => void;
+  addTemplate: (t: Omit<QuestTemplate, "id">) => void;
+  removeTemplate: (id: string) => void;
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
@@ -261,6 +285,7 @@ function applyDailyReset(state: GameState): boolean {
       }
     }
   }
+  state.hp = MAX_HP; // rest restores HP each day
   state.lastDailyReset = today;
   return true;
 }
@@ -290,6 +315,10 @@ function migrate(s: GameState): GameState {
   s.streakFreezes ??= 0;
   if (s.potionUntil === undefined) s.potionUntil = "";
   s.prestige ??= 0;
+  if (typeof s.hp !== "number") s.hp = MAX_HP;
+  s.templates ??= [];
+  if (s.lastDailyChallenge === undefined) s.lastDailyChallenge = "";
+  if (s.lastWeeklyChallenge === undefined) s.lastWeeklyChallenge = "";
   if (s.lastSideQuest === undefined) s.lastSideQuest = "";
   if (s.onboarded === undefined) s.onboarded = true;
   if (!s.settings) {
@@ -403,6 +432,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           negative: q.negative ?? false,
         };
         if (q.days && q.days.length) quest.days = [...q.days].sort();
+        if (q.difficulty) quest.difficulty = q.difficulty;
         const subs = (q.subtasks ?? []).map((t) => t.trim()).filter(Boolean);
         if (subs.length) {
           quest.subtasks = subs.map((t) => ({ id: genId("st"), title: t, done: false }));
@@ -424,6 +454,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         if (quest.negative) {
           const stat = d.stats[quest.stat];
           const toasts: ToastSpec[] = [];
+          d.hp = Math.max(0, d.hp - quest.xp); // anti-habits deal HP damage
           if (stat) {
             stat.xp = Math.max(0, stat.xp - quest.xp);
             stat.level = levelFromXp(stat.xp);
@@ -431,7 +462,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
             toasts.push({
               kind: "info",
               title: `−${quest.xp} XP · ${stat.label}`,
-              subtitle: "Anti-habit logged",
+              subtitle: `Anti-habit logged · −${quest.xp} HP`,
             });
           }
           return toasts;
@@ -441,7 +472,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         touchStreak(d);
         if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
         bumpCombo(d);
-        const earned = gainXp(d, quest.stat, quest.xp, cele);
+        if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40); // rest heals
+        const earned = gainXp(d, quest.stat, effXp(quest), cele);
         fx(d, "complete");
         return earned;
       });
@@ -675,7 +707,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
             touchStreak(d);
             if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
             bumpCombo(d);
-            const earned = gainXp(d, quest.stat, quest.xp, cele);
+            if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40);
+            const earned = gainXp(d, quest.stat, effXp(quest), cele);
             fx(d, "complete");
             return earned;
           }
@@ -778,6 +811,77 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       return [{ kind: "levelup", title: `Prestige ${d.prestige}!`, subtitle: `Permanent +${d.prestige * 2}% XP` }];
     });
   }, [commit]);
+
+  const claimDailyChallenge = useCallback(() => {
+    commit((d) => {
+      const today = localDay();
+      if (d.lastDailyChallenge === today || dailyChallengeProgress(d) < DAILY_CHALLENGE.target) return [];
+      d.lastDailyChallenge = today;
+      d.coins += DAILY_CHALLENGE.reward;
+      return [{ kind: "xp", title: `Daily challenge complete!`, subtitle: `+${DAILY_CHALLENGE.reward} coins` }];
+    });
+  }, [commit]);
+
+  const claimWeeklyChallenge = useCallback(() => {
+    commit((d, cele) => {
+      const wk = weekKey();
+      if (d.lastWeeklyChallenge === wk || weeklyChallengeProgress(d) < WEEKLY_CHALLENGE.target) return [];
+      d.lastWeeklyChallenge = wk;
+      d.coins += WEEKLY_CHALLENGE.reward;
+      const loot = rollQuestLoot(1, perkLootChanceBonus(d.perks));
+      const toasts: ToastSpec[] = [
+        { kind: "xp", title: "Weekly challenge complete!", subtitle: `+${WEEKLY_CHALLENGE.reward} coins` },
+      ];
+      if (loot) {
+        d.inventory.unshift(loot);
+        if (loot.rarity === "legendary") cele({ kind: "loot", title: loot.name, subtitle: "Weekly reward!" });
+        else toasts.push({ kind: "info", title: `Loot: ${loot.name}`, subtitle: `${loot.rarity} drop` });
+      }
+      return toasts;
+    });
+  }, [commit]);
+
+  const respecPerks = useCallback(() => {
+    commit((d) => {
+      const cost = 50;
+      let refund = 0;
+      for (const rank of Object.values(d.perks)) refund += (rank * (rank + 1)) / 2;
+      if (refund === 0) return [{ kind: "info", title: "No perks to respec" }];
+      if (d.coins < cost) return [{ kind: "info", title: "Need 50 coins to respec" }];
+      d.coins -= cost;
+      d.perks = {};
+      d.skillPoints += refund;
+      return [{ kind: "info", title: `Respec complete · +${refund} SP`, subtitle: "−50 coins" }];
+    });
+  }, [commit]);
+
+  const addTemplate = useCallback(
+    (t: Omit<QuestTemplate, "id">) => {
+      commit((d) => {
+        if (d.templates.some((x) => x.title === t.title && x.stat === t.stat)) return [];
+        d.templates.unshift({
+          id: genId("tpl"),
+          title: t.title,
+          stat: t.stat,
+          xp: t.xp,
+          daily: t.daily,
+          difficulty: t.difficulty,
+        });
+        if (d.templates.length > 12) d.templates = d.templates.slice(0, 12);
+        return [{ kind: "info", title: "Saved as template" }];
+      });
+    },
+    [commit],
+  );
+
+  const removeTemplate = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.templates = d.templates.filter((t) => t.id !== id);
+      });
+    },
+    [commit],
+  );
 
   // ─── Stats / settings ──────────────────────────────────────────────────────────
 
@@ -936,6 +1040,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       buyShopItem,
       craft,
       prestige,
+      claimDailyChallenge,
+      claimWeeklyChallenge,
+      respecPerks,
+      addTemplate,
+      removeTemplate,
       addStat,
       renameStat,
       removeStat,
@@ -971,6 +1080,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       buyShopItem,
       craft,
       prestige,
+      claimDailyChallenge,
+      claimWeeklyChallenge,
+      respecPerks,
+      addTemplate,
+      removeTemplate,
       addStat,
       renameStat,
       removeStat,

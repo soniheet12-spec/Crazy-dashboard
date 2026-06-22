@@ -3,9 +3,6 @@
 import type { XpHistoryPoint } from "@/lib/types";
 import { localDay, addDays, shortLabel } from "@/lib/dates";
 
-const WEEKS = 12;
-const DAYS = WEEKS * 7;
-
 function intensityClass(xp: number): string {
   if (xp <= 0) return "bg-bg-soft";
   if (xp < 40) return "bg-accent/25";
@@ -14,15 +11,22 @@ function intensityClass(xp: number): string {
   return "bg-accent";
 }
 
-export function ActivityHeatmap({ history }: { history: XpHistoryPoint[] }) {
+export function ActivityHeatmap({
+  history,
+  weeks = 12,
+}: {
+  history: XpHistoryPoint[];
+  weeks?: number;
+}) {
+  const days = weeks * 7;
   const byDate = new Map(history.map((h) => [h.date, h.xp]));
   const today = localDay();
   // Start so that the grid ends on today; align to whole weeks.
-  const start = addDays(today, -(DAYS - 1));
+  const start = addDays(today, -(days - 1));
 
   // Columns = weeks, each with 7 day cells.
   const columns: { date: string; xp: number }[][] = [];
-  for (let w = 0; w < WEEKS; w++) {
+  for (let w = 0; w < weeks; w++) {
     const col: { date: string; xp: number }[] = [];
     for (let d = 0; d < 7; d++) {
       const date = addDays(start, w * 7 + d);

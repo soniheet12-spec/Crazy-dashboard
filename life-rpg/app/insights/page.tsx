@@ -3,6 +3,7 @@
 import { Zap, Target, CalendarCheck, Flame, Gem, Clock } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { computeInsights, DOW_LABELS, hourLabel } from "@/lib/insights";
+import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import { Card, CardTitle, HydrationGate, PageHeader } from "@/components/ui";
 
 function Stat({ icon: Icon, label, value }: { icon: typeof Zap; label: string; value: string | number }) {
@@ -77,6 +78,11 @@ export default function InsightsPage() {
           </p>
         </Card>
       </div>
+
+      <Card className="mt-5">
+        <CardTitle>Activity — last year</CardTitle>
+        <ActivityHeatmap history={state.xpHistory} weeks={52} />
+      </Card>
     </HydrationGate>
   );
 }

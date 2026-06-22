@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Flame, Zap, Star, Coins } from "lucide-react";
+import { Flame, Zap, Star, Coins, Heart } from "lucide-react";
 import { Icon } from "./Icon";
 import type { DerivedClass } from "@/lib/classes";
 
@@ -13,6 +13,7 @@ export function AvatarBlock({
   klass,
   coins,
   prestige,
+  hp,
 }: {
   characterLevel: number;
   totalXp: number;
@@ -21,6 +22,7 @@ export function AvatarBlock({
   klass: DerivedClass;
   coins: number;
   prestige: number;
+  hp: number;
 }) {
   return (
     <div className="card flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
@@ -71,8 +73,26 @@ export function AvatarBlock({
           </span>
         </div>
 
-        {/* Energy bar */}
+        {/* HP bar */}
         <div className="mt-4">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1 text-slate-400">
+              <Heart size={12} className="text-body" /> HP
+            </span>
+            <span className="tabular text-slate-300">{hp}/100</span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-bg-soft">
+            <motion.div
+              className="h-full rounded-full bg-body"
+              initial={{ width: 0 }}
+              animate={{ width: `${hp}%` }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
+        </div>
+
+        {/* Energy bar */}
+        <div className="mt-3">
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-slate-400">Energy</span>
             <span className="tabular text-slate-300">{energyPct}/100</span>

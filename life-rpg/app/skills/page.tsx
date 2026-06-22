@@ -13,7 +13,7 @@ import { Icon } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader } from "@/components/ui";
 
 export default function SkillsPage() {
-  const { state, hydrated, buyPerk, equipItem, unequipItem, buyShopItem, craft, prestige } =
+  const { state, hydrated, buyPerk, equipItem, unequipItem, buyShopItem, craft, prestige, respecPerks } =
     useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
@@ -88,7 +88,15 @@ export default function SkillsPage() {
 
       {/* Skill tree */}
       <Card className="mb-5">
-        <CardTitle>Skill Tree</CardTitle>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <CardTitle>Skill Tree</CardTitle>
+          <button
+            onClick={respecPerks}
+            className="rounded-md border border-line px-2.5 py-1 text-xs text-slate-300 hover:border-accent"
+          >
+            Respec · 50 coins
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {PERKS.map((perk) => {
             const rank = state.perks[perk.id] ?? 0;
