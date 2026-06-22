@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, Lock, Check, Shield } from "lucide-react";
+import { Sparkles, Lock, Check, Shield, Coins, Hammer, Star } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
@@ -8,11 +8,13 @@ import { PERKS, perkCost } from "@/lib/perks";
 import { RARITY_COLOR, RARITY_ORDER } from "@/lib/loot";
 import { collectionBonus, gearBonusFor, gearMultiplier, MAX_EQUIPPED } from "@/lib/gear";
 import { seasonProgress, seasonXp } from "@/lib/season";
+import { SHOP_ITEMS, potionActive, nextRarity } from "@/lib/shop";
 import { Icon } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader } from "@/components/ui";
 
 export default function SkillsPage() {
-  const { state, hydrated, buyPerk, equipItem, unequipItem } = useGameState();
+  const { state, hydrated, buyPerk, equipItem, unequipItem, buyShopItem, craft, prestige } =
+    useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
 
@@ -25,6 +27,11 @@ export default function SkillsPage() {
 
   const sXp = seasonXp(state);
   const sp = seasonProgress(sXp);
+  const atMaxTier = sp.next === null;
+  const potionOn = potionActive(state);
+  const craftable = RARITY_ORDER.filter(
+    (r) => r !== "legendary" && state.inventory.filter((i) => i.rarity === r).length >= 3,
+  );
 
   return (
     <HydrationGate hydrated={hydrated}>
@@ -135,6 +142,67 @@ export default function SkillsPage() {
         </div>
       </Card>
 
+      {/* Shop */}
+      <Card className="mb-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Shop</CardTitle>
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="flex items-center gap-1 text-amber">
+              <Coins size={13} /> {state.coins} coins
+            </span>
+            <span>{state.streakFreezes} freeze{state.streakFreezes === 1 ? "" : "s"}</span>
+            {potionOn && <span className="text-accent">Potion active</span>}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {SHOP_ITEMS.map((item) => {
+            const afford = state.coins >= item.cost;
+            return (
+              <div key={item.id} className="flex flex-col rounded-xl border border-line/70 bg-bg-soft/50 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber/15 text-amber">
+                    <Icon name={item.icon} size={18} />
+                  </span>
+                  <p className="font-semibold text-slate-100">{item.name}</p>
+                </div>
+                <p className="mb-3 flex-1 text-xs text-slate-400">{item.description}</p>
+                <button
+                  onClick={() => buyShopItem(item.id)}
+                  disabled={!afford}
+                  className="flex items-center justify-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1.5 text-xs font-semibold text-bg hover:bg-accent disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+                >
+                  <Coins size={13} /> {item.cost}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Prestige */}
+      <Card className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber/15 text-amber">
+            <Star size={20} fill={state.prestige > 0 ? "#fbbf24" : "none"} />
+          </span>
+          <div>
+            <p className="font-semibold text-slate-100">Prestige {state.prestige}</p>
+            <p className="text-sm text-slate-400">
+              {atMaxTier
+                ? "Reset the season for a permanent +2% XP per prestige."
+                : "Reach the Mythic season tier to unlock prestige."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={prestige}
+          disabled={!atMaxTier}
+          className="rounded-lg bg-amber/90 px-4 py-2 text-sm font-semibold text-bg hover:bg-amber disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+        >
+          Prestige
+        </button>
+      </Card>
+
       {/* Loot & gear */}
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -148,6 +216,23 @@ export default function SkillsPage() {
             <span className="text-accent">+{totalGearPct}% XP</span> from gear &amp; collection
           </p>
         </div>
+
+        {craftable.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line/70 bg-bg-soft/40 p-3">
+            <span className="flex items-center gap-1 text-xs text-slate-400">
+              <Hammer size={13} /> Craft
+            </span>
+            {craftable.map((r) => (
+              <button
+                key={r}
+                onClick={() => craft(r)}
+                className="rounded-md border border-line px-2 py-1 text-xs capitalize text-slate-200 hover:border-accent"
+              >
+                3× {r} → {nextRarity(r)}
+              </button>
+            ))}
+          </div>
+        )}
 
         {inventory.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">

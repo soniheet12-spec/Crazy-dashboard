@@ -79,6 +79,8 @@ export default function DashboardPage() {
           streakCurrent={state.streak.current}
           energyPct={computeEnergy(state.quests)}
           klass={klass}
+          coins={state.coins}
+          prestige={state.prestige}
         />
 
         {/* Daily bonus · side quest · needs attention */}
