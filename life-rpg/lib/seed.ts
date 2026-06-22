@@ -39,6 +39,7 @@ function defaultSettings() {
     reminderHour: null,
     sound: true,
     haptics: true,
+    reduceMotion: false,
   };
 }
 
@@ -67,6 +68,8 @@ export function emptyState(): GameState {
     templates: [],
     lastDailyChallenge: "",
     lastWeeklyChallenge: "",
+    streakMilestones: [],
+    moods: [],
     lastLoginBonus: "",
     lastSideQuest: "",
     onboarded: true,
@@ -151,6 +154,8 @@ export function sampleState(): GameState {
     templates: [],
     lastDailyChallenge: "",
     lastWeeklyChallenge: "",
+    streakMilestones: [],
+    moods: [],
     lastLoginBonus: "",
     lastSideQuest: "",
     onboarded: false,

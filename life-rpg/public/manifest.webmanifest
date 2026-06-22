@@ -15,5 +15,10 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    { "name": "Today's dashboard", "short_name": "Today", "url": "/" },
+    { "name": "Add a quest", "short_name": "Quests", "url": "/quests" },
+    { "name": "Skills & Shop", "short_name": "Skills", "url": "/skills" }
   ]
 }

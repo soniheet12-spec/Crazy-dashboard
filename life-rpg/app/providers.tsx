@@ -10,6 +10,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { CommandPalette } from "@/components/CommandPalette";
 import { GameStateProvider, useGameState } from "@/lib/gameState";
 import { hexToRgbTriplet } from "@/lib/theme";
+import { setReduceMotion } from "@/lib/motion";
 
 // Applies the saved accent color to the document as a CSS variable so every
 // Tailwind `accent` utility recolors live.
@@ -21,7 +22,8 @@ function ThemeApplier() {
       "--accent-rgb",
       hexToRgbTriplet(state.settings.accent),
     );
-  }, [state.settings.accent, hydrated]);
+    setReduceMotion(state.settings.reduceMotion);
+  }, [state.settings.accent, state.settings.reduceMotion, hydrated]);
   return null;
 }
 

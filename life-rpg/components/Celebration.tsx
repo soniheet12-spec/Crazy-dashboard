@@ -9,6 +9,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpCircle, Crown, Award, Gem, type LucideIcon } from "lucide-react";
+import { getReduceMotion } from "@/lib/motion";
 
 export type CelebrationKind = "levelup" | "boss" | "achievement" | "loot";
 
@@ -44,6 +45,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
 
   const current = queue[0];
   const Icon = current ? ICONS[current.kind] : ArrowUpCircle;
+  const reduce = getReduceMotion();
 
   return (
     <Ctx.Provider value={{ celebrate }}>
@@ -59,6 +61,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
             onClick={() => setQueue((q) => q.slice(1))}
           >
             {/* Confetti burst */}
+            {!reduce && (
             <div className="pointer-events-none absolute left-1/2 top-1/2">
               {CONFETTI.map((_, i) => {
                 const angle = (i / CONFETTI.length) * Math.PI * 2;
@@ -81,6 +84,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
+            )}
 
             <motion.div
               className="relative mx-4 flex flex-col items-center gap-3 rounded-2xl border border-amber/50 bg-bg-card/95 px-10 py-8 text-center shadow-glow-amber"

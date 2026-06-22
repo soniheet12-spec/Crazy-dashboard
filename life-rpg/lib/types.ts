@@ -46,6 +46,7 @@ export interface Quest {
   subtasks?: SubTask[]; // optional checklist; all-done auto-completes the quest
   sideQuest?: boolean; // generated daily side quest
   difficulty?: Difficulty; // scales XP & coins
+  lastLoggedDay?: string; // YYYY-MM-DD an anti-habit was last logged (days-clean)
 }
 
 export interface QuestTemplate {
@@ -108,6 +109,12 @@ export interface GameSettings {
   reminderHour: number | null; // local hour (0-23) for a daily nudge, or null = off
   sound: boolean; // sound effects on level-up / loot / boss
   haptics: boolean; // vibration feedback on supported devices
+  reduceMotion: boolean; // disable confetti / heavy animations
+}
+
+export interface MoodEntry {
+  date: string; // YYYY-MM-DD
+  value: number; // 1-5
 }
 
 export interface Combo {
@@ -138,6 +145,8 @@ export interface GameState {
   templates: QuestTemplate[]; // saved quest templates / favorites
   lastDailyChallenge: string; // YYYY-MM-DD daily challenge claimed
   lastWeeklyChallenge: string; // ISO week key weekly challenge claimed
+  streakMilestones: number[]; // claimed streak milestones (7/30/100)
+  moods: MoodEntry[]; // daily mood check-ins
   combo: Combo; // momentum meter
   lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
   lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted

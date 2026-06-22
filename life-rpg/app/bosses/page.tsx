@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Minus, Trash2, Skull, Crown, TrendingUp, Clock } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { localDay, dayDiff } from "@/lib/dates";
+import { BOSS_PRESETS } from "@/lib/presets";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
 import type { BossGoal, StatKey } from "@/lib/types";
 
@@ -93,6 +94,20 @@ export default function BossesPage() {
               <Plus size={16} /> Add Boss
             </button>
           </form>
+          <div className="mt-4 border-t border-line/70 pt-4">
+            <p className="mb-2 text-xs text-slate-500">Quick templates</p>
+            <div className="flex flex-wrap gap-2">
+              {BOSS_PRESETS.map((b) => (
+                <button
+                  key={b.title}
+                  onClick={() => addBoss({ title: b.title, stat: b.stat, target: b.target, unit: b.unit })}
+                  className="rounded-full border border-line bg-bg-soft px-3 py-1.5 text-xs text-slate-200 hover:border-accent"
+                >
+                  + {b.title}
+                </button>
+              ))}
+            </div>
+          </div>
         </Card>
 
         <div className="flex flex-col gap-4 lg:col-span-2">
