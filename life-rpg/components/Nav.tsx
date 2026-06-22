@@ -14,13 +14,13 @@ import {
 } from "lucide-react";
 
 const LINKS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/quests", label: "Quests", icon: ScrollText },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/achievements", label: "Achievements", icon: Award },
-  { href: "/bosses", label: "Bosses", icon: Skull },
-  { href: "/skills", label: "Skills", icon: Sparkles },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard },
+  { href: "/quests", label: "Quests", short: "Quests", icon: ScrollText },
+  { href: "/calendar", label: "Calendar", short: "Cal", icon: CalendarDays },
+  { href: "/achievements", label: "Achievements", short: "Awards", icon: Award },
+  { href: "/bosses", label: "Bosses", short: "Bosses", icon: Skull },
+  { href: "/skills", label: "Skills", short: "Skills", icon: Sparkles },
+  { href: "/settings", label: "Settings", short: "More", icon: Settings },
 ];
 
 export function Nav() {
@@ -71,20 +71,23 @@ export function Nav() {
       </header>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-line/70 bg-bg/95 px-1 py-1.5 backdrop-blur lg:hidden">
-        {LINKS.map(({ href, label, icon: Icon }) => {
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-line/70 bg-bg/95 px-0.5 py-1.5 backdrop-blur lg:hidden"
+        style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}
+      >
+        {LINKS.map(({ href, label, short, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
               key={href}
               href={href}
               aria-label={label}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-md px-0.5 py-1 text-[10px] ${
                 active ? "text-accent" : "text-slate-500"
               }`}
             >
-              <Icon size={18} />
-              <span className="truncate">{label}</span>
+              <Icon size={18} className="shrink-0" />
+              <span className="w-full truncate text-center">{short}</span>
             </Link>
           );
         })}

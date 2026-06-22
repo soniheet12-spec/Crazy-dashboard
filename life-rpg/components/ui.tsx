@@ -14,7 +14,9 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="font-pixel text-lg text-slate-100 sm:text-xl">{title}</h1>
+        <h1 className="font-pixel text-base leading-snug text-slate-100 [overflow-wrap:anywhere] sm:text-xl">
+          {title}
+        </h1>
         {subtitle && <p className="mt-2 text-sm text-slate-400">{subtitle}</p>}
       </div>
       {action}
