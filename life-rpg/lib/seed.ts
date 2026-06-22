@@ -37,6 +37,8 @@ function defaultSettings() {
     seasonStartedAt: new Date().toISOString(),
     accent: DEFAULT_ACCENT,
     reminderHour: null,
+    sound: true,
+    haptics: true,
   };
 }
 
@@ -56,7 +58,10 @@ export function emptyState(): GameState {
     perks: {},
     inventory: [],
     combo: { count: 0, lastAt: "" },
+    equipped: [],
     lastLoginBonus: "",
+    lastSideQuest: "",
+    onboarded: true,
     isSampleData: false,
     lastDailyReset: today,
     version: STATE_VERSION,
@@ -129,7 +134,10 @@ export function sampleState(): GameState {
       { id: genId("loot"), name: "Copper Coin", rarity: "common", icon: "Coins", acquiredAt: at(3, 11) },
     ],
     combo: { count: 0, lastAt: "" },
+    equipped: [],
     lastLoginBonus: "",
+    lastSideQuest: "",
+    onboarded: false,
     isSampleData: true,
     lastDailyReset: today,
     version: STATE_VERSION,

@@ -1,28 +1,36 @@
 "use client";
 
-import { Sparkles, Lock, Check } from "lucide-react";
+import { Sparkles, Lock, Check, Shield } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
 import { PERKS, perkCost } from "@/lib/perks";
 import { RARITY_COLOR, RARITY_ORDER } from "@/lib/loot";
+import { collectionBonus, gearBonusFor, gearMultiplier, MAX_EQUIPPED } from "@/lib/gear";
+import { seasonProgress, seasonXp } from "@/lib/season";
 import { Icon } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader } from "@/components/ui";
 
 export default function SkillsPage() {
-  const { state, hydrated, buyPerk } = useGameState();
+  const { state, hydrated, buyPerk, equipItem, unequipItem } = useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
 
   const inventory = [...state.inventory].sort(
     (a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity),
   );
+  const coll = collectionBonus(state.inventory);
+  const gMult = gearMultiplier(state.equipped, state.inventory);
+  const totalGearPct = Math.round((gMult * coll.mult - 1) * 100);
+
+  const sXp = seasonXp(state);
+  const sp = seasonProgress(sXp);
 
   return (
     <HydrationGate hydrated={hydrated}>
       <PageHeader
         title="Skills & Loot"
-        subtitle="Spend skill points on perks and show off your collection."
+        subtitle="Spend skill points, equip gear, and climb the season ranks."
         action={
           <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 shadow-glow">
             <Sparkles size={16} className="text-accent" />
@@ -32,21 +40,44 @@ export default function SkillsPage() {
         }
       />
 
-      {/* Class card */}
-      <Card className="mb-5 flex items-center gap-4">
-        <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/15 text-accent shadow-glow">
-          <Icon name={klass.icon} size={26} />
-        </span>
-        <div>
-          <p className="font-pixel text-[10px] text-accent">YOUR CLASS</p>
-          <h2 className="text-xl font-bold text-slate-100">
-            {klass.title} {klass.name}
-          </h2>
-          <p className="text-sm text-slate-400">
-            Class is derived from your strongest stat and evolves as you grow.
-          </p>
-        </div>
-      </Card>
+      {/* Class + season */}
+      <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card className="flex items-center gap-4">
+          <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/15 text-accent shadow-glow">
+            <Icon name={klass.icon} size={26} />
+          </span>
+          <div>
+            <p className="font-pixel text-[10px] text-accent">YOUR CLASS</p>
+            <h2 className="text-xl font-bold text-slate-100">
+              {klass.title} {klass.name}
+            </h2>
+            <p className="text-sm text-slate-400">Evolves with your strongest stat.</p>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Season Pass</CardTitle>
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber/15 text-amber">
+              <Icon name={sp.tier.icon} size={22} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between">
+                <p className="font-semibold text-slate-100">{sp.tier.name}</p>
+                <p className="tabular text-xs text-slate-400">
+                  {sXp} XP{sp.next ? ` · next ${sp.next.name} @ ${sp.next.xp}` : " · max tier"}
+                </p>
+              </div>
+              <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-bg-soft">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-dim to-amber"
+                  style={{ width: `${Math.round(sp.pct * 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {/* Skill tree */}
       <Card className="mb-5">
@@ -76,10 +107,7 @@ export default function SkillsPage() {
                     <p className="font-semibold text-slate-100">{perk.name}</p>
                     <div className="flex gap-0.5">
                       {Array.from({ length: perk.maxRank }).map((_, i) => (
-                        <span
-                          key={i}
-                          className={`h-1.5 w-3 rounded-full ${i < rank ? "bg-accent" : "bg-line"}`}
-                        />
+                        <span key={i} className={`h-1.5 w-3 rounded-full ${i < rank ? "bg-accent" : "bg-line"}`} />
                       ))}
                     </div>
                   </div>
@@ -107,9 +135,20 @@ export default function SkillsPage() {
         </div>
       </Card>
 
-      {/* Inventory */}
+      {/* Loot & gear */}
       <Card>
-        <CardTitle>Loot ({inventory.length})</CardTitle>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>
+            <span className="flex items-center gap-2">
+              <Shield size={13} /> Loot &amp; Gear ({inventory.length})
+            </span>
+          </CardTitle>
+          <p className="text-xs text-slate-400">
+            Equipped {state.equipped.length}/{MAX_EQUIPPED} ·{" "}
+            <span className="text-accent">+{totalGearPct}% XP</span> from gear &amp; collection
+          </p>
+        </div>
+
         {inventory.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">
             No loot yet. Complete quests and defeat bosses to find treasure.
@@ -118,11 +157,13 @@ export default function SkillsPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {inventory.map((item) => {
               const color = RARITY_COLOR[item.rarity];
+              const isEquipped = state.equipped.includes(item.id);
+              const slotsFull = state.equipped.length >= MAX_EQUIPPED;
               return (
                 <div
                   key={item.id}
                   className="flex flex-col items-center gap-2 rounded-xl border bg-bg-soft/50 p-4 text-center"
-                  style={{ borderColor: `${color}55` }}
+                  style={{ borderColor: isEquipped ? color : `${color}55` }}
                 >
                   <span
                     className="flex h-12 w-12 items-center justify-center rounded-lg"
@@ -132,8 +173,24 @@ export default function SkillsPage() {
                   </span>
                   <p className="text-sm font-medium text-slate-100">{item.name}</p>
                   <p className="text-[11px] capitalize" style={{ color }}>
-                    {item.rarity}
+                    {item.rarity} · +{Math.round(gearBonusFor(item.rarity) * 100)}%
                   </p>
+                  {isEquipped ? (
+                    <button
+                      onClick={() => unequipItem(item.id)}
+                      className="w-full rounded-md border border-line px-2 py-1 text-xs text-slate-300 hover:border-body hover:text-body"
+                    >
+                      Unequip
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => equipItem(item.id)}
+                      disabled={slotsFull}
+                      className="w-full rounded-md bg-accent/90 px-2 py-1 text-xs font-semibold text-bg hover:bg-accent disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+                    >
+                      {slotsFull ? "Slots full" : "Equip"}
+                    </button>
+                  )}
                 </div>
               );
             })}

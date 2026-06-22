@@ -24,6 +24,12 @@ export interface HabitStreak {
   lastDay: string; // YYYY-MM-DD of last completion
 }
 
+export interface SubTask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface Quest {
   id: string;
   title: string;
@@ -34,8 +40,11 @@ export interface Quest {
   done: boolean;
   completedAt?: string; // ISO timestamp
   daily?: boolean; // resets each local day
+  days?: number[]; // scheduled weekdays (0=Sun..6=Sat); active only on these days
   negative?: boolean; // "anti-habit" / debuff — logging it subtracts XP
   habitStreak?: HabitStreak; // per-daily-quest streak tracking
+  subtasks?: SubTask[]; // optional checklist; all-done auto-completes the quest
+  sideQuest?: boolean; // generated daily side quest
 }
 
 export type Rarity = "common" | "rare" | "epic" | "legendary";
@@ -70,6 +79,7 @@ export interface BossGoal {
   target: number;
   progress: number;
   unit: string; // e.g. "₹5Cr raised"
+  deadline?: string; // YYYY-MM-DD optional target date for pace tracking
 }
 
 export interface XpHistoryPoint {
@@ -84,6 +94,8 @@ export interface GameSettings {
   seasonStartedAt: string; // ISO, used by "reset season"
   accent: string; // hex accent color for theming
   reminderHour: number | null; // local hour (0-23) for a daily nudge, or null = off
+  sound: boolean; // sound effects on level-up / loot / boss
+  haptics: boolean; // vibration feedback on supported devices
 }
 
 export interface Combo {
@@ -105,8 +117,11 @@ export interface GameState {
   skillPoints: number; // earned on stat level-ups, spent on perks
   perks: Record<string, number>; // perkId -> rank owned
   inventory: LootItem[]; // collected loot
+  equipped: string[]; // equipped loot item ids (gear buffs), max 3
   combo: Combo; // momentum meter
   lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
+  lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted
+  onboarded: boolean; // has the user seen the intro
   // Internal bookkeeping
   isSampleData: boolean; // true until the user clears the seed
   lastDailyReset: string; // YYYY-MM-DD

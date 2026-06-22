@@ -5,6 +5,8 @@ import { useEffect, type ReactNode } from "react";
 import { ToastProvider } from "@/components/Toast";
 import { CelebrationProvider } from "@/components/Celebration";
 import { ReminderScheduler } from "@/components/ReminderScheduler";
+import { Pwa } from "@/components/Pwa";
+import { Onboarding } from "@/components/Onboarding";
 import { GameStateProvider, useGameState } from "@/lib/gameState";
 import { hexToRgbTriplet } from "@/lib/theme";
 
@@ -32,6 +34,8 @@ export function Providers({ children }: { children: ReactNode }) {
           <GameStateProvider>
             <ThemeApplier />
             <ReminderScheduler />
+            <Pwa />
+            <Onboarding />
             {children}
           </GameStateProvider>
         </ToastProvider>

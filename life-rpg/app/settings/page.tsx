@@ -10,6 +10,8 @@ import {
   Sparkles,
   Database,
   Bell,
+  Volume2,
+  Vibrate,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
@@ -226,6 +228,26 @@ export default function SettingsPage() {
             <p className="mt-2 text-xs text-slate-500">
               Best-effort nudge while the app is open if your dailies are unfinished.
             </p>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-5 border-t border-line/70 pt-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={state.settings.sound}
+                onChange={(e) => updateSettings({ sound: e.target.checked })}
+                className="h-4 w-4 accent-accent"
+              />
+              <Volume2 size={15} /> Sound effects
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={state.settings.haptics}
+                onChange={(e) => updateSettings({ haptics: e.target.checked })}
+                className="h-4 w-4 accent-accent"
+              />
+              <Vibrate size={15} /> Haptics
+            </label>
           </div>
         </Card>
 

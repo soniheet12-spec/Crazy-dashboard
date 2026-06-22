@@ -27,6 +27,10 @@ export const metadata: Metadata = {
   title: "Life RPG — Character Sheet",
   description:
     "Turn your goals and habits into a video-game character sheet. Earn XP, level up your stats, and slay your boss goals.",
+  applicationName: "Life RPG",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Life RPG" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {

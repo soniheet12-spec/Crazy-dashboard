@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Minus, Trash2, Skull, Crown, TrendingUp } from "lucide-react";
+import { Plus, Minus, Trash2, Skull, Crown, TrendingUp, Clock } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { localDay, dayDiff } from "@/lib/dates";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
@@ -26,15 +26,17 @@ export default function BossesPage() {
   const [stat, setStat] = useState<StatKey>(statList[0]?.key ?? "body");
   const [target, setTarget] = useState(10);
   const [unit, setUnit] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [steps, setSteps] = useState<Record<string, number>>({});
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    addBoss({ title, stat, target, unit });
+    addBoss({ title, stat, target, unit, deadline: deadline || undefined });
     setTitle("");
     setTarget(10);
     setUnit("");
+    setDeadline("");
   };
 
   return (
@@ -77,6 +79,13 @@ export default function BossesPage() {
                 className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
               />
             </div>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              aria-label="Deadline (optional)"
+              className="rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+            />
             <button
               type="submit"
               className="flex items-center justify-center gap-2 rounded-lg bg-accent/90 px-3 py-2.5 text-sm font-semibold text-bg hover:bg-accent"
@@ -156,6 +165,19 @@ export default function BossesPage() {
                         <TrendingUp size={13} /> ~{eta} day{eta === 1 ? "" : "s"} to defeat at your current pace
                       </p>
                     )}
+                    {b.deadline && !defeated && (() => {
+                      const daysLeft = dayDiff(localDay(), b.deadline);
+                      const onTrack = eta !== null ? eta <= daysLeft : true;
+                      const tone = daysLeft < 0 ? "text-body" : onTrack ? "text-wealth" : "text-amber";
+                      return (
+                        <p className={`mt-1 flex items-center gap-1.5 text-xs ${tone}`}>
+                          <Clock size={13} />
+                          {daysLeft < 0
+                            ? "Deadline passed"
+                            : `Due in ${daysLeft} day${daysLeft === 1 ? "" : "s"} · ${onTrack ? "on track" : "behind pace"}`}
+                        </p>
+                      );
+                    })()}
 
                     {!defeated && (
                       <div className="mt-3 flex items-center gap-2">
