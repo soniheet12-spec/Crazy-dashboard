@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -29,6 +29,13 @@ export const metadata: Metadata = {
     "Turn your goals and habits into a video-game character sheet. Earn XP, level up your stats, and slay your boss goals.",
 };
 
+export const viewport: Viewport = {
+  themeColor: "#0a0e1a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -40,7 +47,7 @@ export default function RootLayout({
         <Providers>
           <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col lg:flex-row">
             <Nav />
-            <main className="flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pt-10">
+            <main className="min-w-0 flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-10">
               {children}
             </main>
           </div>
