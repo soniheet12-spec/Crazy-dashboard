@@ -19,6 +19,9 @@ import { localDay, dayDiff } from "./dates";
 import { comboActive, comboMultiplier } from "./combo";
 import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
 import { rollBossLoot, rollQuestLoot } from "./loot";
+import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
+import { sideQuestForDay } from "./sidequests";
+import { playFx, vibrate, type Fx } from "./sound";
 import type {
   BossGoal,
   CalendarEvent,
@@ -27,7 +30,16 @@ import type {
   Quest,
   Stat,
   StatKey,
+  SubTask,
 } from "./types";
+
+/** Play sound + haptics for an event, respecting user settings. */
+function fx(state: GameState, kind: Fx) {
+  if (state.settings.sound) playFx(kind);
+  if (state.settings.haptics) {
+    vibrate(kind === "boss" ? [20, 40, 20] : kind === "levelup" ? [15, 30, 15] : 15);
+  }
+}
 
 const STORAGE_KEY = "life-rpg:v1";
 
@@ -37,6 +49,8 @@ export interface NewQuestInput {
   xp: number;
   daily?: boolean;
   negative?: boolean;
+  days?: number[];
+  subtasks?: string[];
 }
 
 export interface NewBossInput {
@@ -44,6 +58,7 @@ export interface NewBossInput {
   stat: StatKey;
   target: number;
   unit: string;
+  deadline?: string;
 }
 
 export interface GameStateContextValue {
@@ -65,6 +80,12 @@ export interface GameStateContextValue {
   claimDailyBonus: () => void;
   buyPerk: (perkId: string) => void;
   logFocus: (minutes: number) => void;
+  // gear & extras
+  equipItem: (id: string) => void;
+  unequipItem: (id: string) => void;
+  toggleSubtask: (questId: string, subId: string) => void;
+  acceptSideQuest: () => void;
+  setOnboarded: () => void;
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
@@ -132,11 +153,12 @@ function updateHabitStreak(quest: Quest, today: string) {
   hs.best = Math.max(hs.best, hs.current);
 }
 
-function multiplierNote(streak: number, combo: number, perk: number): string | undefined {
+function multiplierNote(streak: number, combo: number, perk: number, gear: number): string | undefined {
   const parts: string[] = [];
   if (streak > 1.001) parts.push(`Streak ×${streak}`);
   if (combo > 1.001) parts.push(`Combo ×${combo.toFixed(2)}`);
   if (perk > 1.001) parts.push(`Perks ×${perk.toFixed(2)}`);
+  if (gear > 1.001) parts.push(`Gear ×${gear.toFixed(2)}`);
   return parts.length ? parts.join(" · ") : undefined;
 }
 
@@ -153,7 +175,9 @@ function gainXp(
   const streakMult = streakMultiplier(state.streak.current, state.settings);
   const comboMult = comboMultiplier(state.combo.count, state.perks);
   const perkMult = perkXpMultiplier(state.perks, statKey);
-  const total = streakMult * comboMult * perkMult;
+  const gearMult =
+    gearMultiplier(state.equipped, state.inventory) * collectionBonus(state.inventory).mult;
+  const total = streakMult * comboMult * perkMult * gearMult;
   const gained = Math.max(1, Math.round(baseXp * total));
 
   const prevLevel = stat.level;
@@ -165,13 +189,14 @@ function gainXp(
     {
       kind: "xp",
       title: `+${gained} XP · ${stat.label}`,
-      subtitle: multiplierNote(streakMult, comboMult, perkMult),
+      subtitle: multiplierNote(streakMult, comboMult, perkMult, gearMult),
     },
   ];
 
   const levelsGained = stat.level - prevLevel;
   if (levelsGained > 0) {
     state.skillPoints += levelsGained;
+    fx(state, "levelup");
     celebrate({
       kind: "levelup",
       title: `${stat.label.toUpperCase()} reached Level ${stat.level}!`,
@@ -183,6 +208,7 @@ function gainXp(
   const item = rollQuestLoot(0.18, perkLootChanceBonus(state.perks));
   if (item) {
     state.inventory.unshift(item);
+    fx(state, "loot");
     if (item.rarity === "legendary") {
       celebrate({ kind: "loot", title: item.name, subtitle: "A legendary drop!" });
     } else {
@@ -197,9 +223,10 @@ function applyDailyReset(state: GameState): boolean {
   const today = localDay();
   if (state.lastDailyReset === today) return false;
   for (const q of state.quests) {
-    if (q.daily && q.done) {
+    if ((q.daily || (q.days && q.days.length)) && q.done) {
       q.done = false;
       q.completedAt = undefined;
+      if (q.subtasks) q.subtasks.forEach((s) => (s.done = false));
     }
   }
   if (state.streak.lastActiveDate && dayDiff(state.streak.lastActiveDate, today) > 1) {
@@ -229,6 +256,9 @@ function migrate(s: GameState): GameState {
   s.inventory ??= [];
   if (!s.combo) s.combo = { count: 0, lastAt: "" };
   if (s.lastLoginBonus === undefined) s.lastLoginBonus = "";
+  s.equipped ??= [];
+  if (s.lastSideQuest === undefined) s.lastSideQuest = "";
+  if (s.onboarded === undefined) s.onboarded = true;
   if (!s.settings) {
     s.settings = {
       streak7Multiplier: 1.5,
@@ -236,10 +266,14 @@ function migrate(s: GameState): GameState {
       seasonStartedAt: new Date().toISOString(),
       accent: DEFAULT_ACCENT,
       reminderHour: null,
+      sound: true,
+      haptics: true,
     };
   }
   if (s.settings.accent === undefined) s.settings.accent = DEFAULT_ACCENT;
   if (s.settings.reminderHour === undefined) s.settings.reminderHour = null;
+  if (s.settings.sound === undefined) s.settings.sound = true;
+  if (s.settings.haptics === undefined) s.settings.haptics = true;
   return s;
 }
 
@@ -335,6 +369,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           daily: q.daily ?? false,
           negative: q.negative ?? false,
         };
+        if (q.days && q.days.length) quest.days = [...q.days].sort();
+        const subs = (q.subtasks ?? []).map((t) => t.trim()).filter(Boolean);
+        if (subs.length) {
+          quest.subtasks = subs.map((t) => ({ id: genId("st"), title: t, done: false }));
+        }
         d.quests.unshift(quest);
       });
     },
@@ -365,10 +404,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           return toasts;
         }
 
+        if (quest.subtasks) quest.subtasks.forEach((s) => (s.done = true));
         touchStreak(d);
-        if (quest.daily) updateHabitStreak(quest, localDay());
+        if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
         bumpCombo(d);
-        return gainXp(d, quest.stat, quest.xp, cele);
+        const earned = gainXp(d, quest.stat, quest.xp, cele);
+        fx(d, "complete");
+        return earned;
       });
     },
     [commit],
@@ -448,6 +490,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           progress: 0,
           unit: b.unit.trim(),
         };
+        if (b.deadline) boss.deadline = b.deadline;
         d.bosses.push(boss);
       });
     },
@@ -464,6 +507,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         if (!wasDone && boss.progress >= boss.target) {
           const item = rollBossLoot(perkLootChanceBonus(d.perks));
           d.inventory.unshift(item);
+          fx(d, "boss");
           cele({ kind: "boss", title: `${boss.title} defeated!`, subtitle: `Loot: ${item.name}` });
         }
       });
@@ -551,6 +595,88 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     },
     [commit],
   );
+
+  // ─── Gear & extras ───────────────────────────────────────────────────────────
+
+  const equipItem = useCallback(
+    (id: string) => {
+      commit((d) => {
+        if (!d.inventory.some((i) => i.id === id) || d.equipped.includes(id)) return [];
+        if (d.equipped.length >= MAX_EQUIPPED) {
+          return [
+            {
+              kind: "info",
+              title: "All gear slots full",
+              subtitle: `Unequip something first (max ${MAX_EQUIPPED}).`,
+            },
+          ];
+        }
+        d.equipped.push(id);
+      });
+    },
+    [commit],
+  );
+
+  const unequipItem = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.equipped = d.equipped.filter((x) => x !== id);
+      });
+    },
+    [commit],
+  );
+
+  const toggleSubtask = useCallback(
+    (questId: string, subId: string) => {
+      commit((d, cele) => {
+        const quest = d.quests.find((q) => q.id === questId);
+        if (!quest || !quest.subtasks) return [];
+        const st = quest.subtasks.find((s) => s.id === subId);
+        if (!st) return [];
+        st.done = !st.done;
+        if (!quest.done && quest.subtasks.every((s) => s.done)) {
+          quest.done = true;
+          quest.completedAt = new Date().toISOString();
+          if (!quest.negative) {
+            touchStreak(d);
+            if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
+            bumpCombo(d);
+            const earned = gainXp(d, quest.stat, quest.xp, cele);
+            fx(d, "complete");
+            return earned;
+          }
+        }
+      });
+    },
+    [commit],
+  );
+
+  const acceptSideQuest = useCallback(() => {
+    commit((d) => {
+      const today = localDay();
+      if (d.lastSideQuest === today) return [];
+      const keys = Object.keys(d.stats);
+      if (keys.length === 0) return [];
+      const sq = sideQuestForDay(today, keys);
+      d.quests.unshift({
+        id: genId("side"),
+        title: sq.title,
+        stat: d.stats[sq.stat] ? sq.stat : keys[0],
+        xp: sq.xp,
+        source: "manual",
+        done: false,
+        sideQuest: true,
+      });
+      d.lastSideQuest = today;
+      return [{ kind: "info", title: "Side quest accepted", subtitle: sq.title }];
+    });
+  }, [commit]);
+
+  const setOnboarded = useCallback(() => {
+    commit((d) => {
+      d.onboarded = true;
+    });
+  }, [commit]);
 
   // ─── Stats / settings ──────────────────────────────────────────────────────────
 
@@ -701,6 +827,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       claimDailyBonus,
       buyPerk,
       logFocus,
+      equipItem,
+      unequipItem,
+      toggleSubtask,
+      acceptSideQuest,
+      setOnboarded,
       addStat,
       renameStat,
       removeStat,
@@ -728,6 +859,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       claimDailyBonus,
       buyPerk,
       logFocus,
+      equipItem,
+      unequipItem,
+      toggleSubtask,
+      acceptSideQuest,
+      setOnboarded,
       addStat,
       renameStat,
       removeStat,
