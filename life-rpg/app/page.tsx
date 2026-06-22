@@ -1,11 +1,19 @@
 "use client";
 
-import { Gift, TrendingDown, TrendingUp, CalendarRange, Dices, ArrowRight } from "lucide-react";
+import { Gift, TrendingDown, TrendingUp, Dices, ArrowRight, Trophy, Target } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
 import { seasonProgress, seasonXp } from "@/lib/season";
 import { sideQuestForDay } from "@/lib/sidequests";
+import {
+  DAILY_CHALLENGE,
+  WEEKLY_CHALLENGE,
+  dailyChallengeProgress,
+  weeklyChallengeProgress,
+  weekKey,
+  projectCharacterLevel,
+} from "@/lib/gameplay";
 import { localDay, addDays, shortLabel } from "@/lib/dates";
 import { AvatarBlock } from "@/components/AvatarBlock";
 import { StatRadar } from "@/components/StatRadar";
@@ -46,7 +54,8 @@ function periodStats(state: GameState) {
 }
 
 export default function DashboardPage() {
-  const { state, hydrated, claimDailyBonus, acceptSideQuest } = useGameState();
+  const { state, hydrated, claimDailyBonus, acceptSideQuest, claimDailyChallenge, claimWeeklyChallenge } =
+    useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
 
@@ -58,6 +67,11 @@ export default function DashboardPage() {
   const p = periodStats(state);
   const weekDelta = p.weekXp - p.lastWeekXp;
   const sp = seasonProgress(seasonXp(state));
+  const dProg = dailyChallengeProgress(state);
+  const dClaimed = state.lastDailyChallenge === localDay();
+  const wProg = weeklyChallengeProgress(state);
+  const wClaimed = state.lastWeeklyChallenge === weekKey();
+  const proj = projectCharacterLevel(state, 30);
 
   return (
     <HydrationGate hydrated={hydrated}>
@@ -81,6 +95,7 @@ export default function DashboardPage() {
           klass={klass}
           coins={state.coins}
           prestige={state.prestige}
+          hp={state.hp}
         />
 
         {/* Daily bonus · side quest · needs attention */}
@@ -152,6 +167,62 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* Challenges */}
+        <Card>
+          <CardTitle>Challenges</CardTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {[
+              {
+                icon: Target,
+                label: DAILY_CHALLENGE.label,
+                prog: dProg,
+                target: DAILY_CHALLENGE.target,
+                reward: DAILY_CHALLENGE.reward,
+                claimed: dClaimed,
+                claim: claimDailyChallenge,
+              },
+              {
+                icon: Trophy,
+                label: WEEKLY_CHALLENGE.label,
+                prog: wProg,
+                target: WEEKLY_CHALLENGE.target,
+                reward: WEEKLY_CHALLENGE.reward,
+                claimed: wClaimed,
+                claim: claimWeeklyChallenge,
+              },
+            ].map((c, i) => {
+              const Icon = c.icon;
+              const met = c.prog >= c.target;
+              return (
+                <div key={i} className="rounded-xl border border-line/70 bg-bg-soft/50 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Icon size={16} className="text-amber" />
+                    <p className="flex-1 text-sm font-medium text-slate-100">{c.label}</p>
+                  </div>
+                  <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-bg-soft">
+                    <div
+                      className="h-full rounded-full bg-amber"
+                      style={{ width: `${Math.min(100, Math.round((c.prog / c.target) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="tabular text-xs text-slate-400">
+                      {Math.min(c.prog, c.target)}/{c.target}
+                    </span>
+                    <button
+                      onClick={c.claim}
+                      disabled={!met || c.claimed}
+                      className="rounded-md bg-amber/90 px-2.5 py-1 text-xs font-semibold text-bg hover:bg-amber disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+                    >
+                      {c.claimed ? "Claimed" : `Claim +${c.reward}`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
         {/* This week vs last · season */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Card>
@@ -182,6 +253,12 @@ export default function DashboardPage() {
                 <span className="text-slate-600">· best {shortLabel(p.bestDay.date)}</span>
               )}
             </p>
+            {proj.ratePerDay > 0 && (
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                <Target size={13} /> On pace for Character Level {proj.projected} in ~30 days ·{" "}
+                {proj.ratePerDay} XP/day
+              </p>
+            )}
           </Card>
 
           <Card>

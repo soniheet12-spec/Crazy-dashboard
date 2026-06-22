@@ -17,13 +17,17 @@ import {
   Sparkles,
   Dices,
   Wand2,
+  Star,
+  Search,
+  X,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { suggestStat } from "@/lib/calendarMapping";
+import { DIFFICULTIES } from "@/lib/gameplay";
 import { localDay } from "@/lib/dates";
 import { FocusTimer } from "@/components/FocusTimer";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
-import type { Quest, StatKey } from "@/lib/types";
+import type { Difficulty, Quest, StatKey } from "@/lib/types";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -41,6 +45,7 @@ function QuestRow({
   onRemove,
   onUndo,
   onToggleSub,
+  onFavorite,
 }: {
   quest: Quest;
   statLabel: string;
@@ -49,6 +54,7 @@ function QuestRow({
   onRemove?: () => void;
   onUndo?: () => void;
   onToggleSub?: (subId: string) => void;
+  onFavorite?: () => void;
 }) {
   return (
     <motion.li
@@ -99,6 +105,9 @@ function QuestRow({
             {quest.negative && (
               <span className="flex items-center gap-0.5 text-body"><Skull size={10} /> anti-habit</span>
             )}
+            {quest.difficulty && quest.difficulty !== "normal" && (
+              <span className="capitalize text-slate-400">{quest.difficulty}</span>
+            )}
             {quest.source === "calendar" && (
               <span className="flex items-center gap-0.5"><Calendar size={10} /> calendar</span>
             )}
@@ -111,6 +120,11 @@ function QuestRow({
           </div>
         </div>
 
+        {onFavorite && (
+          <button onClick={onFavorite} aria-label="Save as template" className="text-slate-600 hover:text-amber">
+            <Star size={15} />
+          </button>
+        )}
         {onUndo && (
           <button onClick={onUndo} aria-label="Undo" className="text-slate-600 hover:text-slate-300">
             <RotateCcw size={15} />
@@ -155,8 +169,17 @@ interface Suggestion {
 }
 
 export default function QuestsPage() {
-  const { state, hydrated, addQuest, completeQuest, removeQuest, uncompleteQuest, toggleSubtask } =
-    useGameState();
+  const {
+    state,
+    hydrated,
+    addQuest,
+    completeQuest,
+    removeQuest,
+    uncompleteQuest,
+    toggleSubtask,
+    addTemplate,
+    removeTemplate,
+  } = useGameState();
 
   const statList = Object.values(state.stats);
   const [title, setTitle] = useState("");
@@ -167,6 +190,8 @@ export default function QuestsPage() {
   const [days, setDays] = useState<number[]>([]);
   const [subtasksRaw, setSubtasksRaw] = useState("");
   const [quickText, setQuickText] = useState("");
+  const [difficulty, setDifficulty] = useState<Difficulty>("normal");
+  const [search, setSearch] = useState("");
 
   // AI suggestions
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -174,7 +199,10 @@ export default function QuestsPage() {
   const [suggestMsg, setSuggestMsg] = useState<string | null>(null);
 
   const today = localDay();
-  const active = state.quests.filter((q) => !q.done && dueToday(q));
+  const term = search.trim().toLowerCase();
+  const active = state.quests.filter(
+    (q) => !q.done && dueToday(q) && (!term || q.title.toLowerCase().includes(term)),
+  );
   const doneToday = state.quests.filter((q) => q.done && q.completedAt?.startsWith(today));
 
   const label = (key: StatKey) => state.stats[key]?.label ?? key;
@@ -198,6 +226,7 @@ export default function QuestsPage() {
       negative,
       days: days.length ? days : undefined,
       subtasks,
+      difficulty,
     });
     setTitle("");
     setXp(30);
@@ -205,6 +234,7 @@ export default function QuestsPage() {
     setNegative(false);
     setDays([]);
     setSubtasksRaw("");
+    setDifficulty("normal");
   };
 
   const quickAdd = (e: React.FormEvent) => {
@@ -333,6 +363,26 @@ export default function QuestsPage() {
                 </div>
               </div>
 
+              <div>
+                <p className="mb-1.5 text-xs text-slate-500">Difficulty</p>
+                <div className="flex gap-1">
+                  {DIFFICULTIES.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDifficulty(d)}
+                      className={`h-8 flex-1 rounded-md text-xs font-medium capitalize ${
+                        difficulty === d
+                          ? "bg-accent/20 text-accent"
+                          : "bg-bg-soft text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <input
                 value={subtasksRaw}
                 onChange={(e) => setSubtasksRaw(e.target.value)}
@@ -405,12 +455,61 @@ export default function QuestsPage() {
               </ul>
             )}
           </Card>
+
+          {state.templates.length > 0 && (
+            <Card>
+              <CardTitle>Templates</CardTitle>
+              <div className="flex flex-wrap gap-2">
+                {state.templates.map((t) => (
+                  <span
+                    key={t.id}
+                    className="flex items-center gap-1 rounded-full border border-line bg-bg-soft px-2.5 py-1 text-xs text-slate-200"
+                  >
+                    <button
+                      onClick={() =>
+                        addQuest({
+                          title: t.title,
+                          stat: t.stat,
+                          xp: t.xp,
+                          daily: t.daily,
+                          difficulty: t.difficulty,
+                        })
+                      }
+                      className="hover:text-accent"
+                    >
+                      {t.title}
+                    </button>
+                    <button
+                      onClick={() => removeTemplate(t.id)}
+                      aria-label="Remove template"
+                      className="text-slate-600 hover:text-body"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* Today / active */}
         <div className="flex flex-col gap-5 lg:col-span-2">
           <Card>
-            <CardTitle>Today &amp; Active ({active.length})</CardTitle>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Today &amp; Active ({active.length})
+              </h2>
+              <div className="flex items-center gap-1.5 rounded-lg border border-line bg-bg-soft px-2 py-1">
+                <Search size={13} className="text-slate-500" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search…"
+                  className="w-28 bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-600"
+                />
+              </div>
+            </div>
             {active.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-500">
                 Nothing due. Add a quest or accept the daily side quest on the dashboard.
@@ -427,6 +526,15 @@ export default function QuestsPage() {
                       onComplete={() => completeQuest(q.id)}
                       onRemove={() => removeQuest(q.id)}
                       onToggleSub={(subId) => toggleSubtask(q.id, subId)}
+                      onFavorite={() =>
+                        addTemplate({
+                          title: q.title,
+                          stat: q.stat,
+                          xp: q.xp,
+                          daily: q.daily,
+                          difficulty: q.difficulty,
+                        })
+                      }
                     />
                   ))}
                 </AnimatePresence>

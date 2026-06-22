@@ -7,6 +7,7 @@ import { CelebrationProvider } from "@/components/Celebration";
 import { ReminderScheduler } from "@/components/ReminderScheduler";
 import { Pwa } from "@/components/Pwa";
 import { Onboarding } from "@/components/Onboarding";
+import { CommandPalette } from "@/components/CommandPalette";
 import { GameStateProvider, useGameState } from "@/lib/gameState";
 import { hexToRgbTriplet } from "@/lib/theme";
 
@@ -36,6 +37,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <ReminderScheduler />
             <Pwa />
             <Onboarding />
+            <CommandPalette />
             {children}
           </GameStateProvider>
         </ToastProvider>
