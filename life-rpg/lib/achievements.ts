@@ -58,6 +58,33 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   },
 ];
 
+/** Progress toward a (possibly locked) achievement, for progress bars. */
+export function achievementProgress(
+  s: GameState,
+  id: string,
+): { current: number; target: number } | null {
+  const done = s.quests.filter((q) => q.done);
+  switch (id) {
+    case "early-riser":
+      return {
+        current: Math.min(10, done.filter((q) => q.completedAt && new Date(q.completedAt).getHours() < 7).length),
+        target: 10,
+      };
+    case "closer":
+      return { current: Math.min(3, done.filter((q) => q.stat === "wealth").length), target: 3 };
+    case "iron-will":
+      return { current: Math.min(30, Math.max(s.streak.current, s.streak.longest)), target: 30 };
+    case "polymath": {
+      const stats = Object.values(s.stats);
+      return { current: stats.filter((st) => st.level >= 5).length, target: stats.length };
+    }
+    case "marathoner":
+      return { current: Math.min(100, done.length), target: 100 };
+    default:
+      return null;
+  }
+}
+
 export function seedAchievements(): Achievement[] {
   return ACHIEVEMENT_DEFS.map((d) => ({
     id: d.id,

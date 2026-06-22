@@ -122,6 +122,7 @@ export interface GameStateContextValue {
   respecPerks: () => void;
   addTemplate: (t: Omit<QuestTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
+  setMood: (value: number) => void;
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
@@ -170,6 +171,25 @@ function touchStreak(state: GameState) {
   else state.streak.current = 1;
   state.streak.lastActiveDate = today;
   state.streak.longest = Math.max(state.streak.longest, state.streak.current);
+}
+
+const STREAK_MILESTONES = [
+  { days: 7, coins: 50 },
+  { days: 30, coins: 200 },
+  { days: 100, coins: 500 },
+];
+
+/** Award coins the first time a streak milestone is reached. */
+function streakMilestone(state: GameState): ToastSpec[] {
+  const toasts: ToastSpec[] = [];
+  for (const m of STREAK_MILESTONES) {
+    if (state.streak.current >= m.days && !state.streakMilestones.includes(m.days)) {
+      state.streakMilestones.push(m.days);
+      state.coins += m.coins;
+      toasts.push({ kind: "levelup", title: `${m.days}-day streak!`, subtitle: `+${m.coins} coins` });
+    }
+  }
+  return toasts;
 }
 
 function bumpCombo(state: GameState) {
@@ -330,12 +350,16 @@ function migrate(s: GameState): GameState {
       reminderHour: null,
       sound: true,
       haptics: true,
+      reduceMotion: false,
     };
   }
   if (s.settings.accent === undefined) s.settings.accent = DEFAULT_ACCENT;
   if (s.settings.reminderHour === undefined) s.settings.reminderHour = null;
   if (s.settings.sound === undefined) s.settings.sound = true;
   if (s.settings.haptics === undefined) s.settings.haptics = true;
+  if (s.settings.reduceMotion === undefined) s.settings.reduceMotion = false;
+  s.streakMilestones ??= [];
+  s.moods ??= [];
   return s;
 }
 
@@ -455,6 +479,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           const stat = d.stats[quest.stat];
           const toasts: ToastSpec[] = [];
           d.hp = Math.max(0, d.hp - quest.xp); // anti-habits deal HP damage
+          quest.lastLoggedDay = localDay(); // resets "days clean"
           if (stat) {
             stat.xp = Math.max(0, stat.xp - quest.xp);
             stat.level = levelFromXp(stat.xp);
@@ -470,12 +495,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
         if (quest.subtasks) quest.subtasks.forEach((s) => (s.done = true));
         touchStreak(d);
+        const ms = streakMilestone(d);
         if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
         bumpCombo(d);
         if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40); // rest heals
         const earned = gainXp(d, quest.stat, effXp(quest), cele);
         fx(d, "complete");
-        return earned;
+        return [...ms, ...earned];
       });
     },
     [commit],
@@ -526,8 +552,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         d.quests.unshift(quest);
         d.calendarMappings[e.id] = quest.stat;
         touchStreak(d);
+        const ms = streakMilestone(d);
         bumpCombo(d);
-        return gainXp(d, quest.stat, quest.xp, cele);
+        return [...ms, ...gainXp(d, quest.stat, quest.xp, cele)];
       });
     },
     [commit],
@@ -655,8 +682,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         };
         d.quests.unshift(quest);
         touchStreak(d);
+        const ms = streakMilestone(d);
         bumpCombo(d);
-        return gainXp(d, statKey, quest.xp, cele);
+        return [...ms, ...gainXp(d, statKey, quest.xp, cele)];
       });
     },
     [commit],
@@ -705,12 +733,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           quest.completedAt = new Date().toISOString();
           if (!quest.negative) {
             touchStreak(d);
+            const ms = streakMilestone(d);
             if (quest.daily || (quest.days && quest.days.length)) updateHabitStreak(quest, localDay());
             bumpCombo(d);
             if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40);
             const earned = gainXp(d, quest.stat, effXp(quest), cele);
             fx(d, "complete");
-            return earned;
+            return [...ms, ...earned];
           }
         }
       });
@@ -883,6 +912,19 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const setMood = useCallback(
+    (value: number) => {
+      commit((d) => {
+        const today = localDay();
+        const existing = d.moods.find((m) => m.date === today);
+        if (existing) existing.value = value;
+        else d.moods.push({ date: today, value });
+        if (d.moods.length > 400) d.moods = d.moods.slice(-400);
+      });
+    },
+    [commit],
+  );
+
   // ─── Stats / settings ──────────────────────────────────────────────────────────
 
   const addStat = useCallback(
@@ -1045,6 +1087,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      setMood,
       addStat,
       renameStat,
       removeStat,
@@ -1085,6 +1128,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      setMood,
       addStat,
       renameStat,
       removeStat,

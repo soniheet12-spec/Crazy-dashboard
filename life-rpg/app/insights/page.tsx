@@ -1,6 +1,6 @@
 "use client";
 
-import { Zap, Target, CalendarCheck, Flame, Gem, Clock } from "lucide-react";
+import { Zap, Target, CalendarCheck, Flame, Gem, Clock, Smile } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { computeInsights, DOW_LABELS, hourLabel } from "@/lib/insights";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
@@ -25,17 +25,21 @@ export default function InsightsPage() {
   const ins = computeInsights(state);
   const maxDow = Math.max(1, ...ins.byDow);
   const maxHour = Math.max(1, ...ins.byHour);
+  const avgMood = state.moods.length
+    ? state.moods.reduce((s, m) => s + m.value, 0) / state.moods.length
+    : null;
 
   return (
     <HydrationGate hydrated={hydrated}>
       <PageHeader title="Insights" subtitle="Patterns from everything you've logged." />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Stat icon={Target} label="quests done" value={ins.totalQuests} />
         <Stat icon={Zap} label="total XP" value={ins.totalXp.toLocaleString()} />
         <Stat icon={CalendarCheck} label="active days" value={ins.activeDays} />
         <Stat icon={Flame} label="longest streak" value={ins.longestStreak} />
         <Stat icon={Gem} label="loot collected" value={ins.loot} />
+        <Stat icon={Smile} label="avg mood" value={avgMood ? `${avgMood.toFixed(1)}/5` : "—"} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">

@@ -24,7 +24,8 @@ import {
 import { useGameState } from "@/lib/gameState";
 import { suggestStat } from "@/lib/calendarMapping";
 import { DIFFICULTIES } from "@/lib/gameplay";
-import { localDay } from "@/lib/dates";
+import { ROUTINES } from "@/lib/presets";
+import { localDay, dayDiff } from "@/lib/dates";
 import { FocusTimer } from "@/components/FocusTimer";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
 import type { Difficulty, Quest, StatKey } from "@/lib/types";
@@ -56,6 +57,8 @@ function QuestRow({
   onToggleSub?: (subId: string) => void;
   onFavorite?: () => void;
 }) {
+  const daysClean =
+    quest.negative && quest.lastLoggedDay ? dayDiff(quest.lastLoggedDay, localDay()) : null;
   return (
     <motion.li
       layout
@@ -104,6 +107,9 @@ function QuestRow({
             )}
             {quest.negative && (
               <span className="flex items-center gap-0.5 text-body"><Skull size={10} /> anti-habit</span>
+            )}
+            {daysClean !== null && (
+              <span className="text-wealth">{daysClean}d clean</span>
             )}
             {quest.difficulty && quest.difficulty !== "normal" && (
               <span className="capitalize text-slate-400">{quest.difficulty}</span>
@@ -310,6 +316,31 @@ export default function QuestsPage() {
             <p className="mt-2 text-xs text-slate-500">
               Type what you did — we&apos;ll guess the stat. +30 XP.
             </p>
+          </Card>
+
+          <Card>
+            <CardTitle>Routines</CardTitle>
+            <div className="flex flex-wrap gap-2">
+              {ROUTINES.map((r) => (
+                <button
+                  key={r.name}
+                  onClick={() =>
+                    r.quests.forEach((qq) =>
+                      addQuest({
+                        title: qq.title,
+                        stat: qq.stat,
+                        xp: qq.xp,
+                        difficulty: qq.difficulty,
+                        daily: true,
+                      }),
+                    )
+                  }
+                  className="rounded-full border border-line bg-bg-soft px-3 py-1.5 text-xs text-slate-200 hover:border-accent"
+                >
+                  + {r.name} ({r.quests.length})
+                </button>
+              ))}
+            </div>
           </Card>
 
           <Card>

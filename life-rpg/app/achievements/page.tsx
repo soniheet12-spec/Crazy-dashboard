@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGameState } from "@/lib/gameState";
+import { achievementProgress } from "@/lib/achievements";
 import { Card, HydrationGate, PageHeader } from "@/components/ui";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -61,6 +62,22 @@ export default function AchievementsPage() {
                     {a.title}
                   </p>
                   <p className="mt-0.5 text-sm text-slate-500">{a.description}</p>
+                  {!a.unlocked &&
+                    (() => {
+                      const pr = achievementProgress(state, a.id);
+                      if (!pr || pr.target <= 0) return null;
+                      const pct = Math.round((pr.current / pr.target) * 100);
+                      return (
+                        <div className="mt-2">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-soft">
+                            <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="tabular mt-1 text-[11px] text-slate-500">
+                            {pr.current}/{pr.target}
+                          </p>
+                        </div>
+                      );
+                    })()}
                   {a.unlocked && a.unlockedAt && (
                     <p className="mt-2 text-[11px] text-amber/80">
                       Unlocked {new Date(a.unlockedAt).toLocaleDateString()}

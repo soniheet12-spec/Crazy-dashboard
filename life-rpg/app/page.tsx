@@ -54,8 +54,16 @@ function periodStats(state: GameState) {
 }
 
 export default function DashboardPage() {
-  const { state, hydrated, claimDailyBonus, acceptSideQuest, claimDailyChallenge, claimWeeklyChallenge } =
-    useGameState();
+  const {
+    state,
+    hydrated,
+    claimDailyBonus,
+    acceptSideQuest,
+    claimDailyChallenge,
+    claimWeeklyChallenge,
+    setMood,
+  } = useGameState();
+  const todayMood = state.moods.find((m) => m.date === localDay())?.value ?? 0;
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
 
@@ -97,6 +105,28 @@ export default function DashboardPage() {
           prestige={state.prestige}
           hp={state.hp}
         />
+
+        {/* Mood check-in */}
+        <Card className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-300">How are you feeling today?</p>
+          <div className="flex gap-1.5">
+            {["😞", "😕", "😐", "🙂", "😄"].map((e, i) => {
+              const v = i + 1;
+              return (
+                <button
+                  key={v}
+                  onClick={() => setMood(v)}
+                  aria-label={`Mood ${v}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg ${
+                    todayMood === v ? "bg-accent/20 ring-1 ring-accent" : "bg-bg-soft hover:bg-bg-hover"
+                  }`}
+                >
+                  {e}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
 
         {/* Daily bonus · side quest · needs attention */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-3">

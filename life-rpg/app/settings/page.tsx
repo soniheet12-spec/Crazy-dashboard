@@ -12,6 +12,8 @@ import {
   Bell,
   Volume2,
   Vibrate,
+  Accessibility,
+  FileUp,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
@@ -22,6 +24,7 @@ export default function SettingsPage() {
   const {
     state,
     hydrated,
+    addQuest,
     addStat,
     renameStat,
     removeStat,
@@ -37,6 +40,7 @@ export default function SettingsPage() {
 
   const [newStat, setNewStat] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const csvRef = useRef<HTMLInputElement>(null);
 
   const [recap, setRecap] = useState<string | null>(null);
   const [recapMsg, setRecapMsg] = useState<string | null>(null);
@@ -55,6 +59,22 @@ export default function SettingsPage() {
   const doImport = async (file: File) => {
     const text = await file.text();
     if (!importJSON(text)) alert("That file isn't a valid Life RPG save.");
+  };
+
+  const doImportCSV = async (file: File) => {
+    const text = await file.text();
+    const keys = Object.keys(state.stats);
+    let n = 0;
+    for (const line of text.split(/\r?\n/)) {
+      const [title, statRaw, xpRaw] = line.split(",").map((s) => s?.trim());
+      if (!title || title.toLowerCase() === "title") continue; // skip blank / header
+      const match = Object.values(state.stats).find(
+        (s) => s.key === statRaw?.toLowerCase() || s.label.toLowerCase() === statRaw?.toLowerCase(),
+      );
+      addQuest({ title, stat: match?.key ?? keys[0], xp: Math.max(5, Number(xpRaw) || 30) });
+      n++;
+    }
+    alert(`Imported ${n} quest${n === 1 ? "" : "s"} from CSV.`);
   };
 
   const generateRecap = async () => {
@@ -248,6 +268,15 @@ export default function SettingsPage() {
               />
               <Vibrate size={15} /> Haptics
             </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={state.settings.reduceMotion}
+                onChange={(e) => updateSettings({ reduceMotion: e.target.checked })}
+                className="h-4 w-4 accent-accent"
+              />
+              <Accessibility size={15} /> Reduce motion
+            </label>
           </div>
         </Card>
 
@@ -275,6 +304,23 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) doImport(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => csvRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm text-slate-200 hover:border-accent"
+            >
+              <FileUp size={15} /> Import quests (CSV)
+            </button>
+            <input
+              ref={csvRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) doImportCSV(f);
                 e.target.value = "";
               }}
             />
