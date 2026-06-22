@@ -23,6 +23,9 @@ import {
   Sunrise,
   Handshake,
   Trophy,
+  Snowflake,
+  FlaskConical,
+  Gift,
   HelpCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -30,7 +33,7 @@ import {
 const REGISTRY: Record<string, LucideIcon> = {
   Dumbbell, Brain, BrainCircuit, Coins, MessagesSquare, ShieldCheck, Sparkles,
   Flame, Gem, Shield, Feather, Medal, Map, Swords, BookOpen, Crown, Heart,
-  Users, Compass, Sunrise, Handshake, Trophy,
+  Users, Compass, Sunrise, Handshake, Trophy, Snowflake, FlaskConical, Gift,
 };
 
 /** Render a lucide icon by its registry name, with a safe fallback. */

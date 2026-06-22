@@ -118,6 +118,10 @@ export interface GameState {
   perks: Record<string, number>; // perkId -> rank owned
   inventory: LootItem[]; // collected loot
   equipped: string[]; // equipped loot item ids (gear buffs), max 3
+  coins: number; // spendable currency earned from quests/bosses
+  streakFreezes: number; // consumables that protect a missed day
+  potionUntil: string; // ISO; active XP-potion expiry
+  prestige: number; // prestige level (permanent XP bonus)
   combo: Combo; // momentum meter
   lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
   lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted

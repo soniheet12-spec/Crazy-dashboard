@@ -16,8 +16,10 @@ import {
   CheckSquare,
   Sparkles,
   Dices,
+  Wand2,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
+import { suggestStat } from "@/lib/calendarMapping";
 import { localDay } from "@/lib/dates";
 import { FocusTimer } from "@/components/FocusTimer";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
@@ -164,6 +166,7 @@ export default function QuestsPage() {
   const [negative, setNegative] = useState(false);
   const [days, setDays] = useState<number[]>([]);
   const [subtasksRaw, setSubtasksRaw] = useState("");
+  const [quickText, setQuickText] = useState("");
 
   // AI suggestions
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -202,6 +205,14 @@ export default function QuestsPage() {
     setNegative(false);
     setDays([]);
     setSubtasksRaw("");
+  };
+
+  const quickAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = quickText.trim();
+    if (!text) return;
+    addQuest({ title: text, stat: suggestStat(text, Object.keys(state.stats)), xp: 30 });
+    setQuickText("");
   };
 
   const runSuggest = async () => {
@@ -249,6 +260,28 @@ export default function QuestsPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Add quest + focus timer + AI */}
         <div className="flex flex-col gap-5 lg:col-span-1">
+          <Card>
+            <CardTitle>Quick Add</CardTitle>
+            <form onSubmit={quickAdd} className="flex gap-2">
+              <input
+                value={quickText}
+                onChange={(e) => setQuickText(e.target.value)}
+                placeholder="e.g. went to the gym"
+                className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
+              />
+              <button
+                type="submit"
+                aria-label="Quick add"
+                className="flex items-center gap-1.5 rounded-lg bg-accent/90 px-3 py-2 text-sm font-semibold text-bg hover:bg-accent"
+              >
+                <Wand2 size={15} />
+              </button>
+            </form>
+            <p className="mt-2 text-xs text-slate-500">
+              Type what you did — we&apos;ll guess the stat. +30 XP.
+            </p>
+          </Card>
+
           <Card>
             <CardTitle>New Quest</CardTitle>
             <form onSubmit={submit} className="flex flex-col gap-3">

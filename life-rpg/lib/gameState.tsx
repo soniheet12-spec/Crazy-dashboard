@@ -15,10 +15,18 @@ import { useCelebration, type CelebrationSpec } from "@/components/Celebration";
 import { emptyState, sampleState, STATE_VERSION, DEFAULT_ACCENT } from "./seed";
 import { evaluateAchievements } from "./achievements";
 import { levelFromXp, streakMultiplier } from "./leveling";
-import { localDay, dayDiff } from "./dates";
+import { localDay, dayDiff, addDays } from "./dates";
 import { comboActive, comboMultiplier } from "./combo";
 import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
 import { rollBossLoot, rollQuestLoot } from "./loot";
+import {
+  coinsForXp,
+  nextRarity,
+  potionMultiplier,
+  prestigeMultiplier,
+  POTION_MINUTES,
+  SHOP_ITEMS,
+} from "./shop";
 import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
 import { sideQuestForDay } from "./sidequests";
 import { playFx, vibrate, type Fx } from "./sound";
@@ -28,6 +36,7 @@ import type {
   GameSettings,
   GameState,
   Quest,
+  Rarity,
   Stat,
   StatKey,
   SubTask,
@@ -86,6 +95,9 @@ export interface GameStateContextValue {
   toggleSubtask: (questId: string, subId: string) => void;
   acceptSideQuest: () => void;
   setOnboarded: () => void;
+  buyShopItem: (id: string) => void;
+  craft: (rarity: Rarity) => void;
+  prestige: () => void;
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
@@ -153,12 +165,19 @@ function updateHabitStreak(quest: Quest, today: string) {
   hs.best = Math.max(hs.best, hs.current);
 }
 
-function multiplierNote(streak: number, combo: number, perk: number, gear: number): string | undefined {
+function multiplierNote(
+  streak: number,
+  combo: number,
+  perk: number,
+  gear: number,
+  bonus: number,
+): string | undefined {
   const parts: string[] = [];
   if (streak > 1.001) parts.push(`Streak ×${streak}`);
   if (combo > 1.001) parts.push(`Combo ×${combo.toFixed(2)}`);
   if (perk > 1.001) parts.push(`Perks ×${perk.toFixed(2)}`);
   if (gear > 1.001) parts.push(`Gear ×${gear.toFixed(2)}`);
+  if (bonus > 1.001) parts.push(`Bonus ×${bonus.toFixed(2)}`);
   return parts.length ? parts.join(" · ") : undefined;
 }
 
@@ -177,19 +196,21 @@ function gainXp(
   const perkMult = perkXpMultiplier(state.perks, statKey);
   const gearMult =
     gearMultiplier(state.equipped, state.inventory) * collectionBonus(state.inventory).mult;
-  const total = streakMult * comboMult * perkMult * gearMult;
+  const bonusMult = potionMultiplier(state) * prestigeMultiplier(state.prestige);
+  const total = streakMult * comboMult * perkMult * gearMult * bonusMult;
   const gained = Math.max(1, Math.round(baseXp * total));
 
   const prevLevel = stat.level;
   stat.xp += gained;
   stat.level = levelFromXp(stat.xp);
+  state.coins += coinsForXp(baseXp);
   addToHistory(state, gained);
 
   const toasts: ToastSpec[] = [
     {
       kind: "xp",
       title: `+${gained} XP · ${stat.label}`,
-      subtitle: multiplierNote(streakMult, comboMult, perkMult, gearMult),
+      subtitle: multiplierNote(streakMult, comboMult, perkMult, gearMult, bonusMult),
     },
   ];
 
@@ -229,8 +250,16 @@ function applyDailyReset(state: GameState): boolean {
       if (q.subtasks) q.subtasks.forEach((s) => (s.done = false));
     }
   }
-  if (state.streak.lastActiveDate && dayDiff(state.streak.lastActiveDate, today) > 1) {
-    state.streak.current = 0;
+  if (state.streak.lastActiveDate) {
+    const gap = dayDiff(state.streak.lastActiveDate, today);
+    if (gap > 1) {
+      if (gap === 2 && state.streakFreezes > 0) {
+        state.streakFreezes -= 1; // a freeze bridges exactly one missed day
+        state.streak.lastActiveDate = addDays(today, -1);
+      } else {
+        state.streak.current = 0;
+      }
+    }
   }
   state.lastDailyReset = today;
   return true;
@@ -257,6 +286,10 @@ function migrate(s: GameState): GameState {
   if (!s.combo) s.combo = { count: 0, lastAt: "" };
   if (s.lastLoginBonus === undefined) s.lastLoginBonus = "";
   s.equipped ??= [];
+  s.coins ??= 0;
+  s.streakFreezes ??= 0;
+  if (s.potionUntil === undefined) s.potionUntil = "";
+  s.prestige ??= 0;
   if (s.lastSideQuest === undefined) s.lastSideQuest = "";
   if (s.onboarded === undefined) s.onboarded = true;
   if (!s.settings) {
@@ -507,6 +540,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         if (!wasDone && boss.progress >= boss.target) {
           const item = rollBossLoot(perkLootChanceBonus(d.perks));
           d.inventory.unshift(item);
+          d.coins += 50;
           fx(d, "boss");
           cele({ kind: "boss", title: `${boss.title} defeated!`, subtitle: `Loot: ${item.name}` });
         }
@@ -678,6 +712,73 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     });
   }, [commit]);
 
+  const buyShopItem = useCallback(
+    (id: string) => {
+      commit((d, cele) => {
+        const item = SHOP_ITEMS.find((s) => s.id === id);
+        if (!item || d.coins < item.cost) return [];
+        d.coins -= item.cost;
+        if (id === "streak-freeze") {
+          d.streakFreezes += 1;
+          return [{ kind: "info", title: "Streak Freeze purchased", subtitle: `${d.streakFreezes} in reserve` }];
+        }
+        if (id === "xp-potion") {
+          const base = Math.max(Date.now(), d.potionUntil ? new Date(d.potionUntil).getTime() : 0);
+          d.potionUntil = new Date(base + POTION_MINUTES * 60_000).toISOString();
+          return [{ kind: "info", title: "XP Potion active", subtitle: `1.5× XP for ${POTION_MINUTES} min` }];
+        }
+        if (id === "mystery-box") {
+          const loot = rollQuestLoot(1, perkLootChanceBonus(d.perks));
+          if (loot) {
+            d.inventory.unshift(loot);
+            if (loot.rarity === "legendary") {
+              cele({ kind: "loot", title: loot.name, subtitle: "From a Mystery Box!" });
+            }
+            return [{ kind: "info", title: `Mystery Box: ${loot.name}`, subtitle: `${loot.rarity} drop` }];
+          }
+        }
+      });
+    },
+    [commit],
+  );
+
+  const craft = useCallback(
+    (rarity: Rarity) => {
+      commit((d) => {
+        const up = nextRarity(rarity);
+        if (!up) return [];
+        const matches = d.inventory.filter((i) => i.rarity === rarity);
+        if (matches.length < 3) return [];
+        const removeIds = new Set(matches.slice(0, 3).map((i) => i.id));
+        d.inventory = d.inventory.filter((i) => !removeIds.has(i.id));
+        d.equipped = d.equipped.filter((id) => !removeIds.has(id));
+        d.inventory.unshift({
+          id: genId("loot"),
+          name: `Crafted ${up.charAt(0).toUpperCase()}${up.slice(1)}`,
+          rarity: up,
+          icon: "Gem",
+          acquiredAt: new Date().toISOString(),
+        });
+        return [{ kind: "info", title: `Crafted a ${up} item`, subtitle: "3 combined into 1" }];
+      });
+    },
+    [commit],
+  );
+
+  const prestige = useCallback(() => {
+    commit((d) => {
+      const topTierXp = 12000; // Mythic threshold
+      const seasonStart = localDay(new Date(d.settings.seasonStartedAt));
+      const sXp = d.xpHistory.filter((p) => p.date >= seasonStart).reduce((s, p) => s + Math.max(0, p.xp), 0);
+      if (sXp < topTierXp) {
+        return [{ kind: "info", title: "Not yet", subtitle: "Reach the Mythic season tier to prestige." }];
+      }
+      d.prestige += 1;
+      d.settings.seasonStartedAt = new Date().toISOString();
+      return [{ kind: "levelup", title: `Prestige ${d.prestige}!`, subtitle: `Permanent +${d.prestige * 2}% XP` }];
+    });
+  }, [commit]);
+
   // ─── Stats / settings ──────────────────────────────────────────────────────────
 
   const addStat = useCallback(
@@ -832,6 +933,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
+      buyShopItem,
+      craft,
+      prestige,
       addStat,
       renameStat,
       removeStat,
@@ -864,6 +968,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
+      buyShopItem,
+      craft,
+      prestige,
       addStat,
       renameStat,
       removeStat,

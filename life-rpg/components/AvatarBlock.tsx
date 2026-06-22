@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Flame, Zap, Star } from "lucide-react";
+import { Flame, Zap, Star, Coins } from "lucide-react";
 import { Icon } from "./Icon";
 import type { DerivedClass } from "@/lib/classes";
 
@@ -11,12 +11,16 @@ export function AvatarBlock({
   streakCurrent,
   energyPct,
   klass,
+  coins,
+  prestige,
 }: {
   characterLevel: number;
   totalXp: number;
   streakCurrent: number;
   energyPct: number;
   klass: DerivedClass;
+  coins: number;
+  prestige: number;
 }) {
   return (
     <div className="card flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
@@ -43,6 +47,11 @@ export function AvatarBlock({
             {klass.title} <span className="text-accent">{klass.name}</span>
           </h2>
         </div>
+        {prestige > 0 && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-amber">
+            <Star size={11} fill="#fbbf24" /> Prestige {prestige} · +{prestige * 2}% XP
+          </p>
+        )}
 
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <span className="flex items-center gap-1.5 text-slate-300">
@@ -54,6 +63,11 @@ export function AvatarBlock({
             <Flame size={15} className={streakCurrent > 0 ? "text-amber" : "text-slate-600"} />
             <span className="tabular font-semibold text-slate-100">{streakCurrent}</span>
             <span className="text-slate-500">day streak</span>
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-300">
+            <Coins size={15} className="text-amber" />
+            <span className="tabular font-semibold text-slate-100">{coins.toLocaleString()}</span>
+            <span className="text-slate-500">coins</span>
           </span>
         </div>
 

@@ -11,6 +11,7 @@ import {
   Settings,
   Swords,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
 
 const LINKS = [
@@ -20,6 +21,7 @@ const LINKS = [
   { href: "/achievements", label: "Achievements", short: "Awards", icon: Award },
   { href: "/bosses", label: "Bosses", short: "Bosses", icon: Skull },
   { href: "/skills", label: "Skills", short: "Skills", icon: Sparkles },
+  { href: "/insights", label: "Insights", short: "Stats", icon: BarChart3 },
   { href: "/settings", label: "Settings", short: "More", icon: Settings },
 ];
 
