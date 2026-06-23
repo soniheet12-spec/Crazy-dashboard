@@ -1071,7 +1071,7 @@ window.SettingsDB = (function(){
   <button id="sb-hamburger" onclick="toggleSidebar()" title="Toggle menu">&#9776;</button>
   <div id="global-search-wrap" style="position:relative;margin-right:4px">
     <input id="global-search" type="text" placeholder="Search…" oninput="runGlobalSearch(this.value)" onfocus="runGlobalSearch(this.value)" onblur="setTimeout(closeGlobalSearch,160)" style="padding:6px 10px;font-size:12px;background:var(--s1);color:var(--text);border:1px solid var(--border);border-radius:6px;width:200px">
-    <div id="global-search-results" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;width:340px;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
+    <div id="global-search-results" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;width:340px;max-width:90vw;max-height:420px;overflow-y:auto;background:var(--s1);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:80"></div>
   </div>
   <div class="topbar-actions" style="display:flex;gap:8px;align-items:center">
     <button id="gs-sync-btn" class="pill-btn" onclick="manualSync()" title="Sync all data with Google Sheets">&#x21BB; Sync</button>
