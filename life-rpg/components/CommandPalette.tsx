@@ -35,6 +35,7 @@ export function CommandPalette() {
     () => [
       { label: "Go to Dashboard", run: () => router.push("/") },
       { label: "Go to Quests", run: () => router.push("/quests") },
+      { label: "Go to Planner", run: () => router.push("/planner") },
       { label: "Go to Calendar", run: () => router.push("/calendar") },
       { label: "Go to Achievements", run: () => router.push("/achievements") },
       { label: "Go to Bosses", run: () => router.push("/bosses") },

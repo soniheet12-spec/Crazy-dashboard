@@ -16,14 +16,16 @@ import { setReduceMotion } from "@/lib/motion";
 // Tailwind `accent` utility recolors live.
 function ThemeApplier() {
   const { state, hydrated } = useGameState();
+  const { accent, reduceMotion, theme, fontScale } = state.settings;
   useEffect(() => {
     if (!hydrated) return;
-    document.documentElement.style.setProperty(
-      "--accent-rgb",
-      hexToRgbTriplet(state.settings.accent),
-    );
-    setReduceMotion(state.settings.reduceMotion);
-  }, [state.settings.accent, state.settings.reduceMotion, hydrated]);
+    const root = document.documentElement;
+    root.style.setProperty("--accent-rgb", hexToRgbTriplet(accent));
+    root.style.setProperty("--font-scale", String(fontScale ?? 1));
+    if (theme && theme !== "dark") root.dataset.theme = theme;
+    else delete root.dataset.theme;
+    setReduceMotion(reduceMotion);
+  }, [accent, reduceMotion, theme, fontScale, hydrated]);
   return null;
 }
 

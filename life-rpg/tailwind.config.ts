@@ -8,14 +8,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Deep charcoal / navy RPG palette
+        // Deep charcoal / navy RPG palette. Surfaces are CSS-variable driven so
+        // the light / high-contrast themes can repaint the whole app at runtime.
         bg: {
-          DEFAULT: "#0a0e1a",
-          soft: "#0f1626",
-          card: "#121a2e",
-          hover: "#16203a",
+          DEFAULT: "rgb(var(--bg) / <alpha-value>)",
+          soft: "rgb(var(--bg-soft) / <alpha-value>)",
+          card: "rgb(var(--bg-card) / <alpha-value>)",
+          hover: "rgb(var(--bg-hover) / <alpha-value>)",
         },
-        line: "#1e2a45",
+        line: "rgb(var(--line) / <alpha-value>)",
         accent: {
           DEFAULT: "rgb(var(--accent-rgb) / <alpha-value>)", // dynamic, themeable
           dim: "#0ea5e9",

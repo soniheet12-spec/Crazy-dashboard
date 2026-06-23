@@ -16,6 +16,7 @@ export interface Stat {
   xp: number; // cumulative XP earned in this stat
   level: number; // derived from xp, cached for convenience
   color?: string; // hex, used by charts/bars
+  icon?: string; // lucide-react icon name (picked in Settings)
 }
 
 export interface HabitStreak {
@@ -47,6 +48,7 @@ export interface Quest {
   sideQuest?: boolean; // generated daily side quest
   difficulty?: Difficulty; // scales XP & coins
   lastLoggedDay?: string; // YYYY-MM-DD an anti-habit was last logged (days-clean)
+  wager?: number; // coins staked on completion; pays out 2× when done
 }
 
 export interface QuestTemplate {
@@ -110,7 +112,11 @@ export interface GameSettings {
   sound: boolean; // sound effects on level-up / loot / boss
   haptics: boolean; // vibration feedback on supported devices
   reduceMotion: boolean; // disable confetti / heavy animations
+  theme: ThemeMode; // dark (default) / light / high-contrast
+  fontScale: number; // root font-size multiplier (0.9–1.25)
 }
+
+export type ThemeMode = "dark" | "light" | "contrast";
 
 export interface MoodEntry {
   date: string; // YYYY-MM-DD
@@ -151,6 +157,7 @@ export interface GameState {
   lastLoginBonus: string; // YYYY-MM-DD the daily bonus was last claimed
   lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted
   onboarded: boolean; // has the user seen the intro
+  comeback?: number; // days away when returning after a gap (drives welcome-back banner)
   // Internal bookkeeping
   isSampleData: boolean; // true until the user clears the seed
   lastDailyReset: string; // YYYY-MM-DD

@@ -5,12 +5,12 @@ import type { GameState, Stat, StatKey } from "./types";
 
 export const STATE_VERSION = 1;
 
-const STAT_META: { key: StatKey; label: string; color: string }[] = [
-  { key: "body", label: "Body", color: "#f87171" },
-  { key: "mind", label: "Mind", color: "#a78bfa" },
-  { key: "wealth", label: "Wealth", color: "#34d399" },
-  { key: "social", label: "Social", color: "#fb923c" },
-  { key: "discipline", label: "Discipline", color: "#38bdf8" },
+const STAT_META: { key: StatKey; label: string; color: string; icon: string }[] = [
+  { key: "body", label: "Body", color: "#f87171", icon: "Dumbbell" },
+  { key: "mind", label: "Mind", color: "#a78bfa", icon: "Brain" },
+  { key: "wealth", label: "Wealth", color: "#34d399", icon: "Coins" },
+  { key: "social", label: "Social", color: "#fb923c", icon: "MessagesSquare" },
+  { key: "discipline", label: "Discipline", color: "#38bdf8", icon: "ShieldCheck" },
 ];
 
 function buildStats(xpByKey: Partial<Record<StatKey, number>>): Record<StatKey, Stat> {
@@ -21,6 +21,7 @@ function buildStats(xpByKey: Partial<Record<StatKey, number>>): Record<StatKey, 
       key: meta.key,
       label: meta.label,
       color: meta.color,
+      icon: meta.icon,
       xp,
       level: levelFromXp(xp),
     };
@@ -40,6 +41,8 @@ function defaultSettings() {
     sound: true,
     haptics: true,
     reduceMotion: false,
+    theme: "dark" as const,
+    fontScale: 1,
   };
 }
 

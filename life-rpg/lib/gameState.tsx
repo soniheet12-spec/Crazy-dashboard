@@ -21,12 +21,14 @@ import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks"
 import { rollBossLoot, rollQuestLoot } from "./loot";
 import {
   coinsForXp,
+  lootSellValue,
   nextRarity,
   potionMultiplier,
   prestigeMultiplier,
   POTION_MINUTES,
   SHOP_ITEMS,
 } from "./shop";
+import { eventMultiplier } from "./events";
 import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
 import {
   DAILY_CHALLENGE,
@@ -79,6 +81,7 @@ export interface NewQuestInput {
   days?: number[];
   subtasks?: string[];
   difficulty?: Difficulty;
+  wager?: number; // coins staked; refunded 2× on completion
 }
 
 export interface NewBossInput {
@@ -111,9 +114,11 @@ export interface GameStateContextValue {
   // gear & extras
   equipItem: (id: string) => void;
   unequipItem: (id: string) => void;
+  sellLoot: (id: string) => void;
   toggleSubtask: (questId: string, subId: string) => void;
   acceptSideQuest: () => void;
   setOnboarded: () => void;
+  dismissComeback: () => void;
   buyShopItem: (id: string) => void;
   craft: (rarity: Rarity) => void;
   prestige: () => void;
@@ -126,6 +131,7 @@ export interface GameStateContextValue {
   // stats / settings
   addStat: (label: string) => void;
   renameStat: (key: StatKey, label: string) => void;
+  setStatIcon: (key: StatKey, icon: string) => void;
   removeStat: (key: StatKey) => void;
   updateSettings: (patch: Partial<GameSettings>) => void;
   setAccent: (hex: string) => void;
@@ -199,6 +205,15 @@ function bumpCombo(state: GameState) {
   state.combo.lastAt = new Date(now).toISOString();
 }
 
+/** Pay out a winning wager (2× the stake) and clear it. */
+function payWager(state: GameState, quest: Quest): ToastSpec[] {
+  if (!quest.wager) return [];
+  const win = quest.wager * 2;
+  state.coins += win;
+  quest.wager = undefined;
+  return [{ kind: "xp", title: `Wager won · +${win} coins`, subtitle: "Double-or-nothing paid off!" }];
+}
+
 function updateHabitStreak(quest: Quest, today: string) {
   if (!quest.habitStreak) quest.habitStreak = { current: 0, best: 0, lastDay: "" };
   const hs = quest.habitStreak;
@@ -240,7 +255,7 @@ function gainXp(
   const perkMult = perkXpMultiplier(state.perks, statKey);
   const gearMult =
     gearMultiplier(state.equipped, state.inventory) * collectionBonus(state.inventory).mult;
-  const bonusMult = potionMultiplier(state) * prestigeMultiplier(state.prestige);
+  const bonusMult = potionMultiplier(state) * prestigeMultiplier(state.prestige) * eventMultiplier();
   const total = streakMult * comboMult * perkMult * gearMult * bonusMult;
   const gained = Math.max(1, Math.round(baseXp * total));
 
@@ -302,6 +317,12 @@ function applyDailyReset(state: GameState): boolean {
         state.streak.lastActiveDate = addDays(today, -1);
       } else {
         state.streak.current = 0;
+        if (gap >= 3) {
+          // Welcome the player back after a real absence: coins + a free freeze.
+          state.comeback = gap;
+          state.coins += Math.min(100, gap * 10);
+          state.streakFreezes += 1;
+        }
       }
     }
   }
@@ -351,6 +372,8 @@ function migrate(s: GameState): GameState {
       sound: true,
       haptics: true,
       reduceMotion: false,
+      theme: "dark",
+      fontScale: 1,
     };
   }
   if (s.settings.accent === undefined) s.settings.accent = DEFAULT_ACCENT;
@@ -358,6 +381,8 @@ function migrate(s: GameState): GameState {
   if (s.settings.sound === undefined) s.settings.sound = true;
   if (s.settings.haptics === undefined) s.settings.haptics = true;
   if (s.settings.reduceMotion === undefined) s.settings.reduceMotion = false;
+  if (s.settings.theme === undefined) s.settings.theme = "dark";
+  if (typeof s.settings.fontScale !== "number") s.settings.fontScale = 1;
   s.streakMilestones ??= [];
   s.moods ??= [];
   return s;
@@ -461,7 +486,16 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         if (subs.length) {
           quest.subtasks = subs.map((t) => ({ id: genId("st"), title: t, done: false }));
         }
+        // Wager: stake coins up front (only if affordable & not an anti-habit).
+        const wager = Math.max(0, Math.round(q.wager ?? 0));
+        if (wager > 0 && !quest.negative && d.coins >= wager) {
+          d.coins -= wager;
+          quest.wager = wager;
+        }
         d.quests.unshift(quest);
+        if (quest.wager) {
+          return [{ kind: "info", title: `Wager placed · ${quest.wager} coins`, subtitle: "Finish it to win 2× back." }];
+        }
       });
     },
     [commit],
@@ -501,7 +535,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40); // rest heals
         const earned = gainXp(d, quest.stat, effXp(quest), cele);
         fx(d, "complete");
-        return [...ms, ...earned];
+        return [...ms, ...earned, ...payWager(d, quest)];
       });
     },
     [commit],
@@ -720,6 +754,21 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const sellLoot = useCallback(
+    (id: string) => {
+      commit((d) => {
+        const item = d.inventory.find((i) => i.id === id);
+        if (!item) return [];
+        const value = lootSellValue(item.rarity);
+        d.inventory = d.inventory.filter((i) => i.id !== id);
+        d.equipped = d.equipped.filter((x) => x !== id);
+        d.coins += value;
+        return [{ kind: "info", title: `Sold ${item.name}`, subtitle: `+${value} coins` }];
+      });
+    },
+    [commit],
+  );
+
   const toggleSubtask = useCallback(
     (questId: string, subId: string) => {
       commit((d, cele) => {
@@ -739,7 +788,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
             if (REST_RE.test(quest.title)) d.hp = Math.min(MAX_HP, d.hp + 40);
             const earned = gainXp(d, quest.stat, effXp(quest), cele);
             fx(d, "complete");
-            return [...ms, ...earned];
+            return [...ms, ...earned, ...payWager(d, quest)];
           }
         }
       });
@@ -771,6 +820,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const setOnboarded = useCallback(() => {
     commit((d) => {
       d.onboarded = true;
+    });
+  }, [commit]);
+
+  const dismissComeback = useCallback(() => {
+    commit((d) => {
+      d.comeback = undefined;
     });
   }, [commit]);
 
@@ -954,6 +1009,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const setStatIcon = useCallback(
+    (key: StatKey, icon: string) => {
+      commit((d) => {
+        if (d.stats[key]) d.stats[key].icon = icon;
+      });
+    },
+    [commit],
+  );
+
   const removeStat = useCallback(
     (key: StatKey) => {
       commit((d) => {
@@ -1076,9 +1140,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       logFocus,
       equipItem,
       unequipItem,
+      sellLoot,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
+      dismissComeback,
       buyShopItem,
       craft,
       prestige,
@@ -1090,6 +1156,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setMood,
       addStat,
       renameStat,
+      setStatIcon,
       removeStat,
       updateSettings,
       setAccent,
@@ -1117,9 +1184,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       logFocus,
       equipItem,
       unequipItem,
+      sellLoot,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
+      dismissComeback,
       buyShopItem,
       craft,
       prestige,
@@ -1131,6 +1200,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setMood,
       addStat,
       renameStat,
+      setStatIcon,
       removeStat,
       updateSettings,
       setAccent,

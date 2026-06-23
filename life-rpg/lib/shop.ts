@@ -55,6 +55,17 @@ export function coinsForXp(baseXp: number): number {
   return Math.max(1, Math.round(baseXp / 5));
 }
 
+/** Coins paid when selling a loot item, by rarity. */
+const SELL_VALUE: Record<Rarity, number> = {
+  common: 10,
+  rare: 30,
+  epic: 75,
+  legendary: 150,
+};
+export function lootSellValue(rarity: Rarity): number {
+  return SELL_VALUE[rarity];
+}
+
 /** Next rarity up for crafting, or null if already top tier. */
 export function nextRarity(r: Rarity): Rarity | null {
   const i = RARITY_ORDER.indexOf(r);

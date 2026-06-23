@@ -12,11 +12,13 @@ import {
   Swords,
   Sparkles,
   BarChart3,
+  CalendarRange,
 } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard },
   { href: "/quests", label: "Quests", short: "Quests", icon: ScrollText },
+  { href: "/planner", label: "Planner", short: "Plan", icon: CalendarRange },
   { href: "/calendar", label: "Calendar", short: "Cal", icon: CalendarDays },
   { href: "/achievements", label: "Achievements", short: "Awards", icon: Award },
   { href: "/bosses", label: "Bosses", short: "Bosses", icon: Skull },
