@@ -8,13 +8,23 @@ import { PERKS, perkCost } from "@/lib/perks";
 import { RARITY_COLOR, RARITY_ORDER } from "@/lib/loot";
 import { collectionBonus, gearBonusFor, gearMultiplier, MAX_EQUIPPED } from "@/lib/gear";
 import { seasonProgress, seasonXp } from "@/lib/season";
-import { SHOP_ITEMS, potionActive, nextRarity } from "@/lib/shop";
+import { SHOP_ITEMS, potionActive, nextRarity, lootSellValue } from "@/lib/shop";
 import { Icon } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader } from "@/components/ui";
 
 export default function SkillsPage() {
-  const { state, hydrated, buyPerk, equipItem, unequipItem, buyShopItem, craft, prestige, respecPerks } =
-    useGameState();
+  const {
+    state,
+    hydrated,
+    buyPerk,
+    equipItem,
+    unequipItem,
+    sellLoot,
+    buyShopItem,
+    craft,
+    prestige,
+    respecPerks,
+  } = useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
 
@@ -268,22 +278,32 @@ export default function SkillsPage() {
                   <p className="text-[11px] capitalize" style={{ color }}>
                     {item.rarity} · +{Math.round(gearBonusFor(item.rarity) * 100)}%
                   </p>
-                  {isEquipped ? (
+                  <div className="flex w-full gap-1.5">
+                    {isEquipped ? (
+                      <button
+                        onClick={() => unequipItem(item.id)}
+                        className="flex-1 rounded-md border border-line px-2 py-1 text-xs text-slate-300 hover:border-body hover:text-body"
+                      >
+                        Unequip
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => equipItem(item.id)}
+                        disabled={slotsFull}
+                        className="flex-1 rounded-md bg-accent/90 px-2 py-1 text-xs font-semibold text-bg hover:bg-accent disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+                      >
+                        {slotsFull ? "Slots full" : "Equip"}
+                      </button>
+                    )}
                     <button
-                      onClick={() => unequipItem(item.id)}
-                      className="w-full rounded-md border border-line px-2 py-1 text-xs text-slate-300 hover:border-body hover:text-body"
+                      onClick={() => sellLoot(item.id)}
+                      title={`Sell for ${lootSellValue(item.rarity)} coins`}
+                      aria-label={`Sell ${item.name}`}
+                      className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-amber hover:border-amber"
                     >
-                      Unequip
+                      <Coins size={12} /> {lootSellValue(item.rarity)}
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => equipItem(item.id)}
-                      disabled={slotsFull}
-                      className="w-full rounded-md bg-accent/90 px-2 py-1 text-xs font-semibold text-bg hover:bg-accent disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
-                    >
-                      {slotsFull ? "Slots full" : "Equip"}
-                    </button>
-                  )}
+                  </div>
                 </div>
               );
             })}

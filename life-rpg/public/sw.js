@@ -1,6 +1,6 @@
 // Minimal, safe service worker: network-first with cache fallback so the app
 // is installable and works offline without serving stale chunks while online.
-const CACHE = "life-rpg-v1";
+const CACHE = "life-rpg-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

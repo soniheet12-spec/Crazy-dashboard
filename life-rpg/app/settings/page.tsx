@@ -14,11 +14,30 @@ import {
   Vibrate,
   Accessibility,
   FileUp,
+  Moon,
+  Sun,
+  Contrast,
+  Type,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
 import { ACCENT_PRESETS } from "@/lib/theme";
+import { Icon, STAT_ICON_CHOICES } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
+import type { ThemeMode } from "@/lib/types";
+
+const THEMES: { id: ThemeMode; label: string; icon: typeof Moon }[] = [
+  { id: "dark", label: "Dark", icon: Moon },
+  { id: "light", label: "Light", icon: Sun },
+  { id: "contrast", label: "Contrast", icon: Contrast },
+];
+
+const FONT_SIZES: { v: number; label: string }[] = [
+  { v: 0.9, label: "S" },
+  { v: 1, label: "M" },
+  { v: 1.12, label: "L" },
+  { v: 1.25, label: "XL" },
+];
 
 export default function SettingsPage() {
   const {
@@ -27,6 +46,7 @@ export default function SettingsPage() {
     addQuest,
     addStat,
     renameStat,
+    setStatIcon,
     removeStat,
     updateSettings,
     setAccent,
@@ -39,6 +59,7 @@ export default function SettingsPage() {
   } = useGameState();
 
   const [newStat, setNewStat] = useState("");
+  const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
 
@@ -121,30 +142,62 @@ export default function SettingsPage() {
         <Card>
           <CardTitle>Stats</CardTitle>
           <div className="flex flex-col gap-2">
-            {Object.values(state.stats).map((s) => (
-              <div key={s.key} className="flex items-center gap-2">
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: s.color ?? statColor(s.key) }}
-                />
-                <input
-                  value={s.label}
-                  onChange={(e) => renameStat(s.key, e.target.value)}
-                  className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
-                />
-                <span className="tabular w-16 text-right text-xs text-slate-500">
-                  Lv {s.level}
-                </span>
-                <button
-                  onClick={() => removeStat(s.key)}
-                  disabled={Object.keys(state.stats).length <= 1}
-                  className="text-slate-600 hover:text-body disabled:opacity-30"
-                  aria-label={`Remove ${s.label}`}
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
+            {Object.values(state.stats).map((s) => {
+              const color = s.color ?? statColor(s.key);
+              const picking = iconPickerFor === s.key;
+              return (
+                <div key={s.key}>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIconPickerFor(picking ? null : s.key)}
+                      aria-label={`Choose icon for ${s.label}`}
+                      title="Choose icon"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: `${color}22`, color }}
+                    >
+                      {s.icon ? <Icon name={s.icon} size={15} /> : (
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                      )}
+                    </button>
+                    <input
+                      value={s.label}
+                      onChange={(e) => renameStat(s.key, e.target.value)}
+                      className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-accent"
+                    />
+                    <span className="tabular w-12 text-right text-xs text-slate-500">
+                      Lv {s.level}
+                    </span>
+                    <button
+                      onClick={() => removeStat(s.key)}
+                      disabled={Object.keys(state.stats).length <= 1}
+                      className="text-slate-600 hover:text-body disabled:opacity-30"
+                      aria-label={`Remove ${s.label}`}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  {picking && (
+                    <div className="mt-2 grid grid-cols-8 gap-1.5 rounded-lg border border-line/70 bg-bg-soft/50 p-2 sm:grid-cols-11">
+                      {STAT_ICON_CHOICES.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            setStatIcon(s.key, name);
+                            setIconPickerFor(null);
+                          }}
+                          title={name}
+                          className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-bg-hover ${
+                            s.icon === name ? "text-accent ring-1 ring-accent" : "text-slate-400"
+                          }`}
+                        >
+                          <Icon name={name} size={16} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="mt-3 flex gap-2">
             <input
@@ -202,7 +255,47 @@ export default function SettingsPage() {
         {/* Appearance & reminders */}
         <Card>
           <CardTitle>Appearance &amp; Reminders</CardTitle>
-          <p className="mb-2 text-sm text-slate-400">Accent color</p>
+          <p className="mb-2 text-sm text-slate-400">Theme</p>
+          <div className="flex gap-2">
+            {THEMES.map((t) => {
+              const active = (state.settings.theme ?? "dark") === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => updateSettings({ theme: t.id })}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm ${
+                    active ? "border-accent bg-accent/15 text-accent" : "border-line text-slate-300 hover:border-accent"
+                  }`}
+                >
+                  <t.icon size={15} /> {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5">
+            <p className="mb-2 flex items-center gap-1.5 text-sm text-slate-400">
+              <Type size={14} /> Text size
+            </p>
+            <div className="flex gap-2">
+              {FONT_SIZES.map((f) => {
+                const active = Math.abs((state.settings.fontScale ?? 1) - f.v) < 0.001;
+                return (
+                  <button
+                    key={f.v}
+                    onClick={() => updateSettings({ fontScale: f.v })}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold ${
+                      active ? "border-accent bg-accent/15 text-accent" : "border-line text-slate-300 hover:border-accent"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <p className="mb-2 mt-5 text-sm text-slate-400">Accent color</p>
           <div className="flex flex-wrap gap-2">
             {ACCENT_PRESETS.map((p) => (
               <button

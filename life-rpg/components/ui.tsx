@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export function PageHeader({
   title,
@@ -27,11 +27,17 @@ export function PageHeader({
 export function Card({
   children,
   className = "",
+  style,
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
-  return <div className={`card p-5 ${className}`}>{children}</div>;
+  return (
+    <div className={`card p-5 ${className}`} style={style}>
+      {children}
+    </div>
+  );
 }
 
 export function CardTitle({ children }: { children: ReactNode }) {

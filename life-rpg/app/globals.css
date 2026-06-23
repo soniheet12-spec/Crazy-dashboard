@@ -5,12 +5,54 @@
 :root {
   color-scheme: dark;
   --accent-rgb: 56 189 248; /* themeable accent (overridden at runtime) */
+  --font-scale: 1; /* root font-size multiplier (Settings) */
+  /* Surface palette as RGB triplets so themes can repaint everything. */
+  --bg: 10 14 26;
+  --bg-soft: 15 22 38;
+  --bg-card: 18 26 46;
+  --bg-hover: 22 32 58;
+  --line: 30 42 69;
+  --text: 226 232 240;
+}
+
+/* Light theme — surfaces lighten and the slate text scale flips dark. */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: 240 244 250;
+  --bg-soft: 230 235 244;
+  --bg-card: 255 255 255;
+  --bg-hover: 224 231 243;
+  --line: 203 213 225;
+  --text: 15 23 42;
+}
+[data-theme="light"] .text-slate-100 { color: #0f172a !important; }
+[data-theme="light"] .text-slate-200 { color: #1e293b !important; }
+[data-theme="light"] .text-slate-300 { color: #334155 !important; }
+[data-theme="light"] .text-slate-400 { color: #475569 !important; }
+[data-theme="light"] .text-slate-500 { color: #64748b !important; }
+[data-theme="light"] .text-slate-600 { color: #94a3b8 !important; }
+
+/* High-contrast theme — pure-black surfaces, bright borders + lifted text. */
+[data-theme="contrast"] {
+  --bg: 0 0 0;
+  --bg-soft: 10 12 20;
+  --bg-card: 14 18 30;
+  --bg-hover: 26 32 50;
+  --line: 96 116 156;
+  --text: 248 250 252;
+}
+[data-theme="contrast"] .text-slate-400 { color: #e2e8f0 !important; }
+[data-theme="contrast"] .text-slate-500 { color: #cbd5e1 !important; }
+[data-theme="contrast"] .text-slate-600 { color: #aebfd4 !important; }
+
+html {
+  font-size: calc(100% * var(--font-scale));
 }
 
 html,
 body {
-  background-color: #0a0e1a;
-  color: #e2e8f0;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
 }
@@ -39,8 +81,8 @@ body {
 
 /* Card with subtle glow on hover */
 .card {
-  background-color: #121a2e;
-  border: 1px solid #1e2a45;
+  background-color: rgb(var(--bg-card));
+  border: 1px solid rgb(var(--line));
   border-radius: 0.9rem;
   transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }

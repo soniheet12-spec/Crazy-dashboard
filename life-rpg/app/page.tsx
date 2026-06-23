@@ -1,11 +1,12 @@
 "use client";
 
-import { Gift, TrendingDown, TrendingUp, Dices, ArrowRight, Trophy, Target } from "lucide-react";
+import { Gift, TrendingDown, TrendingUp, Dices, ArrowRight, Trophy, Target, PartyPopper, X } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
 import { seasonProgress, seasonXp } from "@/lib/season";
 import { sideQuestForDay } from "@/lib/sidequests";
+import { activeEvent } from "@/lib/events";
 import {
   DAILY_CHALLENGE,
   WEEKLY_CHALLENGE,
@@ -62,7 +63,9 @@ export default function DashboardPage() {
     claimDailyChallenge,
     claimWeeklyChallenge,
     setMood,
+    dismissComeback,
   } = useGameState();
+  const event = activeEvent();
   const todayMood = state.moods.find((m) => m.date === localDay())?.value ?? 0;
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
@@ -95,6 +98,47 @@ export default function DashboardPage() {
       />
 
       <div className="grid grid-cols-1 gap-5">
+        {state.comeback ? (
+          <Card className="flex items-center gap-3 border-amber/40 bg-amber/5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber/15 text-amber">
+              <PartyPopper size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-slate-100">Welcome back!</p>
+              <p className="text-sm text-slate-400">
+                You were away {state.comeback} days — here&apos;s some coins and a streak freeze to ease back in.
+              </p>
+            </div>
+            <button
+              onClick={dismissComeback}
+              aria-label="Dismiss"
+              className="shrink-0 text-slate-500 hover:text-slate-200"
+            >
+              <X size={18} />
+            </button>
+          </Card>
+        ) : null}
+
+        {event ? (
+          <Card
+            className="flex items-center gap-3"
+            style={{ borderColor: `${event.accent ?? "#fbbf24"}55` }}
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${event.accent ?? "#fbbf24"}22`, color: event.accent ?? "#fbbf24" }}
+            >
+              <Icon name={event.icon} size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-slate-100">
+                {event.name} · <span className="text-amber">×{event.xpMult} XP</span>
+              </p>
+              <p className="text-sm text-slate-400">{event.blurb}</p>
+            </div>
+          </Card>
+        ) : null}
+
         <AvatarBlock
           characterLevel={cl}
           totalXp={totalXp(state.stats)}

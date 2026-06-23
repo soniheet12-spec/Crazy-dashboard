@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -20,6 +20,8 @@ import {
   Star,
   Search,
   X,
+  Mic,
+  Coins,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { suggestStat } from "@/lib/calendarMapping";
@@ -32,6 +34,21 @@ import type { Difficulty, Quest, StatKey } from "@/lib/types";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Minimal, self-contained typings for the Web Speech API (not in the TS DOM lib).
+interface VoiceResultEvent {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+interface VoiceRecognition {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: VoiceResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+}
 
 function dueToday(q: Quest): boolean {
   if (q.days && q.days.length) return q.days.includes(new Date().getDay());
@@ -114,6 +131,11 @@ function QuestRow({
             {quest.difficulty && quest.difficulty !== "normal" && (
               <span className="capitalize text-slate-400">{quest.difficulty}</span>
             )}
+            {quest.wager ? (
+              <span className="flex items-center gap-0.5 text-amber">
+                <Coins size={10} /> {quest.wager} staked
+              </span>
+            ) : null}
             {quest.source === "calendar" && (
               <span className="flex items-center gap-0.5"><Calendar size={10} /> calendar</span>
             )}
@@ -198,6 +220,40 @@ export default function QuestsPage() {
   const [quickText, setQuickText] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
   const [search, setSearch] = useState("");
+  const [wager, setWager] = useState(0);
+
+  // Voice quick-add via the Web Speech API (feature-detected; Chrome/Safari).
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<VoiceRecognition | null>(null);
+  const voiceSupported =
+    typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  const startVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: new () => VoiceRecognition;
+      webkitSpeechRecognition?: new () => VoiceRecognition;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const rec = new Ctor();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const text = e.results?.[0]?.[0]?.transcript?.trim();
+      if (text) setQuickText(text);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
 
   // AI suggestions
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -233,6 +289,7 @@ export default function QuestsPage() {
       days: days.length ? days : undefined,
       subtasks,
       difficulty,
+      wager: !negative && wager > 0 ? wager : undefined,
     });
     setTitle("");
     setXp(30);
@@ -241,6 +298,7 @@ export default function QuestsPage() {
     setDays([]);
     setSubtasksRaw("");
     setDifficulty("normal");
+    setWager(0);
   };
 
   const quickAdd = (e: React.FormEvent) => {
@@ -302,9 +360,23 @@ export default function QuestsPage() {
               <input
                 value={quickText}
                 onChange={(e) => setQuickText(e.target.value)}
-                placeholder="e.g. went to the gym"
+                placeholder={listening ? "Listening…" : "e.g. went to the gym"}
                 className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
               />
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={startVoice}
+                  aria-label={listening ? "Stop listening" : "Add by voice"}
+                  className={`flex items-center justify-center rounded-lg border px-3 py-2 ${
+                    listening
+                      ? "border-body bg-body/15 text-body animate-pulse"
+                      : "border-line bg-bg-soft text-slate-300 hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  <Mic size={15} />
+                </button>
+              )}
               <button
                 type="submit"
                 aria-label="Quick add"
@@ -314,7 +386,7 @@ export default function QuestsPage() {
               </button>
             </form>
             <p className="mt-2 text-xs text-slate-500">
-              Type what you did — we&apos;ll guess the stat. +30 XP.
+              Type{voiceSupported ? " or speak" : ""} what you did — we&apos;ll guess the stat. +30 XP.
             </p>
           </Card>
 
@@ -420,6 +492,31 @@ export default function QuestsPage() {
                 placeholder="Subtasks, comma-separated (optional)"
                 className="rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
               />
+
+              {/* Coin wager */}
+              <div className={negative ? "opacity-40" : ""}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-xs text-slate-500">Wager coins (optional)</p>
+                  <span className="flex items-center gap-1 text-[11px] text-amber">
+                    <Coins size={11} /> {state.coins}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={state.coins}
+                    value={wager}
+                    disabled={negative}
+                    onChange={(e) => setWager(Math.max(0, Math.min(state.coins, Number(e.target.value))))}
+                    className="tabular w-24 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent disabled:cursor-not-allowed"
+                    aria-label="Wager coins"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    {wager > 0 ? `Win ${wager * 2} back on completion.` : "Stake coins, win 2× when you finish."}
+                  </p>
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
