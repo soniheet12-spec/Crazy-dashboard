@@ -1,5 +1,6 @@
-import type { GameState } from "./types";
+import type { GameState, Stat, XpHistoryPoint } from "./types";
 import { totalXp } from "./leveling";
+import { localDay, addDays, shortLabel, dayDiff } from "./dates";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -41,6 +42,71 @@ export function computeInsights(state: GameState): Insights {
 }
 
 export const DOW_LABELS = DOW;
+
+// ─── XP forecast ──────────────────────────────────────────────────────────────
+
+export interface ForecastPoint {
+  label: string;
+  actual: number | null; // cumulative XP up to this past day
+  projected: number | null; // projected cumulative XP for future days
+}
+
+/**
+ * Cumulative-XP series for the past `pastDays`, continued with a dashed
+ * projection for `futureDays` based on the last week's average daily pace.
+ */
+export function computeForecast(
+  history: XpHistoryPoint[],
+  pastDays = 14,
+  futureDays = 7,
+): { series: ForecastPoint[]; dailyAvg: number; projectedTotal: number } {
+  const byDate = new Map(history.map((h) => [h.date, h.xp]));
+  const today = localDay();
+  const start = addDays(today, -(pastDays - 1));
+
+  let recentSum = 0;
+  for (let i = 0; i < 7; i++) recentSum += byDate.get(addDays(today, -i)) ?? 0;
+  const dailyAvg = Math.round(recentSum / 7);
+
+  const series: ForecastPoint[] = [];
+  let cum = 0;
+  for (let i = 0; i < pastDays; i++) {
+    const date = addDays(start, i);
+    cum += byDate.get(date) ?? 0;
+    // Seed the projected line at the junction so the dashed segment connects.
+    series.push({ label: shortLabel(date), actual: cum, projected: i === pastDays - 1 ? cum : null });
+  }
+  for (let j = 1; j <= futureDays; j++) {
+    series.push({ label: shortLabel(addDays(today, j)), actual: null, projected: cum + dailyAvg * j });
+  }
+  return { series, dailyAvg, projectedTotal: dailyAvg * futureDays };
+}
+
+// ─── Stat balance ─────────────────────────────────────────────────────────────
+
+export interface StatBalance extends Stat {
+  share: number; // 0–1 portion of total XP
+  recency: number | null; // days since last trained (null = never)
+  neglected: boolean;
+}
+
+/** Per-stat balance, sorted weakest-first, flagging neglected stats. */
+export function statBalance(state: GameState, neglectDays = 3): StatBalance[] {
+  const stats = Object.values(state.stats);
+  const total = stats.reduce((s, x) => s + x.xp, 0) || 1;
+  const day = localDay();
+  return stats
+    .map((s) => {
+      const recency = s.lastTrained ? dayDiff(s.lastTrained, day) : null;
+      return {
+        ...s,
+        share: s.xp / total,
+        recency,
+        neglected: recency === null || recency >= neglectDays,
+      };
+    })
+    .sort((a, b) => a.level - b.level || a.xp - b.xp);
+}
 
 export function hourLabel(h: number): string {
   const ampm = h < 12 ? "am" : "pm";
