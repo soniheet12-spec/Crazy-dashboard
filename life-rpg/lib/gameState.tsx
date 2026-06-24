@@ -87,6 +87,18 @@ export interface NewQuestInput {
   mandatory?: boolean; // obligation; skipping it deals damage in strict modes
 }
 
+/** Editable fields for an existing quest (wager/subtasks are managed elsewhere). */
+export interface QuestEdit {
+  title?: string;
+  stat?: StatKey;
+  xp?: number;
+  daily?: boolean;
+  days?: number[];
+  negative?: boolean;
+  mandatory?: boolean;
+  difficulty?: Difficulty;
+}
+
 export interface NewBossInput {
   title: string;
   stat: StatKey;
@@ -104,6 +116,7 @@ export interface GameStateContextValue {
   uncompleteQuest: (id: string) => void;
   removeQuest: (id: string) => void;
   rescheduleQuest: (id: string, days: number[]) => void;
+  updateQuest: (id: string, patch: QuestEdit) => void;
   // calendar
   completeCalendarEvent: (e: CalendarEvent, stat: StatKey, xp: number) => void;
   setCalendarMapping: (eventId: string, stat: StatKey) => void;
@@ -732,6 +745,31 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  /** Edit an existing quest's core fields (title, stat, reward, schedule, flags). */
+  const updateQuest = useCallback(
+    (id: string, patch: QuestEdit) => {
+      commit((d) => {
+        const q = d.quests.find((x) => x.id === id);
+        if (!q) return;
+        if (patch.title !== undefined) q.title = patch.title.trim() || q.title;
+        if (patch.stat !== undefined && d.stats[patch.stat]) q.stat = patch.stat;
+        if (patch.xp !== undefined) q.xp = Math.max(0, Math.round(patch.xp));
+        if (patch.difficulty !== undefined) q.difficulty = patch.difficulty;
+        if (patch.negative !== undefined) q.negative = patch.negative;
+        if (patch.mandatory !== undefined) q.mandatory = patch.mandatory;
+        if (patch.daily !== undefined) q.daily = patch.daily;
+        if (patch.days !== undefined) {
+          const u = Array.from(new Set(patch.days.filter((n) => n >= 0 && n <= 6))).sort();
+          q.days = u.length ? u : undefined;
+        }
+        // Invariants: anti-habits are never mandatory; daily and scheduled-days are exclusive.
+        if (q.negative) q.mandatory = false;
+        if (q.daily) q.days = undefined;
+      });
+    },
+    [commit],
+  );
+
   const completeCalendarEvent = useCallback(
     (e: CalendarEvent, stat: StatKey, xp: number) => {
       commit((d, cele) => {
@@ -1314,6 +1352,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       uncompleteQuest,
       removeQuest,
       rescheduleQuest,
+      updateQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
@@ -1361,6 +1400,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       uncompleteQuest,
       removeQuest,
       rescheduleQuest,
+      updateQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
