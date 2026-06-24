@@ -62,6 +62,22 @@ export interface QuestTemplate {
   difficulty?: Difficulty;
 }
 
+/** A snapshot of a recurring weekly plan that can be re-applied in one tap. */
+export interface WeekTemplate {
+  id: string;
+  name: string;
+  createdAt: string; // ISO
+  quests: {
+    title: string;
+    stat: StatKey;
+    xp: number;
+    daily?: boolean;
+    days?: number[];
+    difficulty?: Difficulty;
+    mandatory?: boolean;
+  }[];
+}
+
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 
 export type Difficulty = "easy" | "normal" | "hard";
@@ -118,6 +134,7 @@ export interface GameSettings {
   theme: ThemeMode; // dark (default) / light / high-contrast
   fontScale: number; // root font-size multiplier (0.9–1.25)
   mode: GameMode; // difficulty: casual / normal / hardcore / nightmare
+  dailyXpGoal?: number; // target XP per day, shown as a ring on the planner
 }
 
 export type ThemeMode = "dark" | "light" | "contrast";
@@ -183,6 +200,7 @@ export interface GameState {
   prestige: number; // prestige level (permanent XP bonus)
   hp: number; // 0-100; drained by anti-habits, restored daily / by rest
   templates: QuestTemplate[]; // saved quest templates / favorites
+  weekTemplates?: WeekTemplate[]; // saved recurring weekly plans
   lastDailyChallenge: string; // YYYY-MM-DD daily challenge claimed
   lastWeeklyChallenge: string; // ISO week key weekly challenge claimed
   streakMilestones: number[]; // claimed streak milestones (7/30/100)

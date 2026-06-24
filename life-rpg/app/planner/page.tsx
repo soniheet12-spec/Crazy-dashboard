@@ -12,6 +12,11 @@ import {
   SlidersHorizontal,
   Zap,
   Flame,
+  Copy,
+  Target,
+  Bookmark,
+  Trash2,
+  Wrench,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { Card, HydrationGate, PageHeader, statColor } from "@/components/ui";
@@ -47,14 +52,28 @@ function scheduledDays(q: Quest): number[] {
 }
 
 export default function PlannerPage() {
-  const { state, hydrated, completeQuest, rescheduleQuest } = useGameState();
+  const {
+    state,
+    hydrated,
+    completeQuest,
+    rescheduleQuest,
+    updateSettings,
+    saveWeekTemplate,
+    loadWeekTemplate,
+    removeWeekTemplate,
+  } = useGameState();
   const todayWd = new Date().getDay();
   const [filter, setFilter] = useState<StatKey | "all">("all");
   const [editing, setEditing] = useState<string | null>(null);
+  const [copySource, setCopySource] = useState<number>(todayWd);
+  const [copyTargets, setCopyTargets] = useState<number[]>([]);
+  const [tplName, setTplName] = useState("");
 
   const statList = Object.values(state.stats);
   const label = (key: StatKey) => state.stats[key]?.label ?? key;
   const color = (key: StatKey) => state.stats[key]?.color ?? statColor(key);
+  const goal = state.settings.dailyXpGoal ?? 100;
+  const weekTemplates = state.weekTemplates ?? [];
 
   // Calendar dates for the current Mon→Sun week, purely for orientation.
   const monday = useMemo(() => {
@@ -78,12 +97,12 @@ export default function PlannerPage() {
       date,
       xp: qs.reduce((s, q) => s + q.xp, 0),
       done: isToday ? qs.filter((q) => q.done).length : 0,
+      earned: isToday ? qs.filter((q) => q.done).reduce((s, q) => s + q.xp, 0) : 0,
     };
   });
 
   const weekXp = days.reduce((s, d) => s + d.xp, 0);
   const slots = days.reduce((s, d) => s + d.qs.length, 0);
-  const maxXp = Math.max(1, ...days.map((d) => d.xp));
   const today = days.find((d) => d.isToday);
   const busiest = [...days].sort((a, b) => b.qs.length - a.qs.length)[0];
 
@@ -93,6 +112,24 @@ export default function PlannerPage() {
     else cur.add(wd);
     rescheduleQuest(q.id, Array.from(cur));
   };
+
+  // Copy every (positive) quest on the source day onto the chosen target days,
+  // keeping it on the source day too (additive — nothing is removed).
+  const copyDay = () => {
+    if (!copyTargets.length) return;
+    const fromToday = copySource === todayWd;
+    questsForDay(state.quests, copySource, fromToday)
+      .filter((q) => !q.negative)
+      .forEach((q) => {
+        const union = new Set<number>(scheduledDays(q));
+        union.add(copySource);
+        copyTargets.forEach((t) => union.add(t));
+        rescheduleQuest(q.id, Array.from(union));
+      });
+    setCopyTargets([]);
+  };
+  const toggleCopyTarget = (wd: number) =>
+    setCopyTargets((prev) => (prev.includes(wd) ? prev.filter((x) => x !== wd) : [...prev, wd]));
 
   return (
     <HydrationGate hydrated={hydrated}>
@@ -144,11 +181,140 @@ export default function PlannerPage() {
         </div>
       )}
 
+      {/* Planner tools */}
+      <details className="card group mb-5 p-0">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-200">
+          <span className="flex items-center gap-2">
+            <Wrench size={15} className="text-accent" /> Planner tools
+          </span>
+          <span className="text-xs text-slate-500 group-open:hidden">Goal · Copy day · Templates</span>
+        </summary>
+
+        <div className="grid grid-cols-1 gap-5 border-t border-line/60 p-4 lg:grid-cols-3">
+          {/* Daily XP goal */}
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <Target size={13} /> Daily XP goal
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                step={10}
+                value={goal}
+                onChange={(e) => updateSettings({ dailyXpGoal: Math.max(0, Number(e.target.value)) })}
+                className="tabular w-24 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+                aria-label="Daily XP goal"
+              />
+              <span className="text-xs text-slate-500">XP / day</span>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">
+              Each day shows a ring tracking planned XP against this goal.
+            </p>
+          </div>
+
+          {/* Copy a day */}
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <Copy size={13} /> Copy a day
+            </p>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-xs text-slate-500">From</span>
+              <select
+                value={copySource}
+                onChange={(e) => setCopySource(Number(e.target.value))}
+                className="flex-1 rounded-lg border border-line bg-bg-soft px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-accent"
+                aria-label="Copy from day"
+              >
+                {WEEK.map((w) => (
+                  <option key={w.wd} value={w.wd}>{w.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-2 flex gap-1">
+              {WEEK.filter((w) => w.wd !== copySource).map((w) => (
+                <button
+                  key={w.wd}
+                  type="button"
+                  onClick={() => toggleCopyTarget(w.wd)}
+                  title={w.label}
+                  className={`h-7 flex-1 rounded text-[10px] font-medium transition-colors ${
+                    copyTargets.includes(w.wd)
+                      ? "bg-accent/25 text-accent"
+                      : "bg-bg-soft text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {w.short[0]}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={copyDay}
+              disabled={copyTargets.length === 0}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/10 disabled:opacity-40"
+            >
+              <Copy size={13} /> Copy to {copyTargets.length || "…"} day{copyTargets.length === 1 ? "" : "s"}
+            </button>
+          </div>
+
+          {/* Week templates */}
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <Bookmark size={13} /> Week templates
+            </p>
+            <div className="mb-2 flex gap-2">
+              <input
+                value={tplName}
+                onChange={(e) => setTplName(e.target.value)}
+                placeholder="Name this plan…"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-bg-soft px-3 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
+              />
+              <button
+                onClick={() => {
+                  saveWeekTemplate(tplName);
+                  setTplName("");
+                }}
+                className="shrink-0 rounded-lg bg-accent/90 px-3 py-2 text-xs font-semibold text-bg hover:bg-accent"
+              >
+                Save
+              </button>
+            </div>
+            {weekTemplates.length === 0 ? (
+              <p className="text-[11px] text-slate-500">Save your current recurring quests to reuse later.</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {weekTemplates.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-center gap-2 rounded-lg border border-line/70 bg-bg-soft/60 px-2.5 py-1.5"
+                  >
+                    <button
+                      onClick={() => loadWeekTemplate(t.id)}
+                      className="min-w-0 flex-1 text-left"
+                      title={`Load "${t.name}"`}
+                    >
+                      <span className="block truncate text-xs text-slate-100">{t.name}</span>
+                      <span className="text-[10px] text-slate-500">{t.quests.length} quests</span>
+                    </button>
+                    <button
+                      onClick={() => removeWeekTemplate(t.id)}
+                      aria-label={`Delete ${t.name}`}
+                      className="shrink-0 text-slate-600 hover:text-body"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </details>
+
       {/* Day board */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
         {days.map((d) => {
-          const loadPct = Math.round((d.xp / maxXp) * 100);
-          const donePct = d.qs.length ? Math.round((d.done / d.qs.length) * 100) : 0;
+          const ringPct = goal > 0 ? Math.round((100 * (d.isToday ? d.earned : d.xp)) / goal) : 0;
           return (
             <Card
               key={d.wd}
@@ -157,28 +323,26 @@ export default function PlannerPage() {
               }`}
             >
               {/* Header */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-baseline gap-1.5">
-                  <span className={`text-sm font-semibold ${d.isToday ? "text-accent" : "text-slate-200"}`}>
-                    {d.short}
-                  </span>
-                  <span className="tabular text-[10px] text-slate-500">{d.date.getDate()}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-sm font-semibold ${d.isToday ? "text-accent" : "text-slate-200"}`}>
+                      {d.short}
+                    </span>
+                    <span className="tabular text-[10px] text-slate-500">{d.date.getDate()}</span>
+                    {d.isToday && (
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-accent">· now</span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-slate-500">
+                    {d.isToday
+                      ? `${d.done}/${d.qs.length} done`
+                      : d.qs.length
+                        ? `${d.qs.length} · +${d.xp}`
+                        : "rest"}
+                  </p>
                 </div>
-                {d.isToday ? (
-                  <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
-                    Today
-                  </span>
-                ) : (
-                  <span className="tabular text-[10px] text-slate-600">{d.qs.length || ""}</span>
-                )}
-              </div>
-
-              {/* Completion (today) / load (other days) bar */}
-              <div className="h-1 w-full overflow-hidden rounded-full bg-bg-soft">
-                <div
-                  className={`bar-fill h-full rounded-full ${d.isToday ? "bg-accent" : "bg-accent/30"}`}
-                  style={{ width: `${d.isToday ? donePct : loadPct}%` }}
-                />
+                <GoalRing pct={ringPct} accent={d.isToday} />
               </div>
 
               {/* Quests */}
@@ -309,6 +473,41 @@ export default function PlannerPage() {
         </span>
       </div>
     </HydrationGate>
+  );
+}
+
+/** Small circular progress ring for a day's XP vs the daily goal. */
+function GoalRing({ pct, accent }: { pct: number; accent?: boolean }) {
+  const r = 9;
+  const circ = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(100, pct));
+  const stroke = accent ? "rgb(var(--accent-rgb))" : "rgb(var(--accent-rgb) / 0.5)";
+  return (
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 26 26"
+      className="shrink-0"
+      role="img"
+      aria-label={`${p}% of daily goal`}
+    >
+      <g transform="rotate(-90 13 13)">
+        <circle cx="13" cy="13" r={r} fill="none" stroke="rgb(var(--line))" strokeWidth="3" />
+        <circle
+          cx="13"
+          cy="13"
+          r={r}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - p / 100)}
+          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.22,1,0.36,1)" }}
+        />
+      </g>
+      {p >= 100 && <circle cx="13" cy="13" r="2.6" fill={stroke} />}
+    </svg>
   );
 }
 

@@ -55,6 +55,7 @@ import type {
   Stat,
   StatKey,
   SubTask,
+  WeekTemplate,
 } from "./types";
 
 /** Effective base XP after difficulty scaling. */
@@ -146,6 +147,9 @@ export interface GameStateContextValue {
   respecPerks: () => void;
   addTemplate: (t: Omit<QuestTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
+  saveWeekTemplate: (name: string) => void;
+  loadWeekTemplate: (id: string) => void;
+  removeWeekTemplate: (id: string) => void;
   setMood: (value: number) => void;
   // stats / settings
   addStat: (label: string) => void;
@@ -529,8 +533,10 @@ function migrate(s: GameState): GameState {
   if (s.settings.theme === undefined) s.settings.theme = "dark";
   if (typeof s.settings.fontScale !== "number") s.settings.fontScale = 1;
   if (s.settings.mode === undefined) s.settings.mode = "casual";
+  if (typeof s.settings.dailyXpGoal !== "number") s.settings.dailyXpGoal = 100;
   s.streakMilestones ??= [];
   s.moods ??= [];
+  s.weekTemplates ??= [];
   return s;
 }
 
@@ -1181,6 +1187,87 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  // ─── Week templates (saveable recurring plans) ───────────────────────────────
+  const saveWeekTemplate = useCallback(
+    (name: string) => {
+      commit((d) => {
+        // Snapshot the recurring plan: positive quests that repeat daily or on
+        // specific weekdays (one-off quests aren't part of a weekly routine).
+        const plan = d.quests
+          .filter((q) => !q.negative && (q.daily || (q.days && q.days.length > 0)))
+          .map((q) => ({
+            title: q.title,
+            stat: q.stat,
+            xp: q.xp,
+            daily: q.daily,
+            days: q.days ? [...q.days] : undefined,
+            difficulty: q.difficulty,
+            mandatory: q.mandatory,
+          }));
+        if (plan.length === 0) {
+          return [{ kind: "info", title: "Nothing to save", subtitle: "Add some recurring quests first." }];
+        }
+        d.weekTemplates ??= [];
+        d.weekTemplates.unshift({
+          id: genId("wk"),
+          name: name.trim() || `Week of ${localDay()}`,
+          createdAt: new Date().toISOString(),
+          quests: plan,
+        });
+        if (d.weekTemplates.length > 8) d.weekTemplates = d.weekTemplates.slice(0, 8);
+        return [{ kind: "info", title: "Week template saved", subtitle: `${plan.length} quests captured.` }];
+      });
+    },
+    [commit],
+  );
+
+  const loadWeekTemplate = useCallback(
+    (id: string) => {
+      commit((d) => {
+        const tpl = (d.weekTemplates ?? []).find((t) => t.id === id);
+        if (!tpl) return [];
+        let added = 0;
+        for (const q of tpl.quests) {
+          const stat = d.stats[q.stat] ? q.stat : Object.keys(d.stats)[0];
+          // Skip quests already present with the same title + stat to avoid dupes.
+          if (d.quests.some((x) => !x.negative && x.title === q.title && x.stat === stat)) continue;
+          const quest: Quest = {
+            id: genId(),
+            title: q.title,
+            stat,
+            xp: Math.max(0, Math.round(q.xp)),
+            source: "manual",
+            done: false,
+            daily: q.daily ?? false,
+            negative: false,
+          };
+          if (q.days && q.days.length) quest.days = [...q.days].sort();
+          if (q.difficulty) quest.difficulty = q.difficulty;
+          if (q.mandatory) quest.mandatory = true;
+          d.quests.unshift(quest);
+          added++;
+        }
+        return [
+          {
+            kind: "info",
+            title: added ? `Loaded "${tpl.name}"` : "Already up to date",
+            subtitle: added ? `${added} quests added.` : "Those quests are already on your board.",
+          },
+        ];
+      });
+    },
+    [commit],
+  );
+
+  const removeWeekTemplate = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.weekTemplates = (d.weekTemplates ?? []).filter((t) => t.id !== id);
+      });
+    },
+    [commit],
+  );
+
   const setMood = useCallback(
     (value: number) => {
       commit((d) => {
@@ -1378,6 +1465,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      saveWeekTemplate,
+      loadWeekTemplate,
+      removeWeekTemplate,
       setMood,
       addStat,
       renameStat,
@@ -1426,6 +1516,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      saveWeekTemplate,
+      loadWeekTemplate,
+      removeWeekTemplate,
       setMood,
       addStat,
       renameStat,
