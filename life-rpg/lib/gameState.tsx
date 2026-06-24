@@ -32,6 +32,7 @@ import {
 } from "./shop";
 import { eventMultiplier } from "./events";
 import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
+import { DUNGEON_CLEAR_BONUS } from "./dungeons";
 import {
   DAILY_CHALLENGE,
   WEEKLY_CHALLENGE,
@@ -46,6 +47,8 @@ import { playFx, vibrate, type Fx } from "./sound";
 import type {
   BossGoal,
   CalendarEvent,
+  Dungeon,
+  DungeonStage,
   GameSettings,
   GameState,
   Difficulty,
@@ -109,6 +112,12 @@ export interface NewBossInput {
   deadline?: string;
 }
 
+export interface NewDungeonInput {
+  name: string;
+  stat: StatKey;
+  stages: DungeonStage[];
+}
+
 export interface GameStateContextValue {
   state: GameState;
   hydrated: boolean;
@@ -126,6 +135,9 @@ export interface GameStateContextValue {
   addBoss: (b: NewBossInput) => void;
   updateBossProgress: (id: string, delta: number) => void;
   removeBoss: (id: string) => void;
+  addDungeon: (d: NewDungeonInput) => void;
+  progressDungeon: (id: string, delta: number) => void;
+  removeDungeon: (id: string) => void;
   // progression
   claimDailyBonus: () => void;
   buyPerk: (perkId: string) => void;
@@ -542,6 +554,7 @@ function migrate(s: GameState): GameState {
   s.moods ??= [];
   s.weekTemplates ??= [];
   s.loadouts ??= [];
+  s.dungeons ??= [];
   return s;
 }
 
@@ -858,6 +871,83 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       commit((d) => {
         d.bosses = d.bosses.filter((b) => b.id !== id);
+      });
+    },
+    [commit],
+  );
+
+  // ─── Dungeons (multi-stage objectives) ──────────────────────────────────────
+  const addDungeon = useCallback(
+    (input: NewDungeonInput) => {
+      commit((d) => {
+        const stages = input.stages
+          .filter((s) => s.label.trim() && s.target > 0)
+          .map((s) => ({
+            label: s.label.trim(),
+            target: Math.max(1, Math.round(s.target)),
+            reward: Math.max(0, Math.round(s.reward)),
+          }));
+        if (stages.length === 0) {
+          return [{ kind: "info", title: "Add at least one stage" }];
+        }
+        d.dungeons ??= [];
+        d.dungeons.push({
+          id: genId("dg"),
+          name: input.name.trim() || "New Dungeon",
+          stat: d.stats[input.stat] ? input.stat : Object.keys(d.stats)[0],
+          stages,
+          stageIndex: 0,
+          progress: 0,
+          createdAt: new Date().toISOString(),
+        });
+      });
+    },
+    [commit],
+  );
+
+  const progressDungeon = useCallback(
+    (id: string, delta: number) => {
+      commit((d, cele) => {
+        const dg = (d.dungeons ?? []).find((x) => x.id === id);
+        if (!dg || dg.clearedAt) return [];
+        const toasts: ToastSpec[] = [];
+        dg.progress = Math.max(0, dg.progress + delta);
+        // Advance through every stage whose target the new progress reaches.
+        while (dg.stageIndex < dg.stages.length && dg.progress >= dg.stages[dg.stageIndex].target) {
+          const cleared = dg.stages[dg.stageIndex];
+          dg.progress -= cleared.target;
+          d.coins += cleared.reward;
+          toasts.push(...gainXp(d, dg.stat, cleared.reward, cele));
+          dg.stageIndex++;
+          if (dg.stageIndex < dg.stages.length) {
+            fx(d, "boss");
+            cele({ kind: "boss", title: `Stage cleared: ${cleared.label}`, subtitle: `+${cleared.reward} coins` });
+          }
+        }
+        // Final stage cleared → dungeon complete.
+        if (dg.stageIndex >= dg.stages.length && !dg.clearedAt) {
+          dg.clearedAt = localDay();
+          dg.progress = 0;
+          const item = rollBossLoot(perkLootChanceBonus(d.perks));
+          d.inventory.unshift(item);
+          d.coins += DUNGEON_CLEAR_BONUS;
+          fx(d, "boss");
+          cele({
+            kind: "boss",
+            title: `Dungeon cleared: ${dg.name}!`,
+            subtitle: `Loot: ${item.name} · +${DUNGEON_CLEAR_BONUS} coins`,
+          });
+        }
+        return toasts;
+      });
+    },
+    [commit],
+  );
+
+  const removeDungeon = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.dungeons = (d.dungeons ?? []).filter((x) => x.id !== id);
       });
     },
     [commit],
@@ -1500,6 +1590,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       addBoss,
       updateBossProgress,
       removeBoss,
+      addDungeon,
+      progressDungeon,
+      removeDungeon,
       claimDailyBonus,
       buyPerk,
       logFocus,
@@ -1554,6 +1647,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       addBoss,
       updateBossProgress,
       removeBoss,
+      addDungeon,
+      progressDungeon,
+      removeDungeon,
       claimDailyBonus,
       buyPerk,
       logFocus,

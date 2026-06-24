@@ -123,6 +123,25 @@ export interface BossGoal {
   failed?: boolean; // missed its deadline (enraged) in a strict mode
 }
 
+/** One stage of a multi-stage dungeon run. Clearing it pays out its reward. */
+export interface DungeonStage {
+  label: string;
+  target: number; // progress units to clear this stage
+  reward: number; // coins paid + XP awarded on clearing
+}
+
+/** A multi-stage objective tackled sequentially, with rewards at each milestone. */
+export interface Dungeon {
+  id: string;
+  name: string;
+  stat: StatKey;
+  stages: DungeonStage[];
+  stageIndex: number; // index of the stage currently in progress
+  progress: number; // progress within the current stage
+  createdAt: string; // ISO
+  clearedAt?: string; // YYYY-MM-DD when the final stage was cleared
+}
+
 export interface XpHistoryPoint {
   date: string; // YYYY-MM-DD (local)
   xp: number; // XP earned that day
@@ -192,6 +211,7 @@ export interface GameState {
   achievements: Achievement[];
   streak: Streak;
   bosses: BossGoal[];
+  dungeons?: Dungeon[]; // multi-stage objectives
   xpHistory: XpHistoryPoint[];
   settings: GameSettings;
   // Calendar event-id -> chosen stat mapping (persisted locally).
