@@ -19,7 +19,7 @@ import { rules } from "./mode";
 import { activeDebuffs, isCursed, EXHAUSTED_MULT } from "./debuffs";
 import { localDay, dayDiff, addDays } from "./dates";
 import { comboActive, comboMultiplier } from "./combo";
-import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
+import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier, perkCoinMultiplier } from "./perks";
 import { rollBossLoot, rollQuestLoot } from "./loot";
 import {
   coinsForXp,
@@ -49,6 +49,7 @@ import type {
   GameSettings,
   GameState,
   Difficulty,
+  Loadout,
   Quest,
   QuestTemplate,
   Rarity,
@@ -133,6 +134,9 @@ export interface GameStateContextValue {
   equipItem: (id: string) => void;
   unequipItem: (id: string) => void;
   sellLoot: (id: string) => void;
+  saveLoadout: (name: string) => void;
+  applyLoadout: (id: string) => void;
+  removeLoadout: (id: string) => void;
   toggleSubtask: (questId: string, subId: string) => void;
   acceptSideQuest: () => void;
   setOnboarded: () => void;
@@ -289,7 +293,7 @@ function gainXp(
   stat.xp += gained;
   stat.level = levelFromXp(stat.xp);
   stat.lastTrained = localDay();
-  state.coins += coinsForXp(baseXp);
+  state.coins += Math.round(coinsForXp(baseXp) * perkCoinMultiplier(state.perks));
   addToHistory(state, gained);
 
   const toasts: ToastSpec[] = [
@@ -537,6 +541,7 @@ function migrate(s: GameState): GameState {
   s.streakMilestones ??= [];
   s.moods ??= [];
   s.weekTemplates ??= [];
+  s.loadouts ??= [];
   return s;
 }
 
@@ -972,6 +977,56 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         d.equipped = d.equipped.filter((x) => x !== id);
         d.coins += value;
         return [{ kind: "info", title: `Sold ${item.name}`, subtitle: `+${value} coins` }];
+      });
+    },
+    [commit],
+  );
+
+  // ─── Gear loadouts (saveable equip sets) ─────────────────────────────────────
+  const saveLoadout = useCallback(
+    (name: string) => {
+      commit((d) => {
+        if (d.equipped.length === 0) {
+          return [{ kind: "info", title: "Nothing equipped", subtitle: "Equip some gear first." }];
+        }
+        d.loadouts ??= [];
+        d.loadouts.unshift({
+          id: genId("ld"),
+          name: name.trim() || `Loadout ${d.loadouts.length + 1}`,
+          items: [...d.equipped],
+        });
+        if (d.loadouts.length > 8) d.loadouts = d.loadouts.slice(0, 8);
+        return [{ kind: "info", title: "Loadout saved" }];
+      });
+    },
+    [commit],
+  );
+
+  const applyLoadout = useCallback(
+    (id: string) => {
+      commit((d) => {
+        const lo = (d.loadouts ?? []).find((l) => l.id === id);
+        if (!lo) return [];
+        // Only equip items still in the inventory, capped at the slot limit.
+        const valid = lo.items.filter((iid) => d.inventory.some((i) => i.id === iid)).slice(0, MAX_EQUIPPED);
+        d.equipped = valid;
+        const missing = lo.items.length - valid.length;
+        return [
+          {
+            kind: "info",
+            title: `Equipped "${lo.name}"`,
+            subtitle: missing > 0 ? `${missing} item(s) no longer owned were skipped.` : undefined,
+          },
+        ];
+      });
+    },
+    [commit],
+  );
+
+  const removeLoadout = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.loadouts = (d.loadouts ?? []).filter((l) => l.id !== id);
       });
     },
     [commit],
@@ -1451,6 +1506,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       equipItem,
       unequipItem,
       sellLoot,
+      saveLoadout,
+      applyLoadout,
+      removeLoadout,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
@@ -1502,6 +1560,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       equipItem,
       unequipItem,
       sellLoot,
+      saveLoadout,
+      applyLoadout,
+      removeLoadout,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,

@@ -78,6 +78,13 @@ export interface WeekTemplate {
   }[];
 }
 
+/** A saved set of equipped gear that can be swapped in with one tap. */
+export interface Loadout {
+  id: string;
+  name: string;
+  items: string[]; // loot item ids
+}
+
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 
 export type Difficulty = "easy" | "normal" | "hard";
@@ -194,6 +201,7 @@ export interface GameState {
   perks: Record<string, number>; // perkId -> rank owned
   inventory: LootItem[]; // collected loot
   equipped: string[]; // equipped loot item ids (gear buffs), max 3
+  loadouts?: Loadout[]; // saved gear sets
   coins: number; // spendable currency earned from quests/bosses
   streakFreezes: number; // consumables that protect a missed day
   potionUntil: string; // ISO; active XP-potion expiry
