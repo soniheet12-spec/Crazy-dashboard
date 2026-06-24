@@ -103,6 +103,7 @@ export interface GameStateContextValue {
   completeQuest: (id: string) => void;
   uncompleteQuest: (id: string) => void;
   removeQuest: (id: string) => void;
+  rescheduleQuest: (id: string, days: number[]) => void;
   // calendar
   completeCalendarEvent: (e: CalendarEvent, stat: StatKey, xp: number) => void;
   setCalendarMapping: (eventId: string, stat: StatKey) => void;
@@ -705,6 +706,32 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  /**
+   * Change which weekdays a quest is scheduled on (used by the Planner board).
+   * All 7 days → repeats daily; a subset → scheduled on those weekdays; none →
+   * an unscheduled one-off. Anti-habits aren't planned, so they're left alone.
+   */
+  const rescheduleQuest = useCallback(
+    (id: string, days: number[]) => {
+      commit((d) => {
+        const quest = d.quests.find((q) => q.id === id);
+        if (!quest || quest.negative) return;
+        const uniq = Array.from(new Set(days.filter((n) => n >= 0 && n <= 6))).sort();
+        if (uniq.length >= 7) {
+          quest.daily = true;
+          quest.days = undefined;
+        } else if (uniq.length === 0) {
+          quest.daily = false;
+          quest.days = undefined;
+        } else {
+          quest.daily = false;
+          quest.days = uniq;
+        }
+      });
+    },
+    [commit],
+  );
+
   const completeCalendarEvent = useCallback(
     (e: CalendarEvent, stat: StatKey, xp: number) => {
       commit((d, cele) => {
@@ -1286,6 +1313,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       completeQuest,
       uncompleteQuest,
       removeQuest,
+      rescheduleQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
@@ -1332,6 +1360,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       completeQuest,
       uncompleteQuest,
       removeQuest,
+      rescheduleQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
