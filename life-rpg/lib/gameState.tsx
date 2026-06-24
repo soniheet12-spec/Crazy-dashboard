@@ -14,7 +14,9 @@ import { useToast, type ToastSpec } from "@/components/Toast";
 import { useCelebration, type CelebrationSpec } from "@/components/Celebration";
 import { emptyState, sampleState, STATE_VERSION, DEFAULT_ACCENT } from "./seed";
 import { evaluateAchievements } from "./achievements";
-import { levelFromXp, streakMultiplier } from "./leveling";
+import { levelFromXp, streakMultiplier, characterLevel, totalXp } from "./leveling";
+import { rules } from "./mode";
+import { activeDebuffs, isCursed, EXHAUSTED_MULT } from "./debuffs";
 import { localDay, dayDiff, addDays } from "./dates";
 import { comboActive, comboMultiplier } from "./combo";
 import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
@@ -82,6 +84,7 @@ export interface NewQuestInput {
   subtasks?: string[];
   difficulty?: Difficulty;
   wager?: number; // coins staked; refunded 2× on completion
+  mandatory?: boolean; // obligation; skipping it deals damage in strict modes
 }
 
 export interface NewBossInput {
@@ -119,6 +122,8 @@ export interface GameStateContextValue {
   acceptSideQuest: () => void;
   setOnboarded: () => void;
   dismissComeback: () => void;
+  dismissGameOver: () => void;
+  dismissReckoning: () => void;
   buyShopItem: (id: string) => void;
   craft: (rarity: Rarity) => void;
   prestige: () => void;
@@ -255,13 +260,17 @@ function gainXp(
   const perkMult = perkXpMultiplier(state.perks, statKey);
   const gearMult =
     gearMultiplier(state.equipped, state.inventory) * collectionBonus(state.inventory).mult;
-  const bonusMult = potionMultiplier(state) * prestigeMultiplier(state.prestige) * eventMultiplier();
+  const debuffs = activeDebuffs(state);
+  const exhaustMult = debuffs.some((d) => d.kind === "exhausted") ? EXHAUSTED_MULT : 1;
+  const bonusMult =
+    potionMultiplier(state) * prestigeMultiplier(state.prestige) * eventMultiplier() * exhaustMult;
   const total = streakMult * comboMult * perkMult * gearMult * bonusMult;
   const gained = Math.max(1, Math.round(baseXp * total));
 
   const prevLevel = stat.level;
   stat.xp += gained;
   stat.level = levelFromXp(stat.xp);
+  stat.lastTrained = localDay();
   state.coins += coinsForXp(baseXp);
   addToHistory(state, gained);
 
@@ -284,8 +293,8 @@ function gainXp(
     });
   }
 
-  // Loot roll
-  const item = rollQuestLoot(0.18, perkLootChanceBonus(state.perks));
+  // Loot roll (suppressed while Cursed — finish your obligations first)
+  const item = isCursed(state) ? null : rollQuestLoot(0.18, perkLootChanceBonus(state.perks));
   if (item) {
     state.inventory.unshift(item);
     fx(state, "loot");
@@ -299,9 +308,103 @@ function gainXp(
   return toasts;
 }
 
+/** End the current run: record it, then wipe (permadeath) or soft-penalize. */
+function killCharacter(state: GameState, permadeath: boolean, xpLoss: number, cause: string) {
+  const today = localDay();
+  const level = characterLevel(state.stats);
+  const survived = state.runStartedAt ? Math.max(0, dayDiff(state.runStartedAt, today)) : 0;
+  state.runHistory.unshift({
+    id: genId("run"),
+    endedAt: today,
+    level,
+    totalXp: totalXp(state.stats),
+    daysSurvived: survived,
+    cause,
+    permadeath,
+  });
+  if (state.runHistory.length > 50) state.runHistory = state.runHistory.slice(0, 50);
+  state.gameOver = { level, daysSurvived: survived, cause, permadeath };
+
+  if (permadeath) {
+    for (const k of Object.keys(state.stats)) {
+      state.stats[k].xp = 0;
+      state.stats[k].level = 1;
+      state.stats[k].lastTrained = today;
+    }
+    state.quests = state.quests
+      .filter((q) => q.daily || (q.days && q.days.length))
+      .map((q) => ({ ...q, done: false, completedAt: undefined, habitStreak: undefined, wager: undefined }));
+    state.bosses.forEach((b) => {
+      b.progress = 0;
+      b.failed = false;
+    });
+    state.inventory = [];
+    state.equipped = [];
+    state.coins = 0;
+    state.skillPoints = 0;
+    state.perks = {};
+    state.prestige = 0;
+    state.combo = { count: 0, lastAt: "" };
+    state.xpHistory = [];
+    state.streak = { current: 0, longest: state.streak.longest, lastActiveDate: "" };
+    state.runStartedAt = today;
+  } else {
+    for (const k of Object.keys(state.stats)) {
+      state.stats[k].xp = Math.max(0, Math.round(state.stats[k].xp * (1 - xpLoss)));
+      state.stats[k].level = levelFromXp(state.stats[k].xp);
+    }
+    state.equipped = []; // gear shatters
+    state.streak.current = 0;
+  }
+  state.hp = MAX_HP; // revive at full health for the next push
+}
+
 function applyDailyReset(state: GameState): boolean {
   const today = localDay();
   if (state.lastDailyReset === today) return false;
+  const r = rules(state);
+  const yesterday = addDays(today, -1);
+  const yWd = new Date(`${yesterday}T00:00:00`).getDay();
+
+  // 1. Tally skipped obligations from yesterday (before clearing done flags).
+  let missed = 0;
+  for (const q of state.quests) {
+    if (!q.mandatory || q.negative || q.done) continue;
+    const recurring = q.daily || (q.days && q.days.length);
+    if (!recurring) continue;
+    const dueYesterday = q.daily || (q.days?.includes(yWd) ?? false);
+    if (dueYesterday) missed += 1;
+  }
+  let hpLost = missed * r.dailyDamage;
+
+  // 2. Bosses that blew their deadline enrage (one-time hit).
+  let bossesFailed = 0;
+  for (const b of state.bosses) {
+    if (b.deadline && !b.failed && b.progress < b.target && b.deadline < today) {
+      b.failed = true;
+      bossesFailed += 1;
+      hpLost += r.bossEnrageDamage;
+    }
+  }
+
+  // 3. Stat rust: untrained stats bleed XP.
+  let xpDecayed = 0;
+  if (r.decayPerDay > 0) {
+    for (const k of Object.keys(state.stats)) {
+      const s = state.stats[k];
+      const idle = !s.lastTrained || dayDiff(s.lastTrained, today) >= 2;
+      if (idle && s.xp > 0) {
+        const loss = Math.round(s.xp * r.decayPerDay);
+        if (loss > 0) {
+          s.xp = Math.max(0, s.xp - loss);
+          s.level = levelFromXp(s.xp);
+          xpDecayed += loss;
+        }
+      }
+    }
+  }
+
+  // 4. Reset recurring quests for the new day.
   for (const q of state.quests) {
     if ((q.daily || (q.days && q.days.length)) && q.done) {
       q.done = false;
@@ -309,24 +412,49 @@ function applyDailyReset(state: GameState): boolean {
       if (q.subtasks) q.subtasks.forEach((s) => (s.done = false));
     }
   }
+
+  // 5. Streak handling (freezes only if the mode allows them).
   if (state.streak.lastActiveDate) {
     const gap = dayDiff(state.streak.lastActiveDate, today);
     if (gap > 1) {
-      if (gap === 2 && state.streakFreezes > 0) {
+      if (gap === 2 && r.allowFreeze && state.streakFreezes > 0) {
         state.streakFreezes -= 1; // a freeze bridges exactly one missed day
         state.streak.lastActiveDate = addDays(today, -1);
       } else {
         state.streak.current = 0;
         if (gap >= 3) {
-          // Welcome the player back after a real absence: coins + a free freeze.
           state.comeback = gap;
           state.coins += Math.min(100, gap * 10);
-          state.streakFreezes += 1;
+          if (r.allowFreeze) state.streakFreezes += 1;
         }
       }
     }
   }
-  state.hp = MAX_HP; // rest restores HP each day
+
+  // 6. Health: heal fully in soft modes; otherwise only take damage.
+  if (r.autoHeal) state.hp = MAX_HP;
+  else state.hp = Math.max(0, state.hp - hpLost);
+
+  // 7. Daily quota fine (debt allowed).
+  let coinsFined = 0;
+  if (r.quota > 0) {
+    const earnedYesterday = state.xpHistory.find((p) => p.date === yesterday)?.xp ?? 0;
+    if (earnedYesterday < r.quota) {
+      coinsFined = r.quotaFine;
+      state.coins -= r.quotaFine;
+    }
+  }
+
+  // 8. Death check.
+  if (!r.autoHeal && state.hp <= 0) {
+    killCharacter(state, r.permadeath, r.deathXpLoss, "Your HP hit zero.");
+  }
+
+  // 9. Surface the overnight reckoning if anything bad happened.
+  if (hpLost > 0 || coinsFined > 0 || xpDecayed > 0 || bossesFailed > 0) {
+    state.lastReckoning = { hpLost, coinsFined, xpDecayed, missedObligations: missed, bossesFailed };
+  }
+
   state.lastDailyReset = today;
   return true;
 }
@@ -362,6 +490,8 @@ function migrate(s: GameState): GameState {
   if (s.lastWeeklyChallenge === undefined) s.lastWeeklyChallenge = "";
   if (s.lastSideQuest === undefined) s.lastSideQuest = "";
   if (s.onboarded === undefined) s.onboarded = true;
+  s.runHistory ??= [];
+  if (!s.runStartedAt) s.runStartedAt = localDay();
   if (!s.settings) {
     s.settings = {
       streak7Multiplier: 1.5,
@@ -374,6 +504,7 @@ function migrate(s: GameState): GameState {
       reduceMotion: false,
       theme: "dark",
       fontScale: 1,
+      mode: "casual",
     };
   }
   if (s.settings.accent === undefined) s.settings.accent = DEFAULT_ACCENT;
@@ -383,6 +514,7 @@ function migrate(s: GameState): GameState {
   if (s.settings.reduceMotion === undefined) s.settings.reduceMotion = false;
   if (s.settings.theme === undefined) s.settings.theme = "dark";
   if (typeof s.settings.fontScale !== "number") s.settings.fontScale = 1;
+  if (s.settings.mode === undefined) s.settings.mode = "casual";
   s.streakMilestones ??= [];
   s.moods ??= [];
   return s;
@@ -482,6 +614,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         };
         if (q.days && q.days.length) quest.days = [...q.days].sort();
         if (q.difficulty) quest.difficulty = q.difficulty;
+        if (q.mandatory) quest.mandatory = true;
         const subs = (q.subtasks ?? []).map((t) => t.trim()).filter(Boolean);
         if (subs.length) {
           quest.subtasks = subs.map((t) => ({ id: genId("st"), title: t, done: false }));
@@ -544,6 +677,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const uncompleteQuest = useCallback(
     (id: string) => {
       commit((d) => {
+        if (!rules(d).allowUndo) {
+          return [{ kind: "info", title: "No take-backs", subtitle: "Completions are final in this mode." }];
+        }
         const quest = d.quests.find((q) => q.id === id);
         if (!quest || !quest.done) return [];
         const stat = d.stats[quest.stat];
@@ -664,6 +800,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       const bonus = 40;
       lowest.xp += bonus;
       lowest.level = levelFromXp(lowest.xp);
+      lowest.lastTrained = today;
       addToHistory(d, bonus);
       const toasts: ToastSpec[] = [
         { kind: "xp", title: `Daily Blessing: +${bonus} XP · ${lowest.label}` },
@@ -826,6 +963,18 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const dismissComeback = useCallback(() => {
     commit((d) => {
       d.comeback = undefined;
+    });
+  }, [commit]);
+
+  const dismissGameOver = useCallback(() => {
+    commit((d) => {
+      d.gameOver = undefined;
+    });
+  }, [commit]);
+
+  const dismissReckoning = useCallback(() => {
+    commit((d) => {
+      d.lastReckoning = undefined;
     });
   }, [commit]);
 
@@ -1067,17 +1216,24 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       for (const k of Object.keys(d.stats)) {
         d.stats[k].xp = 0;
         d.stats[k].level = 1;
+        d.stats[k].lastTrained = localDay();
       }
       d.quests = d.quests
         .filter((q) => q.daily)
         .map((q) => ({ ...q, done: false, completedAt: undefined, habitStreak: undefined }));
-      d.bosses.forEach((b) => (b.progress = 0));
+      d.bosses.forEach((b) => {
+        b.progress = 0;
+        b.failed = false;
+      });
       d.xpHistory = [];
       d.streak = { current: 0, longest: 0, lastActiveDate: "" };
       d.combo = { count: 0, lastAt: "" };
       d.skillPoints = 0;
       d.perks = {};
       d.settings.seasonStartedAt = new Date().toISOString();
+      d.runStartedAt = localDay();
+      d.gameOver = undefined;
+      d.lastReckoning = undefined;
       d.isSampleData = false;
       return [{ kind: "info", title: "New season started", subtitle: "Stats, perks, and history reset. Loot kept." }];
     });
@@ -1145,6 +1301,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       acceptSideQuest,
       setOnboarded,
       dismissComeback,
+      dismissGameOver,
+      dismissReckoning,
       buyShopItem,
       craft,
       prestige,
@@ -1189,6 +1347,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       acceptSideQuest,
       setOnboarded,
       dismissComeback,
+      dismissGameOver,
+      dismissReckoning,
       buyShopItem,
       craft,
       prestige,

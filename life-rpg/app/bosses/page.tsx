@@ -123,6 +123,7 @@ export default function BossesPage() {
             {state.bosses.map((b) => {
               const pct = Math.min(100, Math.round((b.progress / b.target) * 100));
               const defeated = b.progress >= b.target;
+              const enraged = !!b.failed && !defeated;
               const color = state.stats[b.stat]?.color ?? statColor(b.stat);
               const step = steps[b.id] ?? Math.max(1, Math.round(b.target / 10));
               const eta = !defeated ? forecastDays(b, state.settings.seasonStartedAt) : null;
@@ -134,7 +135,7 @@ export default function BossesPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97 }}
                 >
-                  <Card className={defeated ? "shadow-glow-amber" : ""}>
+                  <Card className={defeated ? "shadow-glow-amber" : enraged ? "border-body/50" : ""}>
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5">
                         <div
@@ -225,6 +226,11 @@ export default function BossesPage() {
                     {defeated && (
                       <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-amber">
                         <Crown size={15} /> Boss defeated — goal complete!
+                      </p>
+                    )}
+                    {enraged && (
+                      <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-body">
+                        <Skull size={15} /> Enraged — deadline missed. It struck back.
                       </p>
                     )}
                   </Card>

@@ -1,12 +1,14 @@
 "use client";
 
-import { Gift, TrendingDown, TrendingUp, Dices, ArrowRight, Trophy, Target, PartyPopper, X } from "lucide-react";
+import { Gift, TrendingDown, TrendingUp, Dices, ArrowRight, Trophy, Target, PartyPopper, X, Skull, AlertTriangle } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
 import { seasonProgress, seasonXp } from "@/lib/season";
 import { sideQuestForDay } from "@/lib/sidequests";
 import { activeEvent } from "@/lib/events";
+import { activeDebuffs } from "@/lib/debuffs";
+import { MODES } from "@/lib/mode";
 import {
   DAILY_CHALLENGE,
   WEEKLY_CHALLENGE,
@@ -64,8 +66,14 @@ export default function DashboardPage() {
     claimWeeklyChallenge,
     setMood,
     dismissComeback,
+    dismissGameOver,
+    dismissReckoning,
   } = useGameState();
   const event = activeEvent();
+  const mode = state.settings.mode ?? "casual";
+  const debuffs = activeDebuffs(state);
+  const strict = mode !== "casual";
+  const rec = state.lastReckoning;
   const todayMood = state.moods.find((m) => m.date === localDay())?.value ?? 0;
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
@@ -86,11 +94,43 @@ export default function DashboardPage() {
 
   return (
     <HydrationGate hydrated={hydrated}>
+      {state.gameOver && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-6 backdrop-blur">
+          <div className="card max-w-md p-8 text-center shadow-glow-amber">
+            <Skull className="mx-auto text-body" size={56} />
+            <h2 className="font-pixel mt-4 text-xl text-body">YOU DIED</h2>
+            <p className="mt-3 text-sm text-slate-300">{state.gameOver.cause}</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Reached Level {state.gameOver.level} · survived {state.gameOver.daysSurvived} day
+              {state.gameOver.daysSurvived === 1 ? "" : "s"}.
+            </p>
+            <p className="mt-3 text-xs text-slate-500">
+              {state.gameOver.permadeath
+                ? "Permadeath: this character was wiped to your Legacy. A new run begins now."
+                : "You lost levels and your streak, and your gear shattered — but you live to fight on."}
+            </p>
+            <button
+              onClick={dismissGameOver}
+              className="mt-5 rounded-lg bg-accent/90 px-4 py-2 text-sm font-semibold text-bg hover:bg-accent"
+            >
+              {state.gameOver.permadeath ? "Begin a new run" : "Continue"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <PageHeader
         title="Dashboard"
         subtitle="Your character sheet, updated in real time as you log."
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                strict ? "border-body/50 bg-body/10 text-body" : "border-line text-slate-400"
+              }`}
+            >
+              {MODES[mode].label} mode
+            </span>
             <ComboMeter />
             <ShareCard />
           </div>
@@ -98,6 +138,46 @@ export default function DashboardPage() {
       />
 
       <div className="grid grid-cols-1 gap-5">
+        {rec ? (
+          <Card className="flex items-start gap-3 border-body/40 bg-body/5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-body/15 text-body">
+              <AlertTriangle size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-slate-100">Overnight reckoning</p>
+              <p className="text-sm text-slate-400">
+                {[
+                  rec.missedObligations > 0 && `${rec.missedObligations} obligation${rec.missedObligations === 1 ? "" : "s"} skipped`,
+                  rec.hpLost > 0 && `−${rec.hpLost} HP`,
+                  rec.coinsFined > 0 && `−${rec.coinsFined} coins (quota)`,
+                  rec.xpDecayed > 0 && `−${rec.xpDecayed} XP rust`,
+                  rec.bossesFailed > 0 && `${rec.bossesFailed} boss${rec.bossesFailed === 1 ? "" : "es"} enraged`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+            <button onClick={dismissReckoning} aria-label="Dismiss" className="shrink-0 text-slate-500 hover:text-slate-200">
+              <X size={18} />
+            </button>
+          </Card>
+        ) : null}
+
+        {debuffs.length > 0 ? (
+          <Card className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Status</span>
+            {debuffs.map((d) => (
+              <span
+                key={d.kind}
+                title={d.blurb}
+                className="flex items-center gap-1 rounded-full border border-body/40 bg-body/10 px-2.5 py-1 text-xs text-body"
+              >
+                <Icon name={d.icon} size={12} /> {d.label}
+              </span>
+            ))}
+          </Card>
+        ) : null}
+
         {state.comeback ? (
           <Card className="flex items-center gap-3 border-amber/40 bg-amber/5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber/15 text-amber">

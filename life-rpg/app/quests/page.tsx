@@ -22,9 +22,11 @@ import {
   X,
   Mic,
   Coins,
+  AlertTriangle,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { suggestStat } from "@/lib/calendarMapping";
+import { rules } from "@/lib/mode";
 import { DIFFICULTIES } from "@/lib/gameplay";
 import { ROUTINES } from "@/lib/presets";
 import { localDay, dayDiff } from "@/lib/dates";
@@ -136,6 +138,11 @@ function QuestRow({
                 <Coins size={10} /> {quest.wager} staked
               </span>
             ) : null}
+            {quest.mandatory ? (
+              <span className="flex items-center gap-0.5 text-body">
+                <AlertTriangle size={10} /> required
+              </span>
+            ) : null}
             {quest.source === "calendar" && (
               <span className="flex items-center gap-0.5"><Calendar size={10} /> calendar</span>
             )}
@@ -215,6 +222,7 @@ export default function QuestsPage() {
   const [xp, setXp] = useState(30);
   const [daily, setDaily] = useState(false);
   const [negative, setNegative] = useState(false);
+  const [mandatory, setMandatory] = useState(false);
   const [days, setDays] = useState<number[]>([]);
   const [subtasksRaw, setSubtasksRaw] = useState("");
   const [quickText, setQuickText] = useState("");
@@ -290,11 +298,13 @@ export default function QuestsPage() {
       subtasks,
       difficulty,
       wager: !negative && wager > 0 ? wager : undefined,
+      mandatory: mandatory && !negative,
     });
     setTitle("");
     setXp(30);
     setDaily(false);
     setNegative(false);
+    setMandatory(false);
     setDays([]);
     setSubtasksRaw("");
     setDifficulty("normal");
@@ -538,6 +548,16 @@ export default function QuestsPage() {
                   />
                   Anti-habit (costs XP)
                 </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={mandatory}
+                    onChange={(e) => setMandatory(e.target.checked)}
+                    disabled={negative}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  Mandatory (penalty if skipped)
+                </label>
               </div>
               <button
                 type="submit"
@@ -681,7 +701,7 @@ export default function QuestsPage() {
                       quest={q}
                       statLabel={label(q.stat)}
                       color={color(q.stat)}
-                      onUndo={() => uncompleteQuest(q.id)}
+                      onUndo={rules(state).allowUndo ? () => uncompleteQuest(q.id) : undefined}
                     />
                   ))}
                 </AnimatePresence>

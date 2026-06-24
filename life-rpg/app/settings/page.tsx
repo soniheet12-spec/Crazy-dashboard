@@ -18,13 +18,27 @@ import {
   Sun,
   Contrast,
   Type,
+  Shield,
+  Swords,
+  Flame,
+  Skull,
+  HeartCrack,
+  AlertTriangle,
 } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel, totalXp } from "@/lib/leveling";
 import { ACCENT_PRESETS } from "@/lib/theme";
+import { GAME_MODES, MODES, rules } from "@/lib/mode";
 import { Icon, STAT_ICON_CHOICES } from "@/components/Icon";
 import { Card, CardTitle, HydrationGate, PageHeader, statColor } from "@/components/ui";
-import type { ThemeMode } from "@/lib/types";
+import type { GameMode, ThemeMode } from "@/lib/types";
+
+const MODE_ICON: Record<GameMode, typeof Shield> = {
+  casual: Shield,
+  normal: Swords,
+  hardcore: Flame,
+  nightmare: Skull,
+};
 
 const THEMES: { id: ThemeMode; label: string; icon: typeof Moon }[] = [
   { id: "dark", label: "Dark", icon: Moon },
@@ -136,6 +150,50 @@ export default function SettingsPage() {
   return (
     <HydrationGate hydrated={hydrated}>
       <PageHeader title="Settings" subtitle="Tune your stats, multipliers, and data." />
+
+      {/* Difficulty / game mode */}
+      <Card className="mb-5">
+        <CardTitle>Game Mode</CardTitle>
+        <p className="mb-3 text-sm text-slate-400">
+          How strict is the game? Higher modes add real consequences — damage, decay, fines, and death.
+        </p>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {GAME_MODES.map((m) => {
+            const M = MODE_ICON[m];
+            const active = (state.settings.mode ?? "casual") === m;
+            const danger = m === "hardcore" || m === "nightmare";
+            return (
+              <button
+                key={m}
+                onClick={() => {
+                  if (danger && state.settings.mode !== m) {
+                    if (!confirm(`Switch to ${MODES[m].label}? ${MODES[m].blurb}`)) return;
+                  }
+                  updateSettings({ mode: m });
+                }}
+                className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
+                  active
+                    ? danger
+                      ? "border-body bg-body/15 text-body"
+                      : "border-accent bg-accent/15 text-accent"
+                    : "border-line text-slate-300 hover:border-accent"
+                }`}
+              >
+                <M size={20} />
+                {MODES[m].label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 rounded-lg border border-line/70 bg-bg-soft/50 p-3 text-xs text-slate-400">
+          {MODES[state.settings.mode ?? "casual"].blurb}
+        </p>
+        {rules(state).permadeath && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-body">
+            <AlertTriangle size={13} /> Permadeath is ON — if your HP hits 0, this character is wiped to your Legacy.
+          </p>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Stats */}
@@ -430,7 +488,9 @@ export default function SettingsPage() {
             ) : (
               <button
                 onClick={loadSampleData}
-                className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm text-slate-300 hover:border-accent"
+                disabled={rules(state).honorLock}
+                title={rules(state).honorLock ? "Disabled in this mode (honor lock)" : undefined}
+                className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm text-slate-300 hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Database size={15} /> Load sample data
               </button>
@@ -475,6 +535,40 @@ export default function SettingsPage() {
             </p>
           )}
           {recapMsg && <p className="mt-4 text-sm text-slate-500">{recapMsg}</p>}
+        </Card>
+
+        {/* Legacy / run history */}
+        <Card>
+          <CardTitle>Legacy — Fallen Characters</CardTitle>
+          {state.runHistory.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No fallen characters yet. Runs that end in death are recorded here.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {state.runHistory.slice(0, 12).map((run) => (
+                <li
+                  key={run.id}
+                  className="flex items-center gap-3 rounded-lg border border-line/70 bg-bg-soft/50 px-3 py-2"
+                >
+                  <HeartCrack size={16} className="shrink-0 text-body" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-slate-100">
+                      Character · Level {run.level}{" "}
+                      {run.permadeath && (
+                        <span className="ml-1 rounded bg-body/15 px-1.5 py-0.5 text-[10px] uppercase text-body">
+                          permadeath
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Survived {run.daysSurvived}d · {run.totalXp.toLocaleString()} XP · {run.endedAt} · {run.cause}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </HydrationGate>
