@@ -17,6 +17,7 @@ export interface Stat {
   level: number; // derived from xp, cached for convenience
   color?: string; // hex, used by charts/bars
   icon?: string; // lucide-react icon name (picked in Settings)
+  lastTrained?: string; // YYYY-MM-DD of last XP gain (drives stat decay)
 }
 
 export interface HabitStreak {
@@ -49,6 +50,7 @@ export interface Quest {
   difficulty?: Difficulty; // scales XP & coins
   lastLoggedDay?: string; // YYYY-MM-DD an anti-habit was last logged (days-clean)
   wager?: number; // coins staked on completion; pays out 2× when done
+  mandatory?: boolean; // an obligation: skipping it deals HP damage in strict modes
 }
 
 export interface QuestTemplate {
@@ -95,6 +97,7 @@ export interface BossGoal {
   progress: number;
   unit: string; // e.g. "₹5Cr raised"
   deadline?: string; // YYYY-MM-DD optional target date for pace tracking
+  failed?: boolean; // missed its deadline (enraged) in a strict mode
 }
 
 export interface XpHistoryPoint {
@@ -114,9 +117,40 @@ export interface GameSettings {
   reduceMotion: boolean; // disable confetti / heavy animations
   theme: ThemeMode; // dark (default) / light / high-contrast
   fontScale: number; // root font-size multiplier (0.9–1.25)
+  mode: GameMode; // difficulty: casual / normal / hardcore / nightmare
 }
 
 export type ThemeMode = "dark" | "light" | "contrast";
+
+export type GameMode = "casual" | "normal" | "hardcore" | "nightmare";
+
+/** A finished run, recorded on death (for the Legacy log). */
+export interface RunRecord {
+  id: string;
+  endedAt: string; // YYYY-MM-DD
+  level: number; // character level reached
+  totalXp: number;
+  daysSurvived: number;
+  cause: string;
+  permadeath: boolean;
+}
+
+/** Transient Game Over payload (drives the death modal). */
+export interface GameOverInfo {
+  level: number;
+  daysSurvived: number;
+  cause: string;
+  permadeath: boolean;
+}
+
+/** Transient summary of overnight penalties (drives the reckoning banner). */
+export interface Reckoning {
+  hpLost: number;
+  coinsFined: number;
+  xpDecayed: number;
+  missedObligations: number;
+  bossesFailed: number;
+}
 
 export interface MoodEntry {
   date: string; // YYYY-MM-DD
@@ -158,6 +192,10 @@ export interface GameState {
   lastSideQuest: string; // YYYY-MM-DD the daily side quest was last accepted
   onboarded: boolean; // has the user seen the intro
   comeback?: number; // days away when returning after a gap (drives welcome-back banner)
+  runStartedAt: string; // YYYY-MM-DD the current character/run began
+  runHistory: RunRecord[]; // past runs that ended in death (Legacy log)
+  gameOver?: GameOverInfo; // set when the character just died
+  lastReckoning?: Reckoning; // overnight penalties summary (banner)
   // Internal bookkeeping
   isSampleData: boolean; // true until the user clears the seed
   lastDailyReset: string; // YYYY-MM-DD

@@ -43,6 +43,7 @@ function defaultSettings() {
     reduceMotion: false,
     theme: "dark" as const,
     fontScale: 1,
+    mode: "casual" as const,
   };
 }
 
@@ -76,6 +77,8 @@ export function emptyState(): GameState {
     lastLoginBonus: "",
     lastSideQuest: "",
     onboarded: true,
+    runStartedAt: today,
+    runHistory: [],
     isSampleData: false,
     lastDailyReset: today,
     version: STATE_VERSION,
@@ -162,6 +165,8 @@ export function sampleState(): GameState {
     lastLoginBonus: "",
     lastSideQuest: "",
     onboarded: false,
+    runStartedAt: today,
+    runHistory: [],
     isSampleData: true,
     lastDailyReset: today,
     version: STATE_VERSION,
