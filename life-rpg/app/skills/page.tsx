@@ -1,6 +1,7 @@
 "use client";
 
-import { Sparkles, Lock, Check, Shield, Coins, Hammer, Star } from "lucide-react";
+import { useState } from "react";
+import { Sparkles, Lock, Check, Shield, Coins, Hammer, Star, Swords, X } from "lucide-react";
 import { useGameState } from "@/lib/gameState";
 import { characterLevel } from "@/lib/leveling";
 import { deriveClass } from "@/lib/classes";
@@ -24,9 +25,14 @@ export default function SkillsPage() {
     craft,
     prestige,
     respecPerks,
+    saveLoadout,
+    applyLoadout,
+    removeLoadout,
   } = useGameState();
   const cl = characterLevel(state.stats);
   const klass = deriveClass(state.stats, cl);
+  const loadouts = state.loadouts ?? [];
+  const [loName, setLoName] = useState("");
 
   const inventory = [...state.inventory].sort(
     (a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity),
@@ -233,6 +239,59 @@ export default function SkillsPage() {
             Equipped {state.equipped.length}/{MAX_EQUIPPED} ·{" "}
             <span className="text-accent">+{totalGearPct}% XP</span> from gear &amp; collection
           </p>
+        </div>
+
+        {/* Gear loadouts */}
+        <div className="mb-4 rounded-lg border border-line/70 bg-bg-soft/40 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1 text-xs text-slate-400">
+              <Swords size={13} /> Loadouts
+            </span>
+            {loadouts.map((lo) => (
+              <span
+                key={lo.id}
+                className="flex items-center gap-1.5 rounded-full border border-line bg-bg-soft px-2.5 py-1 text-xs text-slate-200"
+              >
+                <button
+                  onClick={() => applyLoadout(lo.id)}
+                  className="hover:text-accent"
+                  title={`Equip "${lo.name}"`}
+                >
+                  {lo.name} <span className="text-slate-500">({lo.items.length})</span>
+                </button>
+                <button
+                  onClick={() => removeLoadout(lo.id)}
+                  aria-label={`Delete ${lo.name}`}
+                  className="text-slate-600 hover:text-body"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <div className="ml-auto flex items-center gap-1.5">
+              <input
+                value={loName}
+                onChange={(e) => setLoName(e.target.value)}
+                placeholder="Save current set…"
+                className="w-32 rounded-md border border-line bg-bg-soft px-2 py-1 text-xs text-slate-100 outline-none placeholder:text-slate-600 focus:border-accent"
+              />
+              <button
+                onClick={() => {
+                  saveLoadout(loName);
+                  setLoName("");
+                }}
+                disabled={state.equipped.length === 0}
+                className="rounded-md bg-accent/90 px-2.5 py-1 text-xs font-semibold text-bg hover:bg-accent disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-slate-500"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+          {loadouts.length === 0 && (
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              Equip gear, then save it as a one-tap loadout for different focuses.
+            </p>
+          )}
         </div>
 
         {craftable.length > 0 && (

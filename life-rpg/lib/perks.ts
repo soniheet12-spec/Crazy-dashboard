@@ -4,7 +4,7 @@ import type { StatKey } from "./types";
 // Skill points are earned on stat level-ups and spent here. Effects are pure
 // multipliers/bonuses read at XP-award time, so nothing here needs side effects.
 
-export type PerkKind = "stat" | "all" | "combo" | "loot";
+export type PerkKind = "stat" | "all" | "combo" | "loot" | "coin";
 
 export interface Perk {
   id: string;
@@ -26,6 +26,8 @@ export const PERKS: Perk[] = [
   { id: "polymath", name: "Polymath", description: "+3% XP for every stat per rank.", icon: "Sparkles", kind: "all", per: 0.03, maxRank: 5 },
   { id: "combo-master", name: "Combo Master", description: "Raises your combo multiplier cap by +0.15 per rank.", icon: "Flame", kind: "combo", per: 0.15, maxRank: 3 },
   { id: "lucky-looter", name: "Lucky Looter", description: "+6% loot drop chance per rank.", icon: "Gem", kind: "loot", per: 0.06, maxRank: 4 },
+  { id: "treasure-hunter", name: "Treasure Hunter", description: "+12% coins from quests per rank.", icon: "Coins", kind: "coin", per: 0.12, maxRank: 4 },
+  { id: "renaissance", name: "Renaissance", description: "+2% XP for every stat per rank — deeper mastery.", icon: "Atom", kind: "all", per: 0.02, maxRank: 5 },
 ];
 
 const PERK_BY_ID = new Map(PERKS.map((p) => [p.id, p]));
@@ -56,4 +58,15 @@ export function perkComboCapBonus(perks: Record<string, number>): number {
 export function perkLootChanceBonus(perks: Record<string, number>): number {
   const rank = perks["lucky-looter"] ?? 0;
   return (PERK_BY_ID.get("lucky-looter")?.per ?? 0) * rank;
+}
+
+/** Coin-gain multiplier (≥1) from coin-kind perks (e.g. Treasure Hunter). */
+export function perkCoinMultiplier(perks: Record<string, number>): number {
+  let mult = 1;
+  for (const [id, rank] of Object.entries(perks)) {
+    if (!rank) continue;
+    const perk = PERK_BY_ID.get(id);
+    if (perk?.kind === "coin") mult += perk.per * rank;
+  }
+  return mult;
 }

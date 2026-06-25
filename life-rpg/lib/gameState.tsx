@@ -19,7 +19,7 @@ import { rules } from "./mode";
 import { activeDebuffs, isCursed, EXHAUSTED_MULT } from "./debuffs";
 import { localDay, dayDiff, addDays } from "./dates";
 import { comboActive, comboMultiplier } from "./combo";
-import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier } from "./perks";
+import { PERKS, perkCost, perkLootChanceBonus, perkXpMultiplier, perkCoinMultiplier } from "./perks";
 import { rollBossLoot, rollQuestLoot } from "./loot";
 import {
   coinsForXp,
@@ -32,6 +32,7 @@ import {
 } from "./shop";
 import { eventMultiplier } from "./events";
 import { collectionBonus, gearMultiplier, MAX_EQUIPPED } from "./gear";
+import { DUNGEON_CLEAR_BONUS } from "./dungeons";
 import {
   DAILY_CHALLENGE,
   WEEKLY_CHALLENGE,
@@ -46,15 +47,19 @@ import { playFx, vibrate, type Fx } from "./sound";
 import type {
   BossGoal,
   CalendarEvent,
+  Dungeon,
+  DungeonStage,
   GameSettings,
   GameState,
   Difficulty,
+  Loadout,
   Quest,
   QuestTemplate,
   Rarity,
   Stat,
   StatKey,
   SubTask,
+  WeekTemplate,
 } from "./types";
 
 /** Effective base XP after difficulty scaling. */
@@ -87,12 +92,30 @@ export interface NewQuestInput {
   mandatory?: boolean; // obligation; skipping it deals damage in strict modes
 }
 
+/** Editable fields for an existing quest (wager/subtasks are managed elsewhere). */
+export interface QuestEdit {
+  title?: string;
+  stat?: StatKey;
+  xp?: number;
+  daily?: boolean;
+  days?: number[];
+  negative?: boolean;
+  mandatory?: boolean;
+  difficulty?: Difficulty;
+}
+
 export interface NewBossInput {
   title: string;
   stat: StatKey;
   target: number;
   unit: string;
   deadline?: string;
+}
+
+export interface NewDungeonInput {
+  name: string;
+  stat: StatKey;
+  stages: DungeonStage[];
 }
 
 export interface GameStateContextValue {
@@ -103,6 +126,8 @@ export interface GameStateContextValue {
   completeQuest: (id: string) => void;
   uncompleteQuest: (id: string) => void;
   removeQuest: (id: string) => void;
+  rescheduleQuest: (id: string, days: number[]) => void;
+  updateQuest: (id: string, patch: QuestEdit) => void;
   // calendar
   completeCalendarEvent: (e: CalendarEvent, stat: StatKey, xp: number) => void;
   setCalendarMapping: (eventId: string, stat: StatKey) => void;
@@ -110,6 +135,9 @@ export interface GameStateContextValue {
   addBoss: (b: NewBossInput) => void;
   updateBossProgress: (id: string, delta: number) => void;
   removeBoss: (id: string) => void;
+  addDungeon: (d: NewDungeonInput) => void;
+  progressDungeon: (id: string, delta: number) => void;
+  removeDungeon: (id: string) => void;
   // progression
   claimDailyBonus: () => void;
   buyPerk: (perkId: string) => void;
@@ -118,6 +146,9 @@ export interface GameStateContextValue {
   equipItem: (id: string) => void;
   unequipItem: (id: string) => void;
   sellLoot: (id: string) => void;
+  saveLoadout: (name: string) => void;
+  applyLoadout: (id: string) => void;
+  removeLoadout: (id: string) => void;
   toggleSubtask: (questId: string, subId: string) => void;
   acceptSideQuest: () => void;
   setOnboarded: () => void;
@@ -132,6 +163,9 @@ export interface GameStateContextValue {
   respecPerks: () => void;
   addTemplate: (t: Omit<QuestTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
+  saveWeekTemplate: (name: string) => void;
+  loadWeekTemplate: (id: string) => void;
+  removeWeekTemplate: (id: string) => void;
   setMood: (value: number) => void;
   // stats / settings
   addStat: (label: string) => void;
@@ -271,7 +305,7 @@ function gainXp(
   stat.xp += gained;
   stat.level = levelFromXp(stat.xp);
   stat.lastTrained = localDay();
-  state.coins += coinsForXp(baseXp);
+  state.coins += Math.round(coinsForXp(baseXp) * perkCoinMultiplier(state.perks));
   addToHistory(state, gained);
 
   const toasts: ToastSpec[] = [
@@ -515,8 +549,12 @@ function migrate(s: GameState): GameState {
   if (s.settings.theme === undefined) s.settings.theme = "dark";
   if (typeof s.settings.fontScale !== "number") s.settings.fontScale = 1;
   if (s.settings.mode === undefined) s.settings.mode = "casual";
+  if (typeof s.settings.dailyXpGoal !== "number") s.settings.dailyXpGoal = 100;
   s.streakMilestones ??= [];
   s.moods ??= [];
+  s.weekTemplates ??= [];
+  s.loadouts ??= [];
+  s.dungeons ??= [];
   return s;
 }
 
@@ -705,6 +743,57 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  /**
+   * Change which weekdays a quest is scheduled on (used by the Planner board).
+   * All 7 days → repeats daily; a subset → scheduled on those weekdays; none →
+   * an unscheduled one-off. Anti-habits aren't planned, so they're left alone.
+   */
+  const rescheduleQuest = useCallback(
+    (id: string, days: number[]) => {
+      commit((d) => {
+        const quest = d.quests.find((q) => q.id === id);
+        if (!quest || quest.negative) return;
+        const uniq = Array.from(new Set(days.filter((n) => n >= 0 && n <= 6))).sort();
+        if (uniq.length >= 7) {
+          quest.daily = true;
+          quest.days = undefined;
+        } else if (uniq.length === 0) {
+          quest.daily = false;
+          quest.days = undefined;
+        } else {
+          quest.daily = false;
+          quest.days = uniq;
+        }
+      });
+    },
+    [commit],
+  );
+
+  /** Edit an existing quest's core fields (title, stat, reward, schedule, flags). */
+  const updateQuest = useCallback(
+    (id: string, patch: QuestEdit) => {
+      commit((d) => {
+        const q = d.quests.find((x) => x.id === id);
+        if (!q) return;
+        if (patch.title !== undefined) q.title = patch.title.trim() || q.title;
+        if (patch.stat !== undefined && d.stats[patch.stat]) q.stat = patch.stat;
+        if (patch.xp !== undefined) q.xp = Math.max(0, Math.round(patch.xp));
+        if (patch.difficulty !== undefined) q.difficulty = patch.difficulty;
+        if (patch.negative !== undefined) q.negative = patch.negative;
+        if (patch.mandatory !== undefined) q.mandatory = patch.mandatory;
+        if (patch.daily !== undefined) q.daily = patch.daily;
+        if (patch.days !== undefined) {
+          const u = Array.from(new Set(patch.days.filter((n) => n >= 0 && n <= 6))).sort();
+          q.days = u.length ? u : undefined;
+        }
+        // Invariants: anti-habits are never mandatory; daily and scheduled-days are exclusive.
+        if (q.negative) q.mandatory = false;
+        if (q.daily) q.days = undefined;
+      });
+    },
+    [commit],
+  );
+
   const completeCalendarEvent = useCallback(
     (e: CalendarEvent, stat: StatKey, xp: number) => {
       commit((d, cele) => {
@@ -782,6 +871,83 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       commit((d) => {
         d.bosses = d.bosses.filter((b) => b.id !== id);
+      });
+    },
+    [commit],
+  );
+
+  // ─── Dungeons (multi-stage objectives) ──────────────────────────────────────
+  const addDungeon = useCallback(
+    (input: NewDungeonInput) => {
+      commit((d) => {
+        const stages = input.stages
+          .filter((s) => s.label.trim() && s.target > 0)
+          .map((s) => ({
+            label: s.label.trim(),
+            target: Math.max(1, Math.round(s.target)),
+            reward: Math.max(0, Math.round(s.reward)),
+          }));
+        if (stages.length === 0) {
+          return [{ kind: "info", title: "Add at least one stage" }];
+        }
+        d.dungeons ??= [];
+        d.dungeons.push({
+          id: genId("dg"),
+          name: input.name.trim() || "New Dungeon",
+          stat: d.stats[input.stat] ? input.stat : Object.keys(d.stats)[0],
+          stages,
+          stageIndex: 0,
+          progress: 0,
+          createdAt: new Date().toISOString(),
+        });
+      });
+    },
+    [commit],
+  );
+
+  const progressDungeon = useCallback(
+    (id: string, delta: number) => {
+      commit((d, cele) => {
+        const dg = (d.dungeons ?? []).find((x) => x.id === id);
+        if (!dg || dg.clearedAt) return [];
+        const toasts: ToastSpec[] = [];
+        dg.progress = Math.max(0, dg.progress + delta);
+        // Advance through every stage whose target the new progress reaches.
+        while (dg.stageIndex < dg.stages.length && dg.progress >= dg.stages[dg.stageIndex].target) {
+          const cleared = dg.stages[dg.stageIndex];
+          dg.progress -= cleared.target;
+          d.coins += cleared.reward;
+          toasts.push(...gainXp(d, dg.stat, cleared.reward, cele));
+          dg.stageIndex++;
+          if (dg.stageIndex < dg.stages.length) {
+            fx(d, "boss");
+            cele({ kind: "boss", title: `Stage cleared: ${cleared.label}`, subtitle: `+${cleared.reward} coins` });
+          }
+        }
+        // Final stage cleared → dungeon complete.
+        if (dg.stageIndex >= dg.stages.length && !dg.clearedAt) {
+          dg.clearedAt = localDay();
+          dg.progress = 0;
+          const item = rollBossLoot(perkLootChanceBonus(d.perks));
+          d.inventory.unshift(item);
+          d.coins += DUNGEON_CLEAR_BONUS;
+          fx(d, "boss");
+          cele({
+            kind: "boss",
+            title: `Dungeon cleared: ${dg.name}!`,
+            subtitle: `Loot: ${item.name} · +${DUNGEON_CLEAR_BONUS} coins`,
+          });
+        }
+        return toasts;
+      });
+    },
+    [commit],
+  );
+
+  const removeDungeon = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.dungeons = (d.dungeons ?? []).filter((x) => x.id !== id);
       });
     },
     [commit],
@@ -901,6 +1067,56 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         d.equipped = d.equipped.filter((x) => x !== id);
         d.coins += value;
         return [{ kind: "info", title: `Sold ${item.name}`, subtitle: `+${value} coins` }];
+      });
+    },
+    [commit],
+  );
+
+  // ─── Gear loadouts (saveable equip sets) ─────────────────────────────────────
+  const saveLoadout = useCallback(
+    (name: string) => {
+      commit((d) => {
+        if (d.equipped.length === 0) {
+          return [{ kind: "info", title: "Nothing equipped", subtitle: "Equip some gear first." }];
+        }
+        d.loadouts ??= [];
+        d.loadouts.unshift({
+          id: genId("ld"),
+          name: name.trim() || `Loadout ${d.loadouts.length + 1}`,
+          items: [...d.equipped],
+        });
+        if (d.loadouts.length > 8) d.loadouts = d.loadouts.slice(0, 8);
+        return [{ kind: "info", title: "Loadout saved" }];
+      });
+    },
+    [commit],
+  );
+
+  const applyLoadout = useCallback(
+    (id: string) => {
+      commit((d) => {
+        const lo = (d.loadouts ?? []).find((l) => l.id === id);
+        if (!lo) return [];
+        // Only equip items still in the inventory, capped at the slot limit.
+        const valid = lo.items.filter((iid) => d.inventory.some((i) => i.id === iid)).slice(0, MAX_EQUIPPED);
+        d.equipped = valid;
+        const missing = lo.items.length - valid.length;
+        return [
+          {
+            kind: "info",
+            title: `Equipped "${lo.name}"`,
+            subtitle: missing > 0 ? `${missing} item(s) no longer owned were skipped.` : undefined,
+          },
+        ];
+      });
+    },
+    [commit],
+  );
+
+  const removeLoadout = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.loadouts = (d.loadouts ?? []).filter((l) => l.id !== id);
       });
     },
     [commit],
@@ -1116,6 +1332,87 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  // ─── Week templates (saveable recurring plans) ───────────────────────────────
+  const saveWeekTemplate = useCallback(
+    (name: string) => {
+      commit((d) => {
+        // Snapshot the recurring plan: positive quests that repeat daily or on
+        // specific weekdays (one-off quests aren't part of a weekly routine).
+        const plan = d.quests
+          .filter((q) => !q.negative && (q.daily || (q.days && q.days.length > 0)))
+          .map((q) => ({
+            title: q.title,
+            stat: q.stat,
+            xp: q.xp,
+            daily: q.daily,
+            days: q.days ? [...q.days] : undefined,
+            difficulty: q.difficulty,
+            mandatory: q.mandatory,
+          }));
+        if (plan.length === 0) {
+          return [{ kind: "info", title: "Nothing to save", subtitle: "Add some recurring quests first." }];
+        }
+        d.weekTemplates ??= [];
+        d.weekTemplates.unshift({
+          id: genId("wk"),
+          name: name.trim() || `Week of ${localDay()}`,
+          createdAt: new Date().toISOString(),
+          quests: plan,
+        });
+        if (d.weekTemplates.length > 8) d.weekTemplates = d.weekTemplates.slice(0, 8);
+        return [{ kind: "info", title: "Week template saved", subtitle: `${plan.length} quests captured.` }];
+      });
+    },
+    [commit],
+  );
+
+  const loadWeekTemplate = useCallback(
+    (id: string) => {
+      commit((d) => {
+        const tpl = (d.weekTemplates ?? []).find((t) => t.id === id);
+        if (!tpl) return [];
+        let added = 0;
+        for (const q of tpl.quests) {
+          const stat = d.stats[q.stat] ? q.stat : Object.keys(d.stats)[0];
+          // Skip quests already present with the same title + stat to avoid dupes.
+          if (d.quests.some((x) => !x.negative && x.title === q.title && x.stat === stat)) continue;
+          const quest: Quest = {
+            id: genId(),
+            title: q.title,
+            stat,
+            xp: Math.max(0, Math.round(q.xp)),
+            source: "manual",
+            done: false,
+            daily: q.daily ?? false,
+            negative: false,
+          };
+          if (q.days && q.days.length) quest.days = [...q.days].sort();
+          if (q.difficulty) quest.difficulty = q.difficulty;
+          if (q.mandatory) quest.mandatory = true;
+          d.quests.unshift(quest);
+          added++;
+        }
+        return [
+          {
+            kind: "info",
+            title: added ? `Loaded "${tpl.name}"` : "Already up to date",
+            subtitle: added ? `${added} quests added.` : "Those quests are already on your board.",
+          },
+        ];
+      });
+    },
+    [commit],
+  );
+
+  const removeWeekTemplate = useCallback(
+    (id: string) => {
+      commit((d) => {
+        d.weekTemplates = (d.weekTemplates ?? []).filter((t) => t.id !== id);
+      });
+    },
+    [commit],
+  );
+
   const setMood = useCallback(
     (value: number) => {
       commit((d) => {
@@ -1286,17 +1583,25 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       completeQuest,
       uncompleteQuest,
       removeQuest,
+      rescheduleQuest,
+      updateQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
       updateBossProgress,
       removeBoss,
+      addDungeon,
+      progressDungeon,
+      removeDungeon,
       claimDailyBonus,
       buyPerk,
       logFocus,
       equipItem,
       unequipItem,
       sellLoot,
+      saveLoadout,
+      applyLoadout,
+      removeLoadout,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
@@ -1311,6 +1616,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      saveWeekTemplate,
+      loadWeekTemplate,
+      removeWeekTemplate,
       setMood,
       addStat,
       renameStat,
@@ -1332,17 +1640,25 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       completeQuest,
       uncompleteQuest,
       removeQuest,
+      rescheduleQuest,
+      updateQuest,
       completeCalendarEvent,
       setCalendarMapping,
       addBoss,
       updateBossProgress,
       removeBoss,
+      addDungeon,
+      progressDungeon,
+      removeDungeon,
       claimDailyBonus,
       buyPerk,
       logFocus,
       equipItem,
       unequipItem,
       sellLoot,
+      saveLoadout,
+      applyLoadout,
+      removeLoadout,
       toggleSubtask,
       acceptSideQuest,
       setOnboarded,
@@ -1357,6 +1673,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       respecPerks,
       addTemplate,
       removeTemplate,
+      saveWeekTemplate,
+      loadWeekTemplate,
+      removeWeekTemplate,
       setMood,
       addStat,
       renameStat,

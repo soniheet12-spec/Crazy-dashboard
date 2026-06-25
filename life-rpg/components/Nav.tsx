@@ -13,6 +13,7 @@ import {
   Sparkles,
   BarChart3,
   CalendarRange,
+  Castle,
 } from "lucide-react";
 
 const LINKS = [
@@ -22,6 +23,7 @@ const LINKS = [
   { href: "/calendar", label: "Calendar", short: "Cal", icon: CalendarDays },
   { href: "/achievements", label: "Achievements", short: "Awards", icon: Award },
   { href: "/bosses", label: "Bosses", short: "Bosses", icon: Skull },
+  { href: "/dungeons", label: "Dungeons", short: "Dungeon", icon: Castle },
   { href: "/skills", label: "Skills", short: "Skills", icon: Sparkles },
   { href: "/insights", label: "Insights", short: "Stats", icon: BarChart3 },
   { href: "/settings", label: "Settings", short: "More", icon: Settings },

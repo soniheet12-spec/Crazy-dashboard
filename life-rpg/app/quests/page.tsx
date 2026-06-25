@@ -23,8 +23,10 @@ import {
   Mic,
   Coins,
   AlertTriangle,
+  Pencil,
+  ListChecks,
 } from "lucide-react";
-import { useGameState } from "@/lib/gameState";
+import { useGameState, type QuestEdit } from "@/lib/gameState";
 import { suggestStat } from "@/lib/calendarMapping";
 import { rules } from "@/lib/mode";
 import { DIFFICULTIES } from "@/lib/gameplay";
@@ -66,6 +68,10 @@ function QuestRow({
   onUndo,
   onToggleSub,
   onFavorite,
+  onEdit,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   quest: Quest;
   statLabel: string;
@@ -75,6 +81,10 @@ function QuestRow({
   onUndo?: () => void;
   onToggleSub?: (subId: string) => void;
   onFavorite?: () => void;
+  onEdit?: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const daysClean =
     quest.negative && quest.lastLoggedDay ? dayDiff(quest.lastLoggedDay, localDay()) : null;
@@ -84,10 +94,24 @@ function QuestRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className="rounded-lg border border-line/70 bg-bg-soft/60 px-3 py-2.5"
+      className={`rounded-lg border px-3 py-2.5 transition-colors ${
+        selected ? "border-accent/60 bg-accent/10" : "border-line/70 bg-bg-soft/60"
+      }`}
     >
       <div className="flex items-center gap-3">
-        {onComplete ? (
+        {selectMode ? (
+          <button
+            onClick={onToggleSelect}
+            aria-label={selected ? `Deselect ${quest.title}` : `Select ${quest.title}`}
+            className="flex h-6 w-6 shrink-0 items-center justify-center"
+          >
+            {selected ? (
+              <CheckSquare size={18} className="text-accent" />
+            ) : (
+              <Square size={18} className="text-slate-500" />
+            )}
+          </button>
+        ) : onComplete ? (
           <button
             onClick={onComplete}
             aria-label={`Complete ${quest.title}`}
@@ -155,7 +179,12 @@ function QuestRow({
           </div>
         </div>
 
-        {onFavorite && (
+        {onEdit && !selectMode && (
+          <button onClick={onEdit} aria-label="Edit quest" className="text-slate-600 hover:text-accent">
+            <Pencil size={15} />
+          </button>
+        )}
+        {onFavorite && !selectMode && (
           <button onClick={onFavorite} aria-label="Save as template" className="text-slate-600 hover:text-amber">
             <Star size={15} />
           </button>
@@ -197,6 +226,162 @@ function QuestRow({
   );
 }
 
+/** Inline editor shown in place of a quest row when editing. */
+function EditQuestForm({
+  quest,
+  statList,
+  onSave,
+  onCancel,
+}: {
+  quest: Quest;
+  statList: { key: string; label: string }[];
+  onSave: (patch: QuestEdit) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(quest.title);
+  const [stat, setStat] = useState<string>(quest.stat);
+  const [xp, setXp] = useState(quest.xp);
+  const [days, setDays] = useState<number[]>(quest.days ?? []);
+  const [daily, setDaily] = useState(!!quest.daily);
+  const [difficulty, setDifficulty] = useState<Difficulty>(quest.difficulty ?? "normal");
+  const [negative, setNegative] = useState(!!quest.negative);
+  const [mandatory, setMandatory] = useState(!!quest.mandatory);
+
+  const toggleDay = (d: number) =>
+    setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
+
+  const save = () => {
+    if (!title.trim()) return;
+    onSave({
+      title,
+      stat,
+      xp,
+      days,
+      daily: daily && days.length === 0,
+      negative,
+      mandatory: mandatory && !negative,
+      difficulty,
+    });
+  };
+
+  return (
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      className="rounded-lg border border-accent/50 bg-bg-hover/40 px-3 py-3"
+    >
+      <div className="flex flex-col gap-3">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+          aria-label="Quest title"
+        />
+        <div className="flex gap-2">
+          <select
+            value={stat}
+            onChange={(e) => setStat(e.target.value)}
+            className="flex-1 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+            aria-label="Stat"
+          >
+            {statList.map((s) => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={0}
+            value={xp}
+            onChange={(e) => setXp(Number(e.target.value))}
+            className="tabular w-20 rounded-lg border border-line bg-bg-soft px-3 py-2 text-sm text-slate-100 outline-none focus:border-accent"
+            aria-label="XP reward"
+          />
+        </div>
+
+        <div className="flex gap-1">
+          {DOW.map((d, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleDay(i)}
+              title={DOW_FULL[i]}
+              className={`h-8 flex-1 rounded-md text-xs font-medium ${
+                days.includes(i) ? "bg-accent/20 text-accent" : "bg-bg-soft text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1">
+          {DIFFICULTIES.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDifficulty(d)}
+              className={`h-8 flex-1 rounded-md text-xs font-medium capitalize ${
+                difficulty === d ? "bg-accent/20 text-accent" : "bg-bg-soft text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-4">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={daily}
+              onChange={(e) => setDaily(e.target.checked)}
+              disabled={days.length > 0}
+              className="h-4 w-4 accent-accent"
+            />
+            Daily
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={negative}
+              onChange={(e) => setNegative(e.target.checked)}
+              className="h-4 w-4 accent-accent"
+            />
+            Anti-habit
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={mandatory}
+              onChange={(e) => setMandatory(e.target.checked)}
+              disabled={negative}
+              className="h-4 w-4 accent-accent"
+            />
+            Mandatory
+          </label>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={save}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent/90 px-3 py-2 text-sm font-semibold text-bg hover:bg-accent"
+          >
+            <Check size={15} /> Save
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm text-slate-300 hover:border-slate-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </motion.li>
+  );
+}
+
 interface Suggestion {
   title: string;
   stat: string;
@@ -214,6 +399,8 @@ export default function QuestsPage() {
     toggleSubtask,
     addTemplate,
     removeTemplate,
+    updateQuest,
+    rescheduleQuest,
   } = useGameState();
 
   const statList = Object.values(state.stats);
@@ -229,6 +416,12 @@ export default function QuestsPage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
   const [search, setSearch] = useState("");
   const [wager, setWager] = useState(0);
+
+  // Editing & multi-select (bulk actions).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDays, setBulkDays] = useState<number[]>([]);
 
   // Voice quick-add via the Web Speech API (feature-detected; Chrome/Safari).
   const [listening, setListening] = useState(false);
@@ -277,6 +470,38 @@ export default function QuestsPage() {
 
   const label = (key: StatKey) => state.stats[key]?.label ?? key;
   const color = (key: StatKey) => state.stats[key]?.color ?? statColor(key);
+
+  // ─── Multi-select / bulk actions ───────────────────────────────────────────
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+    setBulkDays([]);
+  };
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const selectAll = () => setSelected(new Set(active.map((q) => q.id)));
+  const selectedIds = active.filter((q) => selected.has(q.id)).map((q) => q.id);
+  const completeSelected = () => {
+    selectedIds.forEach((id) => completeQuest(id));
+    exitSelect();
+  };
+  const deleteSelected = () => {
+    if (!confirm(`Delete ${selectedIds.length} quest(s)? This can't be undone.`)) return;
+    selectedIds.forEach((id) => removeQuest(id));
+    exitSelect();
+  };
+  const rescheduleSelected = () => {
+    if (!bulkDays.length) return;
+    selectedIds.forEach((id) => rescheduleQuest(id, bulkDays));
+    exitSelect();
+  };
+  const toggleBulkDay = (d: number) =>
+    setBulkDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -648,16 +873,96 @@ export default function QuestsPage() {
               <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                 Today &amp; Active ({active.length})
               </h2>
-              <div className="flex items-center gap-1.5 rounded-lg border border-line bg-bg-soft px-2 py-1">
-                <Search size={13} className="text-slate-500" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search…"
-                  className="w-28 bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-600"
-                />
+              <div className="flex items-center gap-2">
+                {active.length > 0 && (
+                  <button
+                    onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      selectMode
+                        ? "border-accent/50 bg-accent/15 text-accent"
+                        : "border-line bg-bg-soft text-slate-300 hover:text-slate-100"
+                    }`}
+                  >
+                    <ListChecks size={13} /> {selectMode ? "Done" : "Select"}
+                  </button>
+                )}
+                <div className="flex items-center gap-1.5 rounded-lg border border-line bg-bg-soft px-2 py-1">
+                  <Search size={13} className="text-slate-500" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search…"
+                    className="w-28 bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-600"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Bulk action bar */}
+            {selectMode && (
+              <div className="mb-3 rounded-lg border border-accent/40 bg-accent/5 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-200">
+                    {selected.size} selected
+                  </span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button onClick={selectAll} className="text-accent hover:underline">
+                      All
+                    </button>
+                    <button onClick={() => setSelected(new Set())} className="text-slate-400 hover:underline">
+                      None
+                    </button>
+                  </div>
+                </div>
+
+                {selected.size > 0 && (
+                  <div className="mt-3 flex flex-col gap-3">
+                    <div>
+                      <p className="mb-1.5 text-[11px] text-slate-500">Reschedule to weekdays, then apply:</p>
+                      <div className="flex gap-1">
+                        {DOW.map((d, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleBulkDay(i)}
+                            title={DOW_FULL[i]}
+                            className={`h-8 flex-1 rounded-md text-xs font-medium ${
+                              bulkDays.includes(i)
+                                ? "bg-accent/20 text-accent"
+                                : "bg-bg-soft text-slate-500 hover:text-slate-300"
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={completeSelected}
+                        className="flex items-center gap-1.5 rounded-lg bg-accent/90 px-3 py-2 text-xs font-semibold text-bg hover:bg-accent"
+                      >
+                        <Check size={14} /> Complete
+                      </button>
+                      <button
+                        onClick={rescheduleSelected}
+                        disabled={bulkDays.length === 0}
+                        className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-slate-200 hover:border-accent disabled:opacity-40"
+                      >
+                        <CalendarClock size={14} /> Reschedule
+                      </button>
+                      <button
+                        onClick={deleteSelected}
+                        className="flex items-center gap-1.5 rounded-lg border border-body/50 px-3 py-2 text-xs font-medium text-body hover:bg-body/10"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {active.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-500">
                 Nothing due. Add a quest or accept the daily side quest on the dashboard.
@@ -665,26 +970,43 @@ export default function QuestsPage() {
             ) : (
               <ul className="flex flex-col gap-2">
                 <AnimatePresence initial={false}>
-                  {active.map((q) => (
-                    <QuestRow
-                      key={q.id}
-                      quest={q}
-                      statLabel={label(q.stat)}
-                      color={color(q.stat)}
-                      onComplete={() => completeQuest(q.id)}
-                      onRemove={() => removeQuest(q.id)}
-                      onToggleSub={(subId) => toggleSubtask(q.id, subId)}
-                      onFavorite={() =>
-                        addTemplate({
-                          title: q.title,
-                          stat: q.stat,
-                          xp: q.xp,
-                          daily: q.daily,
-                          difficulty: q.difficulty,
-                        })
-                      }
-                    />
-                  ))}
+                  {active.map((q) =>
+                    editingId === q.id ? (
+                      <EditQuestForm
+                        key={q.id}
+                        quest={q}
+                        statList={statList}
+                        onSave={(patch) => {
+                          updateQuest(q.id, patch);
+                          setEditingId(null);
+                        }}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    ) : (
+                      <QuestRow
+                        key={q.id}
+                        quest={q}
+                        statLabel={label(q.stat)}
+                        color={color(q.stat)}
+                        onComplete={() => completeQuest(q.id)}
+                        onRemove={() => removeQuest(q.id)}
+                        onToggleSub={(subId) => toggleSubtask(q.id, subId)}
+                        onEdit={() => setEditingId(q.id)}
+                        selectMode={selectMode}
+                        selected={selected.has(q.id)}
+                        onToggleSelect={() => toggleSelect(q.id)}
+                        onFavorite={() =>
+                          addTemplate({
+                            title: q.title,
+                            stat: q.stat,
+                            xp: q.xp,
+                            daily: q.daily,
+                            difficulty: q.difficulty,
+                          })
+                        }
+                      />
+                    ),
+                  )}
                 </AnimatePresence>
               </ul>
             )}

@@ -62,6 +62,29 @@ export interface QuestTemplate {
   difficulty?: Difficulty;
 }
 
+/** A snapshot of a recurring weekly plan that can be re-applied in one tap. */
+export interface WeekTemplate {
+  id: string;
+  name: string;
+  createdAt: string; // ISO
+  quests: {
+    title: string;
+    stat: StatKey;
+    xp: number;
+    daily?: boolean;
+    days?: number[];
+    difficulty?: Difficulty;
+    mandatory?: boolean;
+  }[];
+}
+
+/** A saved set of equipped gear that can be swapped in with one tap. */
+export interface Loadout {
+  id: string;
+  name: string;
+  items: string[]; // loot item ids
+}
+
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 
 export type Difficulty = "easy" | "normal" | "hard";
@@ -100,6 +123,25 @@ export interface BossGoal {
   failed?: boolean; // missed its deadline (enraged) in a strict mode
 }
 
+/** One stage of a multi-stage dungeon run. Clearing it pays out its reward. */
+export interface DungeonStage {
+  label: string;
+  target: number; // progress units to clear this stage
+  reward: number; // coins paid + XP awarded on clearing
+}
+
+/** A multi-stage objective tackled sequentially, with rewards at each milestone. */
+export interface Dungeon {
+  id: string;
+  name: string;
+  stat: StatKey;
+  stages: DungeonStage[];
+  stageIndex: number; // index of the stage currently in progress
+  progress: number; // progress within the current stage
+  createdAt: string; // ISO
+  clearedAt?: string; // YYYY-MM-DD when the final stage was cleared
+}
+
 export interface XpHistoryPoint {
   date: string; // YYYY-MM-DD (local)
   xp: number; // XP earned that day
@@ -118,6 +160,7 @@ export interface GameSettings {
   theme: ThemeMode; // dark (default) / light / high-contrast
   fontScale: number; // root font-size multiplier (0.9–1.25)
   mode: GameMode; // difficulty: casual / normal / hardcore / nightmare
+  dailyXpGoal?: number; // target XP per day, shown as a ring on the planner
 }
 
 export type ThemeMode = "dark" | "light" | "contrast";
@@ -168,6 +211,7 @@ export interface GameState {
   achievements: Achievement[];
   streak: Streak;
   bosses: BossGoal[];
+  dungeons?: Dungeon[]; // multi-stage objectives
   xpHistory: XpHistoryPoint[];
   settings: GameSettings;
   // Calendar event-id -> chosen stat mapping (persisted locally).
@@ -177,12 +221,14 @@ export interface GameState {
   perks: Record<string, number>; // perkId -> rank owned
   inventory: LootItem[]; // collected loot
   equipped: string[]; // equipped loot item ids (gear buffs), max 3
+  loadouts?: Loadout[]; // saved gear sets
   coins: number; // spendable currency earned from quests/bosses
   streakFreezes: number; // consumables that protect a missed day
   potionUntil: string; // ISO; active XP-potion expiry
   prestige: number; // prestige level (permanent XP bonus)
   hp: number; // 0-100; drained by anti-habits, restored daily / by rest
   templates: QuestTemplate[]; // saved quest templates / favorites
+  weekTemplates?: WeekTemplate[]; // saved recurring weekly plans
   lastDailyChallenge: string; // YYYY-MM-DD daily challenge claimed
   lastWeeklyChallenge: string; // ISO week key weekly challenge claimed
   streakMilestones: number[]; // claimed streak milestones (7/30/100)
