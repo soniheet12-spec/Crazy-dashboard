@@ -311,141 +311,160 @@ export default function PlannerPage() {
         </div>
       </details>
 
-      {/* Day board */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+      {/* Day board — one full-width lane per day */}
+      <div className="flex flex-col gap-3">
         {days.map((d) => {
-          const ringPct = goal > 0 ? Math.round((100 * (d.isToday ? d.earned : d.xp)) / goal) : 0;
+          const tracked = d.isToday ? d.earned : d.xp;
+          const ringPct = goal > 0 ? Math.round((100 * tracked) / goal) : 0;
+          const dateLabel = d.date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const summary = d.isToday
+            ? `${d.done}/${d.qs.length} done · ${d.earned}/${goal} XP`
+            : d.qs.length
+              ? `${d.qs.length} quest${d.qs.length === 1 ? "" : "s"} · +${d.xp} XP`
+              : "rest day";
           return (
             <Card
               key={d.wd}
-              className={`flex flex-col gap-2.5 overflow-hidden p-3 ${
-                d.isToday ? "ring-1 ring-accent/60 shadow-glow" : ""
-              }`}
+              className={`overflow-hidden p-0 ${d.isToday ? "ring-1 ring-accent/60 shadow-glow" : ""}`}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className={`text-sm font-semibold ${d.isToday ? "text-accent" : "text-slate-200"}`}>
-                      {d.short}
-                    </span>
-                    <span className="tabular text-[10px] text-slate-500">{d.date.getDate()}</span>
-                    {d.isToday && (
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-accent">· now</span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-slate-500">
-                    {d.isToday
-                      ? `${d.done}/${d.qs.length} done`
-                      : d.qs.length
-                        ? `${d.qs.length} · +${d.xp}`
-                        : "rest"}
-                  </p>
-                </div>
-                <GoalRing pct={ringPct} accent={d.isToday} />
-              </div>
-
-              {/* Quests */}
-              {d.qs.length === 0 ? (
-                <div className="flex flex-col items-center gap-1 py-5 text-slate-600">
-                  <Moon size={16} className="opacity-60" />
-                  <p className="text-[11px]">Rest day</p>
-                </div>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {d.qs.map((q) => {
-                    const done = d.isToday && q.done;
-                    const key = `${d.wd}:${q.id}`;
-                    const open = editing === key;
-                    return (
-                      <li
-                        key={key}
-                        className={`rounded-lg border px-2.5 py-2 transition-colors ${
-                          open ? "border-accent/50 bg-bg-hover/60" : "border-line/60 bg-bg-soft/50"
-                        }`}
+              <div className="flex flex-col sm:flex-row">
+                {/* Day rail */}
+                <div
+                  className={`flex shrink-0 items-center gap-3 border-b border-line/60 px-4 py-3 sm:w-52 sm:border-b-0 sm:border-r sm:py-4 ${
+                    d.isToday ? "bg-accent/5" : "bg-bg-soft/30"
+                  }`}
+                >
+                  <GoalRing pct={ringPct} accent={d.isToday} size={44} />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span
+                        className={`text-base font-semibold ${d.isToday ? "text-accent" : "text-slate-100"}`}
                       >
-                        <div className="flex items-start gap-2">
-                          {d.isToday && !q.done ? (
-                            <button
-                              onClick={() => completeQuest(q.id)}
-                              aria-label={`Complete ${q.title}`}
-                              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-transparent transition-colors hover:text-accent"
-                              style={{ borderColor: color(q.stat) }}
-                            >
-                              <Check size={13} />
-                            </button>
-                          ) : (
-                            <span
-                              className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                              style={{ backgroundColor: color(q.stat), opacity: done ? 1 : 0.5 }}
-                            />
-                          )}
+                        {d.label}
+                      </span>
+                      {d.isToday && (
+                        <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
+                          now
+                        </span>
+                      )}
+                    </div>
+                    <p className="tabular mt-0.5 text-xs text-slate-500">{dateLabel}</p>
+                    <p className="mt-1 text-xs text-slate-400">{summary}</p>
+                  </div>
+                </div>
 
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`truncate text-xs ${
-                                done ? "text-slate-500 line-through" : "text-slate-100"
-                              }`}
-                            >
-                              {q.sideQuest && <Dices size={10} className="mr-0.5 inline text-accent" />}
-                              {q.title}
-                            </p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
-                              <span style={{ color: color(q.stat) }}>{label(q.stat)}</span>
-                              <span className="tabular">+{q.xp}</span>
-                              {q.daily && <Repeat size={9} aria-label="daily" />}
-                              {q.days && q.days.length > 0 && <CalendarClock size={9} aria-label="scheduled" />}
-                              {q.mandatory && <AlertTriangle size={9} className="text-body" aria-label="mandatory" />}
-                              {q.wager ? (
-                                <span className="flex items-center gap-0.5 text-amber">
-                                  <Coins size={9} />
-                                  {q.wager}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => setEditing(open ? null : key)}
-                            aria-label={`Reschedule ${q.title}`}
-                            className={`mt-0.5 shrink-0 transition-colors ${
-                              open ? "text-accent" : "text-slate-600 hover:text-accent"
+                {/* Quests */}
+                <div className="min-w-0 flex-1 p-3 sm:p-4">
+                  {d.qs.length === 0 ? (
+                    <div className="flex h-full min-h-[2.5rem] items-center gap-2 text-slate-600">
+                      <Moon size={15} className="opacity-60" />
+                      <p className="text-xs">Rest day — nothing scheduled.</p>
+                    </div>
+                  ) : (
+                    <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {d.qs.map((q) => {
+                        const done = d.isToday && q.done;
+                        const key = `${d.wd}:${q.id}`;
+                        const open = editing === key;
+                        return (
+                          <li
+                            key={key}
+                            className={`rounded-lg border px-3 py-2.5 transition-colors ${
+                              open ? "border-accent/50 bg-bg-hover/60" : "border-line/60 bg-bg-soft/50"
                             }`}
                           >
-                            <SlidersHorizontal size={13} />
-                          </button>
-                        </div>
+                            <div className="flex items-start gap-2.5">
+                              {d.isToday && !q.done ? (
+                                <button
+                                  onClick={() => completeQuest(q.id)}
+                                  aria-label={`Complete ${q.title}`}
+                                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-transparent transition-colors hover:text-accent"
+                                  style={{ borderColor: color(q.stat) }}
+                                >
+                                  <Check size={13} />
+                                </button>
+                              ) : (
+                                <span
+                                  className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: color(q.stat), opacity: done ? 1 : 0.5 }}
+                                />
+                              )}
 
-                        {/* Inline reschedule editor */}
-                        {open && (
-                          <div className="mt-2 border-t border-line/60 pt-2">
-                            <p className="mb-1.5 text-[9px] uppercase tracking-wide text-slate-500">Repeat on</p>
-                            <div className="flex gap-1">
-                              {WEEK.map((w) => {
-                                const on = scheduledDays(q).includes(w.wd);
-                                return (
-                                  <button
-                                    key={w.wd}
-                                    onClick={() => toggleDay(q, w.wd)}
-                                    title={w.label}
-                                    className={`h-6 flex-1 rounded text-[10px] font-medium transition-colors ${
-                                      on
-                                        ? "bg-accent/25 text-accent"
-                                        : "bg-bg-soft text-slate-500 hover:text-slate-300"
-                                    }`}
-                                  >
-                                    {w.short[0]}
-                                  </button>
-                                );
-                              })}
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`truncate text-sm ${
+                                    done ? "text-slate-500 line-through" : "text-slate-100"
+                                  }`}
+                                >
+                                  {q.sideQuest && <Dices size={11} className="mr-1 inline text-accent" />}
+                                  {q.title}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                                  <span className="font-medium" style={{ color: color(q.stat) }}>
+                                    {label(q.stat)}
+                                  </span>
+                                  <span className="tabular">+{q.xp} XP</span>
+                                  {q.daily && <Repeat size={11} aria-label="daily" />}
+                                  {q.days && q.days.length > 0 && (
+                                    <CalendarClock size={11} aria-label="scheduled" />
+                                  )}
+                                  {q.mandatory && (
+                                    <AlertTriangle size={11} className="text-body" aria-label="mandatory" />
+                                  )}
+                                  {q.wager ? (
+                                    <span className="flex items-center gap-0.5 text-amber">
+                                      <Coins size={11} />
+                                      {q.wager}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => setEditing(open ? null : key)}
+                                aria-label={`Reschedule ${q.title}`}
+                                className={`mt-0.5 shrink-0 transition-colors ${
+                                  open ? "text-accent" : "text-slate-600 hover:text-accent"
+                                }`}
+                              >
+                                <SlidersHorizontal size={14} />
+                              </button>
                             </div>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+
+                            {/* Inline reschedule editor */}
+                            {open && (
+                              <div className="mt-2.5 border-t border-line/60 pt-2.5">
+                                <p className="mb-1.5 text-[10px] uppercase tracking-wide text-slate-500">
+                                  Repeat on
+                                </p>
+                                <div className="flex gap-1">
+                                  {WEEK.map((w) => {
+                                    const on = scheduledDays(q).includes(w.wd);
+                                    return (
+                                      <button
+                                        key={w.wd}
+                                        onClick={() => toggleDay(q, w.wd)}
+                                        title={w.label}
+                                        className={`h-8 flex-1 rounded text-[11px] font-medium transition-colors ${
+                                          on
+                                            ? "bg-accent/25 text-accent"
+                                            : "bg-bg-soft text-slate-500 hover:text-slate-300"
+                                        }`}
+                                      >
+                                        {w.short[0]}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </Card>
           );
         })}
@@ -476,37 +495,54 @@ export default function PlannerPage() {
   );
 }
 
-/** Small circular progress ring for a day's XP vs the daily goal. */
-function GoalRing({ pct, accent }: { pct: number; accent?: boolean }) {
-  const r = 9;
+/** Circular progress ring for a day's XP vs the daily goal. */
+function GoalRing({ pct, accent, size = 26 }: { pct: number; accent?: boolean; size?: number }) {
+  const sw = size >= 40 ? 4 : 3;
+  const c = size / 2;
+  const r = c - sw / 2 - 1;
   const circ = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(100, pct));
   const stroke = accent ? "rgb(var(--accent-rgb))" : "rgb(var(--accent-rgb) / 0.5)";
+  const showLabel = size >= 40;
   return (
     <svg
-      width="26"
-      height="26"
-      viewBox="0 0 26 26"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
       className="shrink-0"
       role="img"
       aria-label={`${p}% of daily goal`}
     >
-      <g transform="rotate(-90 13 13)">
-        <circle cx="13" cy="13" r={r} fill="none" stroke="rgb(var(--line))" strokeWidth="3" />
+      <g transform={`rotate(-90 ${c} ${c})`}>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="rgb(var(--line))" strokeWidth={sw} />
         <circle
-          cx="13"
-          cy="13"
+          cx={c}
+          cy={c}
           r={r}
           fill="none"
           stroke={stroke}
-          strokeWidth="3"
+          strokeWidth={sw}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - p / 100)}
           style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.22,1,0.36,1)" }}
         />
       </g>
-      {p >= 100 && <circle cx="13" cy="13" r="2.6" fill={stroke} />}
+      {showLabel ? (
+        <text
+          x={c}
+          y={c}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="tabular font-semibold"
+          fontSize={size * 0.28}
+          fill={accent ? "rgb(var(--accent-rgb))" : "rgb(148 163 184)"}
+        >
+          {p}
+        </text>
+      ) : (
+        p >= 100 && <circle cx={c} cy={c} r="2.6" fill={stroke} />
+      )}
     </svg>
   );
 }
